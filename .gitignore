@@ -1,0 +1,107 @@
+# -----------------------------------------------------------------------------
+# Local machine and Freebuff/agent state
+# -----------------------------------------------------------------------------
+/.bash_history
+/.bash_logout
+/.bash_profile
+/.bashrc
+/.profile
+/.lesshst
+/.wget-hsts
+/.install-*.log
+/.cache/
+/.cactus_needle/
+/.config/
+/.freebuff/
+/.local/
+/.npm/
+/.nv/
+/.ssh/
+/.triton/
+
+# Agent/runtime notes and local reports
+/agent.md
+**/agent.md
+/*_train.log
+/*_eval*.log
+/*_run.log
+/rt_*.json
+/run_nixlm_eval_when_ready.sh
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+nix_env/
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# Local runtime data
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.backup
+*.db.backup-*
+*.bak
+/backups/
+/nix_backups/
+
+# Runtime logs and request traces
+logs/
+*.log
+*.jsonl
+
+# Downloaded model weights, adapters, datasets, and generated artifacts
+/nix_knowledge/models/
+/nix_knowledge/NVIDIA-Linux-*.run
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+*.parquet
+*.zip
+*.tgz
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local hardware/vendor installers
+*.run
