@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dependencies = ["cactus-needle>=2.0.12"]
+name = "nix-knowledge"
+version = "0.1.0"
+description = "Nix Knowledge Engine"
+requires-python = ">=3.10"
+
+[project.scripts]
+nix-knowledge = "nix_knowledge.cli:main"
+nix-knowledge-base = "nix_knowledge.cli:base"
+nix-knowledge-maintenance = "nix_knowledge.maintenance_cli:main"
+nix-knowledge-semantic = "nix_knowledge.semantic_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["nix_knowledge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
