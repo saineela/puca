@@ -80,15 +80,16 @@ OLLAMA_MODEL = os.environ.get("NIX_OLLAMA_MODEL", "qwen3.5:4b")
 # Fast conversational mode; deterministic services handle reasoning-heavy
 # knowledge operations separately.
 OLLAMA_THINK = os.environ.get("NIX_OLLAMA_THINK", "0") == "1"
-# Optional semantic emotion/intent heads remain off by default. The smaller
-# Knowledge function-selector model is intentionally allowed alongside Casper:
-# it runs in the Knowledge API process and has its own VRAM ceiling.
+# Nix_predictor: the local Qwen2.5 0.5B selector handles ambiguous and
+# multi-intent routing after deterministic safety rules. It is intentionally
+# small, constrained to Knowledge function calls, and capped separately from
+# Casper. Set the Core flag to 0 only for a no-selector diagnostic run.
 USE_NEURAL_INTENT = os.environ.get("NIX_CORE_USE_NEURAL_INTENT", "0") == "1"
 USE_KNOWLEDGE_MODEL_GATE = os.environ.get(
     "NIX_CORE_USE_KNOWLEDGE_MODEL_GATE", "1"
 ) == "1"
-# Parallel warm-up initializes Casper and the Knowledge selector concurrently;
-# it never runs two generations for one request.
+# Parallel warm-up initializes Casper and Nix_predictor concurrently; they
+# never perform two generations for the same request.
 WARMUP_MODELS = os.environ.get("NIX_CORE_WARMUP_MODELS", "1") == "1"
 KNOWLEDGE_VRAM_FRACTION = float(
     os.environ.get("NIX_KNOWLEDGE_VRAM_FRACTION", "0.30")

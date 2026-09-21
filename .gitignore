@@ -84,9 +84,27 @@ logs/
 *.sock
 *.tmp
 *.temp
+*.out
+*.trace
+*.prof
 .nix-runtime/
 .runtime/
 /tmp/
+/tmp-*/
+.nix_test_sandbox_*/
+**/nix_test_sandbox_*/
+
+# Local benchmark/evaluation results (keep benchmark source scripts tracked)
+/benchmarks/
+/benchmark-results/
+/eval-results/
+/evaluation-results/
+**/*_results.json
+**/*_results.jsonl
+**/*_metrics.json
+**/wandb/
+**/runs/
+**/tensorboard/
 
 # Downloaded model weights, adapters, datasets, and generated artifacts
 /nix_knowledge/models/
@@ -96,10 +114,32 @@ models/
 *.bin
 *.pt
 *.pth
+*.pt2
 *.onnx
+*.gguf
+*.exl2
+*.exl3
 *.parquet
+*.arrow
 *.zip
+*.tar
 *.tgz
+*.whl
+
+# Hugging Face, PyTorch, CUDA, Triton, and compiler caches
+/.huggingface/
+/huggingface/
+**/.huggingface/
+**/huggingface_cache/
+**/transformers_cache/
+**/torch_extensions/
+**/.torch/
+**/.triton/
+**/.nv/
+**/cuda_cache/
+**/.cache/
+**/compile_cache/
+**/compiled_models/
 
 # OS/editor files
 .DS_Store

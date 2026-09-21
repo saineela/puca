@@ -1,72 +1,92 @@
-# Nix
+# NIX / Casper
 
-Nix is a modular personal-assistant stack with deterministic routing, durable knowledge, scheduled actions, and a websocket gateway.
+NIX is a modular personal-user companion platform. It combines deterministic personal knowledge, temporal memory, scheduled actions, conversational Core orchestration, and a future trigger-driven decision layer.
 
-## Repository layout
+The conversational identity is **Casper**, a Personal User Companion Agent (PUCA), created and built by Sai Neela and living in NIX's PUCA system.
 
-- `nix_core/` — request routing, conversation orchestration, websocket gateway, console, and routing evaluations.
-- `nix_knowledge/` — durable facts/events, temporal resolution, semantic retrieval, and HTTP API.
-- `nix_actions/` — deterministic action capture, scheduling, session storage, and HTTP API.
-- `nix_decision/` — standalone decision-engine prototype with its own tests.
-- `testing-echo-connect/` — optional Home Assistant/Echo integration prototype; it is not required by the Nix services.
+## Architecture
 
-Runtime databases, models, logs, virtual environments, caches, and credentials are intentionally excluded from version control.
+```text
+Client / voice gateway
+        |
+        v
+nix_core  --->  nix_knowledge  --->  nix_actions
+   |                 |                   |
+ Casper chat     durable memory       schedules/actions
+   |
+ nix_decision (future proactive trigger layer)
+```
+
+| Package | Responsibility |
+|---|---|
+| [`nix_core`](nix_core/) | Request routing, conversation state, Casper responses, websocket gateway, and dashboard console. |
+| [`nix_knowledge`](nix_knowledge/) | Durable facts, people, temporal states, calendar events, retrieval, and symbolic/neural parsing. |
+| [`nix_actions`](nix_actions/) | Deterministic action capture, reminders, scheduling, session storage, and propagation. |
+| [`nix_decision`](nix_decision/) | Initial foundation for future explicit triggers that may ask Core to check in with a user. It currently has no calling rules. |
+| [`testing-echo-connect`](testing-echo-connect/) | Optional Echo/Home Assistant integration prototype; not required by the main stack. |
+
+## Current principles
+
+- **Core owns speech and planning.** Knowledge returns grounded context; Casper creates the final user-facing response. Core uses deterministic safety rules plus the small constrained Nix_predictor for indirect and multi-intent planning.
+- **Knowledge is durable.** Facts, people, temporal states, and events are stored separately and temporal updates supersede prior states.
+- **Actions are deterministic.** Natural-language interpretation belongs upstream; Actions schedules and executes captured operations.
+- **Decision is explicit and gated.** Future proactive triggers must be supplied explicitly and can only reach Core when the user is known to be home.
+- **Relative time becomes absolute time.** Requests such as `tmr`, `in 2 more days`, and `next Monday` are resolved in the configured timezone before storage or response formatting.
+- **Private runtime data stays local.** Databases, logs, model weights, adapters, credentials, environments, and caches are ignored by Git.
 
 ## Requirements
 
 - Python 3.10+
-- A virtual environment with the dependencies declared by the package you are running
-- `requests` and `websockets` for the core gateway
-- Optional local model dependencies and model files for semantic/model-gate features
+- Per-package dependencies installed in the appropriate environment
+- Optional local model files for Casper and the Knowledge model gate
+- NVIDIA CUDA is supported for the local Transformers/PEFT Casper runtime
 
-The services can run independently for development. The knowledge and actions APIs use SQLite files under `data/` by default; set `NIX_DATA_DIR` or the individual database variables to place them elsewhere.
+Configuration is documented in [`.env.example`](.env.example). Copy it to `.env`, set a unique `NIX_AUTH_TOKEN`, and never commit the resulting file.
 
-## Configuration
+## Run the stack
 
-Copy `.env.example` to `.env` and provide a unique `NIX_AUTH_TOKEN` before starting the websocket gateway. Never commit `.env`, database files, model weights, logs, or API credentials.
-
-Important variables include:
-
-- `NIX_AUTH_TOKEN` — required websocket authentication secret.
-- `NIX_KNOWLEDGE_API_URL` / `NIX_ACTIONS_API_URL` — sibling service URLs.
-- `NIX_KNOWLEDGE_DB`, `NIX_ACTIONS_DB`, `NIX_CORE_DB` — SQLite paths.
-- `NIX_DATA_DIR` — default directory for runtime databases.
-- `NIX_OLLAMA_API_URL` / `NIX_OLLAMA_MODEL` — optional chat backend.
-- `NIX_WS_HOST` / `NIX_WS_PORT` — websocket bind configuration.
-
-## Running locally
-
-Run each service from the repository root with the same Python environment:
+From the repository root, start the services in separate terminals:
 
 ```bash
 python nix_knowledge/scripts/knowledge_api.py
 python nix_actions/scripts/actions_api.py
-python nix_core/ws_server.py
+python nix_core/console.py       # browser dashboard, optional
+python nix_core/ws_server.py     # websocket gateway, when needed
 ```
 
-The console is optional:
+The console normally serves on the configured `NIX_CONSOLE_PORT` (the current development setup uses port `35567`). The websocket gateway normally uses `NIX_WS_PORT`.
 
-```bash
-python nix_core/console.py
-```
+For a complete model/runtime setup, see [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md).
 
-## Testing
+## Test
 
-Run the deterministic and hermetic suites first:
+Run package suites from the repository root:
 
 ```bash
 (cd nix_knowledge && python -m pytest tests -q)
 (cd nix_actions && PYTHONPATH=../nix_knowledge:. python -m pytest tests -q)
-(cd nix_core && python -m pytest test_router.py hard_corpus.py -q)
-python -m nix_decision.test_engine
-python -m nix_decision.test_knowledge
+(cd nix_core && python -m pytest -q)
+PYTHONPATH=. python -m pytest -q nix_decision/nix_decision/test_engine.py
 ```
 
-Evaluation and benchmark scripts are under `nix_core/` and `nix_knowledge/scripts/`. The subprocess E2E suite uses temporary databases and skips the live chat assertion when its optional backend is unavailable.
+Some Core tests require local services or model backends. Prefer the hermetic/package tests for ordinary changes, and use temporary databases for integration experiments.
 
-## Security and release notes
+## Documentation map
 
-- Supply secrets through environment variables; no development secret is embedded in the source.
-- Do not run tests against live databases. Use temporary paths for experiments.
-- Model weights and downloaded datasets are local deployment artifacts, not source-distribution files.
-- The Echo/Home Assistant prototype is isolated from the core service path and requires its own credentials.
+- [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md) — detailed model lineage, runtime paths, temporal fixes, service operations, known caveats, and future-agent handoff.
+- [`nix_core/README.md`](nix_core/README.md) — request flow, dashboard, websocket protocol, and Casper integration.
+- [`nix_knowledge/README.md`](nix_knowledge/README.md) — memory model, temporal parser, APIs, and isolated testing.
+- [`nix_actions/README.md`](nix_actions/README.md) — action lifecycle, scheduler, sessions, and propagation.
+- [`nix_decision/README.md`](nix_decision/README.md) — future proactive decision foundation and safety gates.
+
+## Repository hygiene
+
+Do not commit:
+
+- `.env` files or credentials
+- SQLite databases and request logs
+- Model weights, QLoRA adapters, datasets, or generated checkpoints
+- Virtual environments and Python caches
+- Runtime PID/temp files
+
+Use `.gitignore` and keep production/personal data outside tracked source files.

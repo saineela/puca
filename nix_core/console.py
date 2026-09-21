@@ -70,6 +70,7 @@ from config import (  # noqa: E402
     CASPER_BACKEND,
     TABBY_API_URL,
     TABBY_MODEL,
+    USE_KNOWLEDGE_MODEL_GATE,
 )
 
 DATA_DIR = os.environ.get(
@@ -793,10 +794,16 @@ class Handler(BaseHTTPRequestHandler):
                 "deterministic": {"route": route, "features": features}
             }
 
-            if route == "unknown":
+            if route == "unknown" and USE_KNOWLEDGE_MODEL_GATE:
                 brain = get_brain()
                 gate = brain.knowledge.classify(text)
                 outcome["model_gate"] = {"route": gate}
+            elif route == "unknown":
+                outcome["model_gate"] = {
+                    "route": "chat",
+                    "disabled": True,
+                    "reason": "core_hybrid_default",
+                }
 
             final = route if route != "unknown" else outcome.get(
                 "model_gate", {}

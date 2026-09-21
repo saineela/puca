@@ -1143,6 +1143,11 @@ Available functions:
 - find_states(query)
   Show current states of close people ('how is my sister', 'who is
   sick').
+- multi_action(actions)
+  Use this ONLY when one user message contains two or more independent
+  Knowledge intents. The actions array must contain independently
+  selected function calls, each with its own name and arguments. Never
+  merge unrelated titles, people, or time expressions into one action.
 - create_fact(value)
   Remember a durable fact or preference: "remember that I like
   robotics", "I love programming but hate robotics", "I am in TSA".
@@ -1174,7 +1179,17 @@ STRICT RULES:
 6. "When is my <event>" and "what time is <event>" ask about an
    EXISTING event: use find_calendar_events with its title.
 
-7. If the request is genuinely ambiguous and no safe function can be
+7. Multi-intent requests are valid. For example, a message that says
+   "I have robotics tomorrow and remember that I joined TSA" must return
+   multi_action with one create_calendar_event action and one create_fact
+   action. Keep each action's arguments local to its clause.
+
+8. Do not confuse a conversational question with a Knowledge intent.
+   World questions, jokes, explanations, and general advice should not
+   be routed here. If a request contains both world chat and personal
+   Knowledge, return only the Knowledge action(s).
+
+9. If the request is genuinely ambiguous and no safe function can be
    selected, respond with:
    <tool_call>
    {"name": "find_facts", "arguments": {}}
@@ -1372,6 +1387,59 @@ The pattern for every response is:
             {
                 "role": "user",
                 "content": (
+                    "I have robotics practice tomorrow at 5pm and remember "
+                    "that I joined TSA"
+                ),
+            },
+            {
+                "role": "assistant",
+                "content": (
+                    '<tool_call>\n'
+                    '{"name": "multi_action", "arguments": {"actions": '
+                    '[{"name": "create_calendar_event", "arguments": '
+                    '{"title": "robotics practice", '
+                    '"temporal_expression": "tomorrow at 5pm"}}, '
+                    '{"name": "create_fact", "arguments": '
+                    '{"value": "I joined TSA"}}]}}\n'
+                    '</tool_call>'
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "What is on my schedule next week, and do you remember "
+                    "what I like about robotics?"
+                ),
+            },
+            {
+                "role": "assistant",
+                "content": (
+                    '<tool_call>\n'
+                    '{"name": "multi_action", "arguments": {"actions": '
+                    '[{"name": "find_calendar_events", "arguments": '
+                    '{"window": "next week"}}, {"name": "find_facts", '
+                    '"arguments": {"query": "robotics"}}]}}\n'
+                    '</tool_call>'
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Tell me a joke, and remind me what appointment I have tomorrow"
+                ),
+            },
+            {
+                "role": "assistant",
+                "content": (
+                    '<tool_call>\n'
+                    '{"name": "find_calendar_events", "arguments": '
+                    '{"window": "tomorrow"}}\n'
+                    '</tool_call>'
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
                     "what is on my schedule next week"
                 ),
             },
@@ -1516,7 +1584,12 @@ The pattern for every response is:
             {},
         )
 
-        if name not in self.tool_functions:
+        if name != "multi_action" and name not in self.tool_functions:
+            return None
+
+        if name == "multi_action" and not isinstance(arguments, dict):
+            return None
+        if name == "multi_action" and not isinstance(arguments.get("actions"), list):
             return None
 
         if not isinstance(arguments, dict):
@@ -1933,6 +2006,70 @@ The pattern for every response is:
 
             name = tool_call["name"]
             arguments = tool_call["arguments"]
+
+        # Nix_predictor may return several independent Knowledge actions for
+        # one compound request. Execute each action through the same symbolic
+        # validation and tool boundary; never let the model mutate directly.
+        if name == "multi_action":
+            subtask_results = []
+            for action in arguments.get("actions", []):
+                if not isinstance(action, dict):
+                    continue
+                action_name = action.get("name")
+                action_args = action.get("arguments") or {}
+                if action_name not in self.tool_functions:
+                    continue
+                try:
+                    action_args, hybrid_parse, hybrid_error = (
+                        self._prepare_calendar_arguments(
+                            user_request,
+                            action_name,
+                            action_args,
+                        )
+                    )
+                    if hybrid_error:
+                        function_result = {
+                            "ok": False,
+                            "error": hybrid_error,
+                        }
+                    else:
+                        action_args = self._validate_arguments(
+                            action_name,
+                            action_args,
+                        )
+                        function_result = self.tool_functions[action_name](
+                            **action_args
+                        )
+                        if hybrid_parse is not None:
+                            function_result["temporal_parse"] = {
+                                "source": hybrid_parse.source,
+                                "confidence": hybrid_parse.confidence,
+                                "slots": hybrid_parse.slots,
+                            }
+                except Exception as exc:  # noqa: BLE001
+                    function_result = {
+                        "ok": False,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                subtask_results.append({
+                    "function": {
+                        "name": action_name,
+                        "arguments": action_args,
+                    },
+                    "result": function_result,
+                })
+            return KnowledgeResponse(
+                user_request=user_request,
+                function={"name": "multi_action", "arguments": arguments},
+                result={
+                    "ok": True,
+                    "status": "multi_action",
+                    "count": len(subtask_results),
+                    "subtasks": subtask_results,
+                    "temporal_context": self._temporal_envelope(),
+                },
+                analysis_required=True,
+            ).to_dict()
 
         # Neuro-symbolic boundary: the selector may propose calendar
         # arguments, but Python must validate/repair the proposal against

@@ -963,9 +963,17 @@ class Brain:
             from casper_model import get_casper_client
 
             casper_loader = get_casper_client
+        # The Knowledge selector is not part of the default route path. Do
+        # not warm it merely because the console starts; that would allocate
+        # a second model for a job Core's deterministic hybrid already does.
+        knowledge_warmup = (
+            self.knowledge.warmup
+            if USE_KNOWLEDGE_MODEL_GATE
+            else lambda: {"knowledge": "route_gate_disabled"}
+        )
         return warm_models(
             casper_loader=casper_loader,
-            knowledge_health=self.knowledge.warmup,
+            knowledge_health=knowledge_warmup,
         )
 
     # ------------------------------------------------------------------
