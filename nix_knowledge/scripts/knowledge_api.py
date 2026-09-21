@@ -64,6 +64,9 @@ ACTIONS_DB = os.environ.get(
     str(DATA_DIR / "actions.db"),
 )
 
+# Nix_predictor is the local Qwen2.5 0.5B constrained function selector.
+# Deterministic rules remain the safety/fast path, while the predictor handles
+# indirect and multi-intent requests. Set to 0 only for diagnostics.
 MODEL_GATE_ENV = "NIX_KNOWLEDGE_MODEL_GATE"  # "1" force, "0" disable
 
 _state_lock = threading.Lock()
