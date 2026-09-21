@@ -269,12 +269,48 @@ def test_entries_carry_human_when_labels(engine, context):
 
     result = find_calendar_events(engine, context=context)
 
-    assert result["events"][0]["when"] == "tomorrow 6pm"
+    event = result["events"][0]
+    assert event["when"] == "tomorrow 6pm"
+    assert event["start_date"] == event["start"][:10]
+    assert event["start_time"] == "18:00:00"
+    assert event["end_date"] == event["end"][:10]
+    assert event["temporal_grounding"]["relative_label"] == "tomorrow 6pm"
+    assert event["temporal_grounding"]["start"]["iso"] == event["start"]
 
 
 # ---------------------------------------------------------------------
 # TemporalContext primitives
 # ---------------------------------------------------------------------
+
+
+def test_event_entries_keep_relative_and_absolute_temporal_grounding(engine):
+    context = _FrozenContext("America/Chicago")
+    start = datetime(2026, 9, 21, 9, 0, tzinfo=TZ)
+    end = datetime(2026, 9, 21, 11, 0, tzinfo=TZ)
+    engine.create(
+        "calendar_event",
+        {
+            "title": "Robotics practice",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "all_day": False,
+            "temporal_expression": "tmr morning",
+            "recurring": False,
+            "recurrence": None,
+            "status": "scheduled",
+        },
+    )
+
+    result = find_calendar_events(engine, context=context)
+    event = result["events"][0]
+
+    assert event["temporal_expression"] == "tmr morning"
+    assert event["start"] == "2026-09-21T09:00:00-05:00"
+    assert event["end"] == "2026-09-21T11:00:00-05:00"
+    assert event["start_local"].startswith("Monday, September 21, 2026 at 9:00:00 AM")
+    assert event["temporal_grounding"]["timezone"] == "America/Chicago"
+    assert event["temporal_grounding"]["start"]["date"] == "2026-09-21"
+    assert event["temporal_grounding"]["end"]["time"] == "11:00:00"
 
 
 def test_window_names_resolve(context):

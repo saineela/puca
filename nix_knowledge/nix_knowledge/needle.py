@@ -193,16 +193,32 @@ class KnowledgeNeedle:
 
         print("Loading Qwen2.5 0.5B...")
 
+        # This API normally runs separately from Core/Casper. Keep its model
+        # on an explicit small GPU budget so both services can stay warm. A
+        # device-map limit is safer than a process-wide allocator fraction:
+        # the console may embed the HTTP handler in the same Python process.
+        max_memory = None
+        if torch.cuda.is_available():
+            max_memory = {
+                0: os.environ.get("NIX_KNOWLEDGE_GPU_MEMORY", "2GiB"),
+                "cpu": os.environ.get("NIX_KNOWLEDGE_CPU_MEMORY", "16GiB"),
+            }
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             MODEL_PATH,
             local_files_only=True,
         )
 
+        load_kwargs: dict[str, Any] = {
+            "dtype": "auto",
+            "device_map": "auto",
+            "local_files_only": True,
+        }
+        if max_memory is not None:
+            load_kwargs["max_memory"] = max_memory
         self.model = AutoModelForCausalLM.from_pretrained(
             MODEL_PATH,
-            dtype="auto",
-            device_map="auto",
-            local_files_only=True,
+            **load_kwargs,
         )
 
         self.model.eval()
@@ -587,15 +603,30 @@ class KnowledgeNeedle:
                 "Calendar event temporal_expression cannot be empty."
             )
 
-        resolved = self.temporal.resolve(
-            temporal_expression
-        )
+        # Direct callers are protected by the same neuro-symbolic gate as
+        # the routed process path. The proposal is only a candidate; the
+        # symbolic parser supplies the authoritative title/expression/date.
+        from .temporal_hybrid import parse_event, TemporalProposal
 
-        if resolved is None:
+        parsed = parse_event(
+            f"{title} {temporal_expression}",
+            self.temporal,
+            proposal=TemporalProposal(
+                title=title,
+                expression=temporal_expression,
+                confidence=1.0,
+                source="direct_tool",
+            ),
+        )
+        if parsed is None:
             raise ValueError(
-                "Could not interpret the temporal expression: "
+                "Could not validate the calendar time symbolically: "
                 f"'{temporal_expression}'."
             )
+
+        title = parsed.title
+        temporal_expression = parsed.expression
+        resolved = parsed.resolved
 
         result = create_calendar_event(
             self.engine,
@@ -959,23 +990,34 @@ class KnowledgeNeedle:
         temporal_expression = None
 
         if new_temporal_expression:
-            resolved = self.temporal.resolve(
-                new_temporal_expression
-            )
+            # Updates use the same symbolic validation as creates. Never
+            # reschedule an action from an unvalidated neural expression.
+            from .temporal_hybrid import parse_event, TemporalProposal
 
-            if resolved is None:
+            parsed = parse_event(
+                f"{title} {new_temporal_expression}",
+                self.temporal,
+                proposal=TemporalProposal(
+                    title=title,
+                    expression=new_temporal_expression,
+                    confidence=1.0,
+                    source="direct_tool",
+                ),
+            )
+            if parsed is None:
                 return {
                     "ok": False,
                     "operation": "UPDATE",
                     "error": (
-                        "Could not interpret the temporal "
-                        f"expression: '{new_temporal_expression}'."
+                        "The new calendar time could not be validated "
+                        "symbolically; no change was made."
                     ),
                 }
 
+            resolved = parsed.resolved
             start = resolved.start.isoformat()
             end = resolved.end.isoformat()
-            temporal_expression = new_temporal_expression
+            temporal_expression = parsed.expression
 
         result = update_calendar_event(
             self.engine,
@@ -1607,6 +1649,56 @@ The pattern for every response is:
     # Public interface
     # ------------------------------------------------------------------
 
+    def _prepare_calendar_arguments(
+        self,
+        request: str,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any | None, str | None]:
+        """Run every calendar mutation through the hybrid safety gate.
+
+        Tool selection may be neural or symbolic, but the final temporal
+        expression is always repaired and validated by Python before a
+        create/update can reach the database or action bridge.
+        """
+        if name == "create_calendar_event":
+            from .temporal_hybrid import repair_calendar_arguments
+
+            repaired, parsed = repair_calendar_arguments(
+                request,
+                arguments,
+                self.temporal,
+            )
+            if parsed is None:
+                return (
+                    arguments,
+                    None,
+                    "The calendar time could not be validated symbolically; "
+                    "no event was created.",
+                )
+            return repaired, parsed, None
+
+        if name == "update_calendar_event" and arguments.get(
+            "new_temporal_expression"
+        ):
+            from .temporal_hybrid import validate_calendar_update_arguments
+
+            repaired, parsed = validate_calendar_update_arguments(
+                request,
+                arguments,
+                self.temporal,
+            )
+            if parsed is None:
+                return (
+                    arguments,
+                    None,
+                    "The new calendar time could not be validated "
+                    "symbolically; no change was made.",
+                )
+            return repaired, parsed, None
+
+        return arguments, None, None
+
     # ------------------------------------------------------------------
     # Temporal envelope
     # ------------------------------------------------------------------
@@ -1618,10 +1710,21 @@ The pattern for every response is:
         """
         now = self.context.now()
 
+        tomorrow = now.date() + timedelta(days=1)
+
         return {
+            # These values are authoritative and are generated once by
+            # Knowledge in its configured timezone. Core/Casper must not
+            # resolve relative words against their own machine clock.
             "now": now.isoformat(),
             "timezone": self.timezone,
+            "current_date": now.date().isoformat(),
+            "current_time": now.strftime("%H:%M:%S"),
+            "current_datetime_display": now.strftime(
+                "%A, %B %-d, %Y at %-I:%M %p"
+            ),
             "today": now.date().isoformat(),
+            "tomorrow": tomorrow.isoformat(),
             "weekday": now.strftime("%A"),
             "week_start": (now.date() - timedelta(days=now.weekday())).isoformat(),
             "weekend_start": (
@@ -1677,6 +1780,15 @@ The pattern for every response is:
 
         # ---- 2. route + execute ---------------------------------------
         payload = self._process_route(user_request)
+
+        # Every response crosses the same temporal contract, including
+        # facts, misses, clarifications, and non-calendar operations. This
+        # gives Core one authoritative reference clock for words such as
+        # "tomorrow"/"tmr" even when the selected function returned no
+        # events.
+        result = payload.get("result")
+        if isinstance(result, dict):
+            result.setdefault("temporal_context", self._temporal_envelope())
 
         # ---- 3. store keys, attach to whatever result came back -------
         try:
@@ -1735,15 +1847,37 @@ The pattern for every response is:
             subtask_results = []
 
             for name, arguments in subtasks:
+                hybrid_parse = None
                 try:
-                    arguments = self._validate_arguments(
-                        name,
-                        arguments,
+                    arguments, hybrid_parse, hybrid_error = (
+                        self._prepare_calendar_arguments(
+                            user_request,
+                            name,
+                            arguments,
+                        )
                     )
-
-                    function_result = self.tool_functions[name](
-                        **arguments
-                    )
+                    if hybrid_error:
+                        function_result = {
+                            "ok": False,
+                            "operation": "UPDATE"
+                            if name == "update_calendar_event"
+                            else "CREATE",
+                            "error": hybrid_error,
+                        }
+                    else:
+                        arguments = self._validate_arguments(
+                            name,
+                            arguments,
+                        )
+                        function_result = self.tool_functions[name](
+                            **arguments
+                        )
+                        if hybrid_parse is not None:
+                            function_result["temporal_parse"] = {
+                                "source": hybrid_parse.source,
+                                "confidence": hybrid_parse.confidence,
+                                "slots": hybrid_parse.slots,
+                            }
                 except Exception as exc:  # noqa: BLE001
                     function_result = {
                         "ok": False,
@@ -1800,6 +1934,33 @@ The pattern for every response is:
             name = tool_call["name"]
             arguments = tool_call["arguments"]
 
+        # Neuro-symbolic boundary: the selector may propose calendar
+        # arguments, but Python must validate/repair the proposal against
+        # the original utterance before any mutation. This catches partial
+        # parses such as a title containing "5 days after today" while the
+        # expression contains only "from 9am to 11am".
+        arguments, hybrid_parse, hybrid_error = (
+            self._prepare_calendar_arguments(
+                user_request,
+                name,
+                arguments,
+            )
+        )
+        if hybrid_error:
+            return KnowledgeResponse(
+                user_request=user_request,
+                function={"name": name, "arguments": arguments},
+                result={
+                    "ok": False,
+                    "operation": "UPDATE"
+                    if name == "update_calendar_event"
+                    else "CREATE",
+                    "error": hybrid_error,
+                    "temporal_context": self._temporal_envelope(),
+                },
+                analysis_required=True,
+            ).to_dict()
+
         try:
             arguments = self._validate_arguments(
                 name,
@@ -1855,6 +2016,13 @@ The pattern for every response is:
                 "temporal_context",
                 self._temporal_envelope(),
             )
+
+        if hybrid_parse is not None and isinstance(function_result, dict):
+            function_result["temporal_parse"] = {
+                "source": hybrid_parse.source,
+                "confidence": hybrid_parse.confidence,
+                "slots": hybrid_parse.slots,
+            }
 
         return KnowledgeResponse(
             user_request=user_request,

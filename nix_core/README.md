@@ -96,7 +96,7 @@ go by Sai, ...". Self-introductions route deterministically to
 `store_profile_keys` (the model gate never guesses on them) and are
 never decomposed into calendar subtasks. Keys ride along in every
 knowledge response under `result.keys_found`, appear in the chat
-model's `/digest` so phi4-mini knows your people mid-conversation,
+model's `/digest` so the chat model knows your people mid-conversation,
 and surface in recall ("who is Maanvi" -> their keys). Chat-routed
 utterances also teach keys via a `/keys` endpoint, so even a passing
 "btw my brother Alex loves hiking" builds the profile. A bare "who is
@@ -165,12 +165,35 @@ Configuration lives in `nix_core/config.py`, all overridable via env
 (`NIX_KNOWLEDGE_API_URL`, `NIX_ACTIONS_API_URL`, `NIX_OLLAMA_API_URL`,
 `NIX_OLLAMA_MODEL`, `NIX_AUTH_TOKEN`, `NIX_WS_PORT`, `NIX_TZ`, ...).
 
-Point the chat model at your phi-4 + SearXNG Ollama server:
+The verified local chat backend is Casper v5 through Transformers/PEFT. Casper
+uses about 2.91 GiB on the RTX 4060 and is capped at 68% VRAM. The smaller
+Knowledge selector may be warmed in parallel in its own process; its default
+budget is 22%, and Casper generation is bounded to one concurrent decode.
+
+For Ollama compatibility:
 
 ```bash
-export NIX_OLLAMA_HOST=192.168.0.154
-export NIX_OLLAMA_MODEL=phi4-mini:latest   # default; the model on .154
+export NIX_CASPER_BACKEND=ollama
+export NIX_OLLAMA_HOST=127.0.0.1
+export NIX_OLLAMA_MODEL=qwen3.5:4b
+export NIX_OLLAMA_THINK=0
 ```
+
+For the optional ExLlama path, TabbyAPI must already be serving a verified
+Qwen-compatible EXL2/EXL3 artifact. The current Casper PEFT adapter and local
+`Qwen3_5ForConditionalGeneration` base are not directly loadable by
+ExLlamaV2, so this is deliberately opt-in and does not silently replace the
+working adapter:
+
+```bash
+export NIX_CASPER_BACKEND=tabby
+export NIX_TABBY_API_URL=http://127.0.0.1:5000/v1/chat/completions
+export NIX_TABBY_MODEL=casper-puca-v5
+```
+
+Core sends OpenAI-compatible non-streaming requests to TabbyAPI, while the
+Knowledge model gate remains independently enabled (`NIX_KNOWLEDGE_MODEL_GATE=1`)
+and Core/Knowledge warm up concurrently (`NIX_CORE_WARMUP_MODELS=1`).
 
 Websocket protocol (unchanged from the original gateway contract):
 
@@ -178,8 +201,16 @@ Websocket protocol (unchanged from the original gateway contract):
 client -> {"token": "$NIX_AUTH_TOKEN"}                     first message
 client -> {"text_prompt": "...", "location": "desk_area"}
 server -> {"type": "status", "msg": "thinking"}
-server -> {"type": "reply", "msg": "...", "route": "knowledge|chat", "rule": "..."}
+server -> {"type": "reply", "msg": "...", "route": "knowledge|chat", "rule": "...", "conversation_id": "...", "follow_up": {"active": true, "expires_at": "..."}}
 ```
+
+After the first authenticated prompt, the websocket enters a short-lived
+follow-up window (12 seconds by default). Additional voice text can continue
+the conversation without repeating the wake word. Send `start_session: true`
+(or `wake_word: true`) to reopen an expired window, and send `end_session: true`
+or `goodbye`/`stop` to close it. The follow-up context is capped at 12 turns
+and 6,000 characters; durable turns still go to the Actions session store and
+personal facts still go to Knowledge.
 
 ## Files
 

@@ -429,6 +429,18 @@ class Handler(BaseHTTPRequestHandler):
         payload = self._read_json()
         text = str(payload.get("text") or "").strip()
 
+        if path == "/warmup":
+            try:
+                _get_needle()
+                self._json({"ok": True, "model_loaded": True})
+            except Exception as exc:
+                self._json({
+                    "ok": False,
+                    "model_loaded": False,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }, 503)
+            return
+
         if path == "/process":
             if not text:
                 self._json(

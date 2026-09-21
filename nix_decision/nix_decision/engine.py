@@ -1,121 +1,69 @@
 from __future__ import annotations
 
-import time
+from collections.abc import Callable, Iterable
+from typing import Any
 
-from .clock import SystemClock
-from .evaluator import Evaluator
-from .state import WorldState
+from .triggers import CorePromptRequest, DecisionOutcome, DecisionTrigger
+from .user_state import Presence, UserStateSnapshot
+
+CoreCallback = Callable[[CorePromptRequest], Any]
 
 
-class NixDecisionEngine:
+class DecisionEngine:
+    """Foundation for proactive decisions.
 
-    def __init__(
+    No calling rules are installed by default. Future rules should be added
+    explicitly with ``register`` and should return a CorePromptRequest only
+    after considering the supplied UserStateSnapshot.
+    """
+
+    def __init__(self, core_callback: CoreCallback | None = None) -> None:
+        self._rules: dict[str, Callable[[DecisionTrigger, UserStateSnapshot], CorePromptRequest | None]] = {}
+        self._core_callback = core_callback
+
+    @property
+    def registered_triggers(self) -> tuple[str, ...]:
+        return tuple(self._rules)
+
+    def register(
         self,
-        clock=None,
-        evaluator=None,
-        interval=2.0,
-        on_decision_change=None,
-    ):
+        trigger_name: str,
+        rule: Callable[[DecisionTrigger, UserStateSnapshot], CorePromptRequest | None],
+    ) -> None:
+        """Register a future rule explicitly; this does not call Core."""
+        name = trigger_name.strip()
+        if not name:
+            raise ValueError("A trigger name is required")
+        if name in self._rules:
+            raise ValueError(f"Trigger already registered: {name}")
+        self._rules[name] = rule
 
-        self.clock = clock or SystemClock()
-
-        self.world = WorldState()
-
-        self.evaluator = evaluator or Evaluator()
-
-        self.interval = interval
-
-        self.on_decision_change = on_decision_change
-
-        self.current_decision = None
-
-        self.running = False
-
-    # ---------------------------------------------------------
-    # OBSERVATION INPUT
-    # ---------------------------------------------------------
-
-    def ingest(self, observation):
-
-        self.world.ingest(observation)
-
-        return self.evaluate()
-
-    # ---------------------------------------------------------
-    # COGNITION
-    # ---------------------------------------------------------
-
-    def evaluate(self):
-
-        now = self.clock.now()
-
-        new_decision = self.evaluator.evaluate(
-            self.world,
-            now,
-        )
-
-        # First decision.
-        if self.current_decision is None:
-
-            previous = None
-
-            self.current_decision = new_decision
-
-            self._decision_changed(
-                previous,
-                new_decision,
-            )
-
-            return new_decision
-
-        # Determine whether cognition actually changed.
-        if (
-            new_decision.identity()
-            != self.current_decision.identity()
-        ):
-
-            previous = self.current_decision
-
-            self.current_decision = new_decision
-
-            self._decision_changed(
-                previous,
-                new_decision,
-            )
-
-        return self.current_decision
-
-    # ---------------------------------------------------------
-    # DECISION TRANSITION
-    # ---------------------------------------------------------
-
-    def _decision_changed(
+    def evaluate(
         self,
-        previous,
-        current,
-    ):
+        trigger: DecisionTrigger,
+        user_state: UserStateSnapshot,
+    ) -> DecisionOutcome:
+        """Evaluate one trigger and optionally deliver its result to Core.
 
-        if self.on_decision_change:
+        Availability is a hard gate: away or unknown users never receive a
+        proactive Core call. An unregistered trigger is a deliberate no-op.
+        """
+        if user_state.presence is not Presence.HOME:
+            return DecisionOutcome("ignored", "user_not_home")
+        rule = self._rules.get(trigger.name)
+        if rule is None:
+            return DecisionOutcome("ignored", "trigger_not_registered")
 
-            self.on_decision_change(
-                previous,
-                current,
-            )
+        request = rule(trigger, user_state)
+        if request is None:
+            return DecisionOutcome("ignored", "rule_no_action")
+        if self._core_callback is not None:
+            self._core_callback(request)
+        return DecisionOutcome("dispatched", "core_callback_invoked", request)
 
-    # ---------------------------------------------------------
-    # CONTINUOUS COGNITION LOOP
-    # ---------------------------------------------------------
-
-    def run(self):
-
-        self.running = True
-
-        while self.running:
-
-            self.evaluate()
-
-            time.sleep(self.interval)
-
-    def stop(self):
-
-        self.running = False
+    def evaluate_many(
+        self,
+        triggers: Iterable[DecisionTrigger],
+        user_state: UserStateSnapshot,
+    ) -> list[DecisionOutcome]:
+        return [self.evaluate(trigger, user_state) for trigger in triggers]

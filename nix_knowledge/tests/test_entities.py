@@ -67,4 +67,17 @@ def test_registry_roundtrip():
     # re-registering updates (people change names/roles)
     registry.register("sister", "jane")
     assert registry.get("sister") == "jane"
+    assert registry.candidates("sister") == ["jane", "maanvi"]
+    registry.close()
+
+
+def test_registry_retains_multiple_people_with_same_role():
+    db = os.path.join(tempfile.mkdtemp(), "multiple_people.db")
+    registry = EntityRegistry(db)
+    registry.register("sister", "maanvi")
+    registry.register("sister", "jane")
+    assert registry.candidates("sister") == ["jane", "maanvi"]
+    # The legacy default is still available, but callers requiring
+    # correctness must use candidates() and ask for clarification.
+    assert registry.get("sister") == "jane"
     registry.close()

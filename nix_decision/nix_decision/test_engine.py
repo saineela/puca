@@ -1,162 +1,65 @@
 from __future__ import annotations
 
-import argparse
-from datetime import datetime, timedelta, timezone
+from nix_decision import (
+    CoreBoundary,
+    CorePromptRequest,
+    DecisionEngine,
+    DecisionTrigger,
+    Energy,
+    Presence,
+    UserStateSnapshot,
+)
 
-from .clock import SimulatedClock
-from .dashboard import render
-from .engine import NixDecisionEngine
-from .events import Observation
 
-
-def decision_changed(previous, current):
-
-    old = (
-        previous.state
-        if previous
-        else "START"
+def test_engine_starts_without_calling_rules() -> None:
+    engine = DecisionEngine()
+    outcome = engine.evaluate(
+        DecisionTrigger("future_event"), UserStateSnapshot(presence=Presence.HOME)
     )
+    assert engine.registered_triggers == ()
+    assert outcome.status == "ignored"
+    assert outcome.reason == "trigger_not_registered"
 
-    print()
-    print(
-        f"[DECISION] {old} → {current.state}"
+
+def test_user_must_be_home_before_rule_can_dispatch() -> None:
+    calls: list[CorePromptRequest] = []
+    engine = DecisionEngine(calls.append)
+
+    def rule(trigger: DecisionTrigger, state: UserStateSnapshot) -> CorePromptRequest:
+        return CorePromptRequest(trigger, state, "Ask whether the user needs help.")
+
+    engine.register("future_event", rule)
+    outcome = engine.evaluate(
+        DecisionTrigger("future_event"), UserStateSnapshot(presence=Presence.AWAY)
     )
+    assert outcome.reason == "user_not_home"
+    assert calls == []
 
-    print(
-        f"Reason: {current.reason}"
+
+def test_registered_rule_dispatches_state_to_core() -> None:
+    received: list[dict] = []
+    engine = DecisionEngine(CoreBoundary(received.append).dispatch)
+
+    def rule(trigger: DecisionTrigger, state: UserStateSnapshot) -> CorePromptRequest:
+        return CorePromptRequest(trigger, state, "Carefully check in without tiring the user.")
+
+    engine.register("future_event", rule)
+    state = UserStateSnapshot(
+        presence=Presence.HOME, location="living_room", energy=Energy.TIRED, confidence=0.9
     )
+    outcome = engine.evaluate(DecisionTrigger("future_event", {"kind": "reminder"}), state)
 
-    print()
+    assert outcome.status == "dispatched"
+    assert received[0]["source"] == "nix_decision"
+    assert received[0]["user_state"]["in_house"] is True
+    assert received[0]["user_state"]["tired"] is True
+    assert received[0]["instruction"].startswith("Carefully")
 
 
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Nix Decision cognitive simulator"
+def test_rule_can_decline_to_speak() -> None:
+    engine = DecisionEngine()
+    engine.register("future_event", lambda trigger, state: None)
+    outcome = engine.evaluate(
+        DecisionTrigger("future_event"), UserStateSnapshot(presence=Presence.HOME)
     )
-
-    parser.add_argument(
-        "--scenario",
-        default="normal-day",
-        choices=[
-            "normal-day",
-            "late-arrival",
-        ],
-    )
-
-    args = parser.parse_args()
-
-    start = (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-    )
-
-    clock = SimulatedClock(start)
-
-    engine = NixDecisionEngine(
-        clock=clock,
-        interval=2.0,
-        on_decision_change=decision_changed,
-    )
-
-    # ---------------------------------------------------------
-    # Initial dashboard.
-    # ---------------------------------------------------------
-
-    render(engine)
-
-    # ---------------------------------------------------------
-    # Create historical context.
-    #
-    # CyberPatriot ended 30 minutes ago.
-    # ---------------------------------------------------------
-
-    event_end = (
-        start - timedelta(minutes=30)
-    )
-
-    engine.ingest(
-        Observation(
-            kind="calendar.event",
-            source="simulator",
-            timestamp=start,
-            data={
-                "name": "CyberPatriot",
-                "start": (
-                    start - timedelta(hours=2)
-                ),
-                "end": event_end,
-            },
-        )
-    )
-
-    # ---------------------------------------------------------
-    # Normal arrival.
-    # ---------------------------------------------------------
-
-    if args.scenario == "normal-day":
-
-        engine.ingest(
-            Observation(
-                kind="phone.location",
-                source="simulator",
-                timestamp=clock.now(),
-                data={
-                    "location": "home",
-                },
-            )
-        )
-
-        engine.ingest(
-            Observation(
-                kind="presence.room",
-                source="simulator",
-                timestamp=clock.now(),
-                data={
-                    "room": "bedroom",
-                },
-                confidence=0.95,
-            )
-        )
-
-    # ---------------------------------------------------------
-    # Late arrival.
-    # ---------------------------------------------------------
-
-    elif args.scenario == "late-arrival":
-
-        clock.advance(
-            2 * 60 * 60
-        )
-
-        engine.ingest(
-            Observation(
-                kind="phone.location",
-                source="simulator",
-                timestamp=clock.now(),
-                data={
-                    "location": "home",
-                },
-            )
-        )
-
-        engine.ingest(
-            Observation(
-                kind="presence.room",
-                source="simulator",
-                timestamp=clock.now(),
-                data={
-                    "room": "bedroom",
-                },
-                confidence=0.95,
-            )
-        )
-
-    render(engine)
-
-    print()
-    print("Simulation complete.")
-
-
-if __name__ == "__main__":
-    main()
+    assert outcome.reason == "rule_no_action"

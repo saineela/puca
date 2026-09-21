@@ -40,6 +40,10 @@ def engine(tmp_path):
     "text,role,name,state",
     [
         ("my sister is sick", "sister", None, "sick"),
+        ("my sister is doing alright now", "sister", None, "alright"),
+        ("my sister is doing fine now", "sister", None, "fine"),
+        ("my sistser is doign alright now", "sister", None, "alright"),
+        ("Jane is fine", None, "jane", "fine"),
         ("my sister maanvi is sick", "sister", "maanvi", "sick"),
         ("maanvi my sister is sick with flu", "sister", "maanvi", "sick"),
         ("my mom is happy today", "mom", None, "happy"),
@@ -69,6 +73,34 @@ def test_parse_positive(text, role, name, state):
 )
 def test_parse_negative(text):
     assert parse_state_statement(text) is None
+
+
+def test_typo_role_update_uses_canonical_person_state(engine):
+    first = store_state(
+        engine,
+        parse_state_statement("my sister is sick"),
+        "my sister is sick",
+    )
+    second = store_state(
+        engine,
+        parse_state_statement("my sistser is doing alright now"),
+        "my sistser is doing alright now",
+    )
+    assert second["operation"] == "SUPERSEDE_STATE"
+    assert first["record_id"] in second["superseded"]
+    current = find_states(engine)["states"]
+    assert len(current) == 1
+    assert current[0]["role"] == "sister"
+    assert current[0]["state"] == "alright"
+    assert "sistser" not in current[0]["value"]
+
+
+def test_alright_is_a_temporal_well_state_not_a_fact():
+    parsed = parse_state_statement("my sister is doing alright now")
+    assert parsed is not None
+    assert parsed["state"] == "alright"
+    assert parsed["group"] == "well"
+    assert parsed["valence"] == "good"
 
 
 def test_valence_sides():
@@ -157,6 +189,40 @@ def test_unrelated_records_not_touched(engine):
         "garage" in str(rec.data.get("value", ""))
         for rec in engine.search("fact")
     )
+
+
+def test_ambiguous_role_query_requests_clarification(engine):
+    if engine.semantic is None:
+        pytest.skip("local semantic dependencies/model are unavailable")
+    engine.semantic.entities.register("sister", "maanvi")
+    engine.semantic.entities.register("sister", "jane")
+    store_state(engine, parse_state_statement("my sister maanvi is sick"), "my sister maanvi is sick")
+    store_state(engine, parse_state_statement("my sister jane is happy"), "my sister jane is happy")
+
+    result = find_states(engine, query="how is my sister doing")
+    assert result["needs_clarification"] is True
+    assert result["clarification"]["candidates"] == ["jane", "maanvi"]
+    assert "Which sister" in result["clarification"]["question"]
+    assert result["states"] == []
+
+    selected = find_states(engine, query="how is my sister maanvi doing")
+    assert selected["needs_clarification"] is False
+    assert selected["states"][0]["name"] == "maanvi"
+
+
+def test_ambiguous_role_state_write_is_not_assigned_randomly(engine):
+    if engine.semantic is None:
+        pytest.skip("local semantic dependencies/model are unavailable")
+    engine.semantic.entities.register("sister", "maanvi")
+    engine.semantic.entities.register("sister", "jane")
+    result = store_state(
+        engine,
+        parse_state_statement("my sister is sick"),
+        "my sister is sick",
+    )
+    assert result["operation"] == "NEEDS_CLARIFICATION"
+    assert result["candidates"] == ["jane", "maanvi"]
+    assert engine.search("person") == []
 
 
 def test_find_states_filters_by_query(engine):

@@ -40,6 +40,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+import uuid
 from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -66,6 +67,9 @@ from config import (  # noqa: E402
     OLLAMA_HOST,
     OLLAMA_MODEL,
     TIMEZONE,
+    CASPER_BACKEND,
+    TABBY_API_URL,
+    TABBY_MODEL,
 )
 
 DATA_DIR = os.environ.get(
@@ -141,6 +145,13 @@ class TracedKnowledge(KnowledgeClient):
     def digest(self) -> str:
         with _Timed("knowledge /digest", "verified knowledge block"):
             return super().digest()
+
+    def memory_block(self, current_text=None) -> str:
+        with _Timed(
+            "knowledge /memory_block",
+            f"grounded context: {str(current_text or '')[:100]}",
+        ):
+            return super().memory_block(current_text)
 
 
 class TracedActions(ActionsClient):
@@ -252,7 +263,65 @@ def _view_turns() -> list[dict]:
     return _rows(
         CORE_DB,
         "SELECT id, session_tag, role, content, created_at "
-        "FROM turns ORDER BY id DESC LIMIT 25",
+        "FROM turns ORDER BY id DESC LIMIT 100",
+    )
+
+
+def _view_sessions() -> list[dict]:
+    """Return live chat sessions from the Actions/Core session service.
+
+    The dashboard process has its own environment and historically read a
+    second, unused ``CORE_DB`` path, making the sessions panel appear empty.
+    The Actions API owns the live SessionStore, so query it first and retain a
+    read-only DB fallback for older deployments.
+    """
+    try:
+        base_url = (
+            getattr(_brain.actions, "base_url", None)
+            if _brain is not None
+            else ACTIONS_API_URL
+        ) or ACTIONS_API_URL
+        response = requests.get(f"{base_url.rstrip('/')}/sessions", timeout=5)
+        response.raise_for_status()
+        payload = response.json()
+        sessions = payload.get("sessions")
+        if isinstance(sessions, list):
+            return sessions
+    except Exception:
+        pass
+
+    turns = _rows(
+        CORE_DB,
+        "SELECT id, session_tag, role, content, created_at "
+        "FROM turns ORDER BY id DESC LIMIT 500",
+    )
+    grouped: dict[str, dict] = {}
+    for turn in turns:
+        tag = str(turn.get("session_tag") or "unbucketed")
+        session = grouped.setdefault(
+            tag,
+            {
+                "session_tag": tag,
+                "turn_count": 0,
+                "first_turn": turn.get("created_at"),
+                "last_turn": turn.get("created_at"),
+                "turns": [],
+            },
+        )
+        session["turn_count"] += 1
+        session["first_turn"] = min(
+            session["first_turn"] or turn.get("created_at") or "",
+            turn.get("created_at") or "",
+        )
+        session["last_turn"] = max(
+            session["last_turn"] or turn.get("created_at") or "",
+            turn.get("created_at") or "",
+        )
+        session["turns"].append(turn)
+    return sorted(
+        grouped.values(),
+        key=lambda item: item.get("last_turn") or "",
+        reverse=True,
     )
 
 
@@ -432,6 +501,27 @@ def _people_view() -> list[dict]:
 # ----------------------------------------------------------------------
 
 
+def _tabby_health() -> dict:
+    """Health for the optional TabbyAPI/ExLlama backend."""
+    try:
+        from tabby_client import TabbyClient
+
+        return {
+            "backend": "tabby",
+            "endpoint": TABBY_API_URL,
+            **TabbyClient().health(),
+        }
+    except Exception as exc:
+        return {
+            "backend": "tabby",
+            "endpoint": TABBY_API_URL,
+            "model": TABBY_MODEL,
+            "ok": False,
+            "model_loaded": False,
+            "error": type(exc).__name__,
+        }
+
+
 def _ollama_health() -> dict:
     host = os.environ.get("NIX_OLLAMA_HOST", OLLAMA_HOST)
     model = os.environ.get("NIX_OLLAMA_MODEL", OLLAMA_MODEL)
@@ -447,6 +537,7 @@ def _ollama_health() -> dict:
             "ok": response.ok,
             "host": f"{host}:11434",
             "model": model,
+            "backend": CASPER_BACKEND,
             "model_loaded": model in names,
             "models": names,
         }
@@ -455,6 +546,7 @@ def _ollama_health() -> dict:
             "ok": False,
             "host": f"{host}:11434",
             "model": model,
+            "backend": CASPER_BACKEND,
             "error": f"{type(exc).__name__}",
             "models": [],
         }
@@ -480,8 +572,15 @@ def get_brain() -> Brain:
             _trace(
                 "console ready",
                 f"knowledge={knowledge_url} actions={actions_url} "
-                f"chat={OLLAMA_MODEL}",
+                f"chat={getattr(_brain.ollama, 'model', OLLAMA_MODEL)} "
+                f"backend={CASPER_BACKEND}",
             )
+            try:
+                _warmup_status = _brain.warmup()
+            except Exception as exc:
+                _warmup_status = {"error": f"{type(exc).__name__}: {exc}"}
+            # Expose startup state without making health re-run warm-up.
+            Handler.warmup_status = _warmup_status
         return _brain
 
 
@@ -534,11 +633,40 @@ class Handler(BaseHTTPRequestHandler):
             brain = get_brain()
             knowledge = brain.knowledge.health() or {"ok": False}
             actions = brain.actions.health() or {"ok": False}
+            ollama = _ollama_health()
+            tabby = _tabby_health() if CASPER_BACKEND == "tabby" else {
+                "backend": "tabby", "ok": False, "model_loaded": False,
+                "model": TABBY_MODEL, "not_selected": True,
+            }
+            try:
+                import torch
+
+                gpu = {
+                    "name": torch.cuda.get_device_name(0)
+                    if torch.cuda.is_available() else None,
+                    "allocated_gib": round(
+                        torch.cuda.memory_allocated() / 2**30, 3
+                    ) if torch.cuda.is_available() else 0.0,
+                    "reserved_gib": round(
+                        torch.cuda.memory_reserved() / 2**30, 3
+                    ) if torch.cuda.is_available() else 0.0,
+                }
+            except Exception:
+                gpu = {"name": None, "allocated_gib": None, "reserved_gib": None}
             self._json(
                 {
                     "knowledge": knowledge,
                     "actions": actions,
-                    "ollama": _ollama_health(),
+                    "ollama": ollama,
+                    "tabby": tabby,
+                    "casper": {
+                        "backend": CASPER_BACKEND,
+                        "model": getattr(brain.ollama, "model", OLLAMA_MODEL),
+                        "active": True,
+                        "warmup": getattr(Handler, "warmup_status", None),
+                    },
+                    "gpu": gpu,
+                    "warmup": getattr(Handler, "warmup_status", None),
                     "embedded_services": len(_embedded),
                     "timezone": TIMEZONE,
                 }
@@ -557,6 +685,10 @@ class Handler(BaseHTTPRequestHandler):
                     "knowledge": _view_knowledge(),
                 }
             )
+            return
+
+        if path == "/api/sessions":
+            self._json({"ok": True, "sessions": _view_sessions()})
             return
 
         if path == "/api/state":
@@ -626,7 +758,11 @@ class Handler(BaseHTTPRequestHandler):
             brain = get_brain()
             t0 = time.perf_counter()
             try:
-                result = brain.handle(text=text, location=location)
+                result = brain.handle(
+                    text=text,
+                    location=location,
+                    conversation_id=str(payload.get("conversation_id") or "") or None,
+                )
             except Exception as exc:
                 _trace("brain error", f"{type(exc).__name__}: {exc}", ok=False)
                 self._json(
@@ -1151,7 +1287,7 @@ _PAGE_V1_UNUSED = r"""<!DOCTYPE html>
   <h1>&#9678; NIX TEST CONSOLE</h1>
   <span class="chip" id="chip-knowledge"><span class="dot"></span>knowledge</span>
   <span class="chip" id="chip-actions"><span class="dot"></span>actions</span>
-  <span class="chip" id="chip-ollama"><span class="dot"></span><span id="chip-model">chat model</span></span>
+  <span class="chip" id="chip-ollama"><span class="dot"></span><span id="chip-model">chat backend</span></span>
   <span class="chip" id="chip-mode"><span class="dot ok"></span><span id="mode-text">mode</span></span>
 </header>
 
@@ -1216,6 +1352,17 @@ _PAGE_V1_UNUSED = r"""<!DOCTYPE html>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
+const CHAT_SESSION_ID = (() => {
+  const key = "casper-dashboard-session";
+  let value = window.localStorage.getItem(key);
+  if (!value) {
+    value = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    window.localStorage.setItem(key, value);
+  }
+  return value;
+})();
 let tab = "trace";
 let autoRefresh = true;
 
@@ -1327,7 +1474,11 @@ async function send(dry) {
   if (!dry) startFiller(text);
   try {
     const result = dry ? await post("/api/classify", {text})
-                       : await post("/api/send", {text, location: "console"});
+                       : await post("/api/send", {
+                           text,
+                           location: "console",
+                           conversation_id: CHAT_SESSION_ID,
+                         });
     show(result, dry);
     if (result && result.mood && result.mood.valence) {
       playMood(result.mood.valence === "good" ? "trumpet" : result.mood.valence === "bad" ? "sympathy" : "blip");
@@ -1368,17 +1519,18 @@ async function refreshHealth() {
     const h = await (await fetch("/api/health")).json();
     setChip("chip-knowledge", h.knowledge.ok, "knowledge");
     setChip("chip-actions", h.actions.ok, "actions");
-    const o = h.ollama;
+    const o = h.casper?.backend === "tabby" ? h.tabby : h.ollama;
     setChip("chip-ollama", o.ok && o.model_loaded,
       `${o.model}${o.model_loaded ? "" : " (missing)"}`);
     $("mode-text").textContent =
       h.embedded_services > 0
         ? `embedded APIs (${h.embedded_services})`
         : "live APIs";
+    const endpoint = o.host || o.endpoint || "local";
     $("foot").textContent =
       `timezone ${h.timezone} | knowledge ${h.knowledge.knowledge_records ?? "?"} records` +
-      ` | chat model ${o.model} on ${o.host}` +
-      ` | ollama models: ${(o.models || []).join(", ") || "none"}`;
+      ` | ${h.casper?.backend || "chat"} ${o.model} on ${endpoint}` +
+      ` | advertised models: ${(o.models || []).join(", ") || "none"}`;
   } catch (e) { /* health chip stays stale */ }
 }
 
@@ -1767,7 +1919,7 @@ PAGE_V2 = r"""<!DOCTYPE html>
   </nav>
   <span class="chip" id="chip-knowledge"><span class="dot"></span>knowledge</span>
   <span class="chip" id="chip-actions"><span class="dot"></span>actions</span>
-  <span class="chip" id="chip-ollama"><span class="dot"></span><span id="chip-model">chat model</span></span>
+  <span class="chip" id="chip-ollama"><span class="dot"></span><span id="chip-model">chat backend</span></span>
   <span class="chip" id="chip-mode"><span class="dot ok"></span><span id="mode-text">mode</span></span>
 </header>
 
@@ -1880,6 +2032,17 @@ PAGE_V2 = r"""<!DOCTYPE html>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
+const CHAT_SESSION_ID = (() => {
+  const key = "casper-dashboard-session";
+  let value = window.localStorage.getItem(key);
+  if (!value) {
+    value = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    window.localStorage.setItem(key, value);
+  }
+  return value;
+})();
 
 function esc(s) {
   const d = document.createElement("div");
@@ -1922,13 +2085,14 @@ async function refreshHealth() {
     LAST_HEALTH = h;
     setChip("chip-knowledge", h.knowledge.ok);
     setChip("chip-actions", h.actions.ok);
-    const o = h.ollama;
+    const o = h.casper?.backend === "tabby" ? h.tabby : h.ollama;
     setChip("chip-ollama", o.ok && o.model_loaded);
     $("chip-model").textContent = o.model + (o.model_loaded ? "" : " (missing)");
     $("mode-text").textContent = h.embedded_services > 0
       ? `embedded APIs (${h.embedded_services})` : "live APIs";
+    const endpoint = o.host || o.endpoint || "local";
     $("foot").textContent =
-      `timezone ${h.timezone} | ollama ${o.host} | models: ${(o.models || []).join(", ") || "none"}`;
+      `timezone ${h.timezone} | ${h.casper?.backend || "chat"} ${endpoint} | models: ${(o.models || []).join(", ") || "none"}`;
   } catch (e) { /* stale */ }
 }
 
@@ -1963,7 +2127,11 @@ async function send(dry) {
   $("send").disabled = true;
   try {
     const result = dry ? await post("/api/classify", {text})
-                       : await post("/api/send", {text, location: "console"});
+                       : await post("/api/send", {
+                           text,
+                           location: "console",
+                           conversation_id: CHAT_SESSION_ID,
+                         });
     show(result, dry);
   } catch (e) {
     show({ok: false, error: String(e)}, dry);
@@ -2239,16 +2407,30 @@ function renderKb() {
     : "<div class='evt'>no records match</div>";
 }
 
+function renderSessionGroups(sessions) {
+  if (!sessions.length) return "<div class='evt'>no chat sessions yet</div>";
+  return sessions.map((session) => {
+    const turns = (session.turns || []).slice().reverse();
+    const preview = turns.slice(0, 12).map((turn) =>
+      `<div class="evt"><b>${esc(turn.role)}</b> ${esc(turn.content)}<br><span class="meta">${esc(turn.created_at || "")}</span></div>`
+    ).join("");
+    return `<details class="kbcard" open>
+      <summary><b>${esc(session.session_tag)}</b> · ${session.turn_count} turns · ${esc(session.first_turn || "")} → ${esc(session.last_turn || "")}</summary>
+      <div class="feed" style="max-height:260px;margin-top:8px">${preview}</div>
+    </details>`;
+  }).join("");
+}
+
 async function refreshKb() {
   try {
     const d = await (await fetch("/api/kb")).json();
     KB = d.records || [];
     renderKb();
     refreshPeople();
-    const st = LAST_HEALTH;
     $("kb-sessions").innerHTML = "<div class='evt'>loading...</div>";
+    const sessions = await (await fetch("/api/sessions")).json();
+    $("kb-sessions").innerHTML = renderSessionGroups(sessions.sessions || []);
     const feed = await (await fetch("/api/feed")).json();
-    $("kb-sessions").innerHTML = tableHtml(feed.turns || [], COLS.turns);
     $("kb-actions").innerHTML = tableHtml(feed.actions || [], COLS.actions);
   } catch (e) {
     $("kb-list").innerHTML = `<div class="evt bad">${esc(String(e))}</div>`;
@@ -2477,7 +2659,7 @@ def main() -> int:
     print("  NIX TEST CONSOLE")
     print(f"  local : http://127.0.0.1:{port}")
     print(f"  LAN   : http://{host}:{port}   (from any device on your network)")
-    print(f"  chat model : {OLLAMA_MODEL} on {OLLAMA_HOST}:11434")
+    print(f"  chat backend : {CASPER_BACKEND} ({OLLAMA_MODEL} / {TABBY_MODEL})")
     print(f"  timezone   : {TIMEZONE}")
     print("  Ctrl+C to stop")
     print()

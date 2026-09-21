@@ -269,10 +269,12 @@ class SemanticService:
             else:
                 rejected.append(entry)
 
+        from ..emotion import analyze_emotion
         return {
             "stored": stored,
             "rejected": rejected,
             "escalated": escalated,
+            "emotional_signals": analyze_emotion(text),
             "contradictions": [
                 {
                     "text": c.text,
@@ -346,10 +348,12 @@ class SemanticService:
                 )
                 indexed = self.store.upsert(chunks, vectors)
 
+        from ..emotion import analyze_emotion
         return {
             "stored": stored,
             "rejected": rejected,
             "escalated": escalated,
+            "emotional_signals": analyze_emotion(text),
             "indexed_chunks": indexed,
             "contradictions": [
                 {

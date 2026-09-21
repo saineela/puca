@@ -215,19 +215,22 @@ def _ws_session(cluster, token=AUTH_TOKEN):
     return ws
 
 
+def _recv_reply(ws, expect_reply_timeout: float = 120.0):
+    status = json.loads(ws.recv(timeout=10))
+    assert status.get("type") == "status", status
+    deadline = time.time() + expect_reply_timeout
+    while True:
+        remaining = max(1.0, deadline - time.time())
+        frame = json.loads(ws.recv(timeout=remaining))
+        if frame.get("type") == "reply":
+            return frame
+
+
 def _ask(cluster, text: str, expect_reply_timeout: float = 120.0):
     ws = _ws_session(cluster)
     try:
         ws.send(json.dumps({"text_prompt": text, "location": "e2e-test"}))
-        # first frame: {"type": "status", "msg": "thinking"}
-        status = json.loads(ws.recv(timeout=10))
-        assert status.get("type") == "status", status
-        deadline = time.time() + expect_reply_timeout
-        while True:
-            remaining = max(1.0, deadline - time.time())
-            frame = json.loads(ws.recv(timeout=remaining))
-            if frame.get("type") == "reply":
-                return frame
+        return _recv_reply(ws, expect_reply_timeout)
     finally:
         ws.close()
 
@@ -275,6 +278,29 @@ def test_ws_happy_path_knowledge(cluster):
         "GET", f"{cluster['actions']}/context?limit=10"
     )["turns"]
     assert any(marker in t["content"] for t in turns)
+
+
+def test_ws_follow_up_keeps_one_conversation_context(cluster):
+    from websockets.sync.client import connect
+
+    ws = _ws_session(cluster)
+    try:
+        ws.send(json.dumps({"text_prompt": "Hi Casper", "location": "e2e-test"}))
+        first = _recv_reply(ws)
+        assert first["follow_up"]["active"] is True, first
+        conversation_id = first["conversation_id"]
+
+        # No second wake word: this is the Alexa-style continuation.
+        ws.send(json.dumps({"text_prompt": "Keep your next reply short", "location": "e2e-test"}))
+        second = _recv_reply(ws)
+        assert second["conversation_id"] == conversation_id
+        assert second["follow_up"]["active"] is True
+
+        ws.send(json.dumps({"text_prompt": "goodbye", "location": "e2e-test"}))
+        ended = _recv_reply(ws)
+        assert ended["follow_up"]["active"] is False
+    finally:
+        ws.close()
 
 
 def test_ws_chat_route_live_ollama(cluster):

@@ -187,6 +187,8 @@ class TemporalContext:
             "today": "today",
             "now": "today",
             "tomorrow": "tomorrow",
+            "tmr": "tomorrow",
+            "tmrw": "tomorrow",
             "yesterday": "yesterday",
             "this week": "this_week",
             "next week": "next_week",

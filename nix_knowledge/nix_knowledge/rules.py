@@ -102,6 +102,14 @@ _WHO_IS = re.compile(
     re.IGNORECASE,
 )
 
+# Identity recall is personal memory, never open-ended chat or a state
+# lookup. Route all natural variants to the deterministic name/fact query.
+_IDENTITY_RECALL = re.compile(
+    r"^(?:who\s+am\s+i|do\s+you\s+know\s+(?:who\s+)?i\s+am|"
+    r"do\s+you\s+know\s+me|what\s+do\s+you\s+know\s+about\s+me)\??$",
+    re.IGNORECASE,
+)
+
 # Self-introduction detection: a sentence that identifies the user.
 # "my name is X" / "call me X" / "i was born ..." / "people call me X"
 _INTRO_MARKERS = re.compile(
@@ -179,7 +187,7 @@ _CALENDAR_BARE = re.compile(
 
 # Trailing time frames for calendar browsing and existence probes.
 _WINDOW_ALT = (
-    r"today|tomorrow|tmr|yesterday|"
+    r"today|tomorrow|tmr|yesterday|day\s+after\s+tomorrow|"
     r"this\s+week|next\s+week|last\s+week|"
     r"this\s+weekend|this\s+month|"
     r"upcoming|coming\s+up|soon|"
@@ -194,9 +202,9 @@ _CALENDAR_WINDOWED = re.compile(
     r"what(?:'s| is| do i have)(?: on)? (?:my|the)?\s*(?:calendar|schedule|events)"
     r"|what events do i have"
     r"|what do i have"
-    r"|show me (?:my|the) (?:calendar|schedule|events)"
+    r"|show (?:me|my) (?:calendar|schedule|events)"
     r")"
-    rf"\s+(?P<window>{_WINDOW_ALT})"
+    rf"\s+(?:for\s+|on\s+|in\s+)?(?P<window>{_WINDOW_ALT})"
     r"\s*\??$",
     re.IGNORECASE,
 )
@@ -534,11 +542,23 @@ def route(
     """
     text = request.strip()
     lowered = text.lower().rstrip(".!?")
+    # Common speech-to-text spelling; keep the symbolic calendar rules
+    # deterministic instead of delegating a simple window to the selector.
+    lowered = re.sub(r"\bcalender\b", "calendar", lowered)
 
     # Spoken address ("nix remember my ...", "nic what was my ...").
     address_match = _ADDRESS_RE.match(lowered)
     if address_match:
         lowered = lowered[address_match.end():].strip()
+
+    # Voice transcripts often retain conversational lead-ins when the
+    # Knowledge service is called directly (Core normally removes some
+    # of these first). Keep the service boundary equally tolerant.
+    for prefix in ("real quick", "quickly", "ok so", "okay so", "hey", "okay", "ok", "so"):
+        marker = prefix + " "
+        if lowered.startswith(marker):
+            lowered = lowered[len(marker):].lstrip(" ,:-")
+            break
 
     # Polite command wrappers: "can you remind me to...", "could you
     # please cancel my...". The request starts after the wrapper.
@@ -556,8 +576,18 @@ def route(
     if stripped != lowered:
         lowered = stripped.rstrip(".!?").strip()
 
+    # Speech often appends politeness after the actual request: "what
+    # events do I have next week, please". It carries no intent data.
+    lowered = re.sub(r"\s+(?:please|okay|ok)$", "", lowered).strip()
+
     if not lowered:
         return None
+
+    # ---- identity recall must be checked before state/world rules.
+    # The stored key finder knows the user's name and can return the
+    # authoritative answer; Casper must not infer identity from chat.
+    if _IDENTITY_RECALL.match(lowered):
+        return "find_facts", {"query": "name"}
 
     # ---- recall: "do you remember X" must be checked BEFORE "remember X"
     match = _RECALL_ABOUT.match(lowered)
@@ -627,7 +657,11 @@ def route(
     # request. Runs before the reminder/alarm rules (below) because
     # "alarm" in a possessive statement is data, not a scheduling verb.
     match = _PERSONAL_STATEMENT.match(lowered)
-    if match and not _CALENDAR_NOUNS_RE.search(lowered):
+    if (
+        match
+        and not lowered.endswith("?")
+        and not _CALENDAR_NOUNS_RE.search(lowered)
+    ):
         subject = match.group("subject").strip()
         value = match.group("value").strip()
         if subject and value:
@@ -641,7 +675,11 @@ def route(
             return "create_fact", {"value": value}
 
     # ---- preference statements ("I hate X, but love Y")
-    preference_clauses = _preference_clauses(lowered)
+    preference_clauses = (
+        None
+        if lowered.endswith("?")
+        else _preference_clauses(lowered)
+    )
     if preference_clauses:
         return "create_fact", {"value": "; ".join(preference_clauses)}
 
