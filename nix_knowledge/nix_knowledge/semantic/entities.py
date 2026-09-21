@@ -133,6 +133,14 @@ class EntityRegistry:
         evidence   TEXT,
         updated_at REAL NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS entity_aliases (
+        role       TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        record_id  INTEGER,
+        evidence   TEXT,
+        updated_at REAL NOT NULL,
+        PRIMARY KEY (role, name)
+    );
     """
 
     def __init__(self, db_path: str | Path):
@@ -154,6 +162,12 @@ class EntityRegistry:
         evidence: str | None = None,
     ) -> None:
         with self._lock, self._conn:
+            normalized_role = role.lower().strip()
+            normalized_name = name.lower().strip()
+            now = time.time()
+            # Keep the legacy role -> latest name index for callers that
+            # need a single default, but retain every observed person so
+            # "my two sisters" never silently overwrites the first one.
             self._conn.execute(
                 """
                 INSERT INTO entities
@@ -165,8 +179,19 @@ class EntityRegistry:
                     evidence = excluded.evidence,
                     updated_at = excluded.updated_at
                 """,
-                (role.lower(), name.lower(), record_id, evidence,
-                 time.time()),
+                (normalized_role, normalized_name, record_id, evidence, now),
+            )
+            self._conn.execute(
+                """
+                INSERT INTO entity_aliases
+                    (role, name, record_id, evidence, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(role, name) DO UPDATE SET
+                    record_id = excluded.record_id,
+                    evidence = excluded.evidence,
+                    updated_at = excluded.updated_at
+                """,
+                (normalized_role, normalized_name, record_id, evidence, now),
             )
 
     def get(self, role: str) -> str | None:
@@ -181,6 +206,19 @@ class EntityRegistry:
             "SELECT role, name FROM entities"
         ).fetchall()
         return {role: name for role, name in rows}
+
+    def candidates(self, role: str) -> list[str]:
+        """Return every known distinct person for a relationship role."""
+        role = role.lower().strip()
+        rows = self._conn.execute(
+            """
+            SELECT name FROM entity_aliases WHERE role = ?
+            UNION SELECT name FROM entities WHERE role = ?
+            ORDER BY name
+            """,
+            (role, role),
+        ).fetchall()
+        return [row[0] for row in rows]
 
     def close(self) -> None:
         with self._lock:

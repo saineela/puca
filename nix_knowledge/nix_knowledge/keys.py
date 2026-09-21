@@ -948,7 +948,10 @@ def extract_keys(text: str) -> list[dict[str, Any]]:
     personal found (the common case for chat/world requests).
     """
     text = (text or "").strip()
-    if not text or _STORAGE_HINT.search(text):
+    # A question is a request for recall, not a user assertion. This
+    # guard applies before relation/attribute extraction so forms such
+    # as "my sister is coming over?" cannot become durable memory.
+    if not text or text.endswith("?") or _STORAGE_HINT.search(text):
         return []
     # explicit store commands store their own fact - no key extraction
     if re.match(

@@ -170,13 +170,19 @@ class TemporalResolver:
           "this"        this week's weekday, literally (Monday-based)
           "next"        following week's weekday
         """
-        if qualifier == "this":
+        if qualifier in {"this", "this week"}:
             monday = now.date() - timedelta(
                 days=now.weekday()
             )
-            return monday + timedelta(days=weekday)
+            target = monday + timedelta(days=weekday)
+            # Bare "this Friday" means the upcoming Friday when the
+            # current week's Friday has already passed; explicit "this
+            # week Friday" retains its documented literal semantics.
+            if qualifier == "this" and target < now.date():
+                target += timedelta(days=7)
+            return target
 
-        if qualifier == "next":
+        if qualifier in {"next", "next week"}:
             next_monday = now.date() + timedelta(
                 days=7 - now.weekday()
             )
@@ -263,8 +269,174 @@ class TemporalResolver:
 
         now = now or self.now()
 
+        # Normalize natural day-part wrappers before parsing. These are
+        # common in speech and must not be left in the event title:
+        # "during the morning time" -> "morning".
+        text = re.sub(
+            r"\b(?:during|in)\s+(?:the\s+)?"
+            r"(morning|afternoon|evening|tonight)"
+            r"(?:\s+time)?\b",
+            r"\1",
+            text,
+        )
+        text = re.sub(r"\b(morning|afternoon|evening|tonight)\s+time\b", r"\1", text)
+        # Speech commonly inserts "more" in relative offsets and uses
+        # "around" before a clock. They do not change the intended date or
+        # time, so normalize them before the strict symbolic grammar runs.
+        text = re.sub(
+            r"\bin\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+            r"more\s+(minutes?|hours?|days?|weeks?)\b",
+            r"in \1 \2",
+            text,
+        )
+        text = re.sub(r"\baround\s+(?=\d|noon|midnight)", "at ", text)
+        # Normalize spoken day offsets before the strict grammar and before
+        # candidate-span extraction, so a title cannot swallow "day after".
+        text = re.sub(
+            r"\b(?:the\s+)?day\s+after\s+tomorrow\b",
+            "in 2 days",
+            text,
+        )
+        # An explicit clock range makes a preceding day-part redundant:
+        # "next Monday morning from 9am to 11am" is the same concrete
+        # window as "next Monday from 9am to 11am".
+        text = re.sub(
+            rf"((?:today|tomorrow|tmr|yesterday|next\s+(?:{self._weekday_alt})|"
+            rf"(?:this|next|on)\s+(?:{self._weekday_alt}))\s+)"
+            r"(?:morning|afternoon|evening|tonight)\s+(?=(?:from|at)\b)",
+            r"\1",
+            text,
+        )
+
         wd = self._weekday_alt
         months = self._month_alt
+
+        # --------------------------------------------------------
+        # Compound relative dates and day parts
+        #
+        # Voice requests often combine an offset, a reference day, a
+        # day-part, and an explicit range:
+        #   "5 days after today during the morning time"
+        #   "in five days from 9am to 11am"
+        #   "5 days after tomorrow morning"
+        # The whole expression is resolved here before the generic
+        # suffix/range parsers, so Core never stores the offset as part
+        # of the event title or silently falls back to today's date.
+        # --------------------------------------------------------
+
+        amount_words = {
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+        }
+        amount_pattern = (
+            r"(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)"
+        )
+        compound = re.fullmatch(
+            rf"(?:(?P<amount>{amount_pattern})\s+"
+            rf"(?P<unit>days?|weeks?)\s+"
+            rf"(?P<relation>after|before|from)\s+"
+            rf"(?P<base>today|tomorrow|tmr|"
+            rf"yesterday|now)|"
+            rf"in\s+(?P<in_amount>{amount_pattern})\s+"
+            rf"(?P<in_unit>days?|weeks?))"
+            rf"(?:\s+(?P<tail>.*))?",
+            text,
+        )
+
+        if compound:
+            raw_amount = compound.group("amount") or compound.group("in_amount")
+            amount = (
+                int(raw_amount)
+                if raw_amount.isdigit()
+                else amount_words[raw_amount]
+            )
+            if (
+                (compound.group("unit") or "").startswith("week")
+                or (compound.group("in_unit") or "").startswith("week")
+            ):
+                amount *= 7
+            base = compound.group("base") or "today"
+            base_offsets = {
+                "today": 0,
+                "tomorrow": 1,
+                "tmr": 1,
+                "yesterday": -1,
+                "now": 0,
+            }
+            relation = compound.group("relation") or "from"
+            signed_amount = -amount if relation == "before" else amount
+            target = now.date() + timedelta(
+                days=base_offsets[base] + signed_amount
+            )
+            tail = (compound.group("tail") or "").strip()
+
+            period_hours = {
+                "morning": (6, 12),
+                "afternoon": (12, 17),
+                "evening": (17, 22),
+                "tonight": (18, 23),
+            }
+            period = tail.strip()
+            start_clock = end_clock = None
+
+            # An explicit clock range is more precise than a broad
+            # day-part qualifier: "morning from 9am to 11am" means
+            # 09:00-11:00, while plain "morning" means the full
+            # morning window.
+            range_match = re.fullmatch(
+                r"(?:(?:morning|afternoon|evening|tonight)\s+)?"
+                r"(?:from\s+)?(.+?)\s+(?:to|until|till)\s+(.+)",
+                period,
+            )
+            if range_match:
+                start_clock = self._parse_clock(range_match.group(1))
+                end_clock = self._parse_clock(range_match.group(2))
+                if start_clock is None or end_clock is None:
+                    return None
+            elif period.startswith("at "):
+                start_clock = self._parse_clock(period[3:])
+                if start_clock is None:
+                    return None
+                end_clock = start_clock
+            elif period in period_hours:
+                start_hour, end_hour = period_hours[period]
+                start_clock = time(start_hour, 0)
+                end_clock = time(end_hour, 0)
+            elif period:
+                # A compound expression with an unrecognized tail is
+                # unsafe to execute; do not guess or discard it.
+                return None
+
+            if start_clock is None:
+                start, end = self._day_bounds(target)
+                return TemporalResult(
+                    expression=original,
+                    start=start,
+                    end=end,
+                    all_day=True,
+                )
+
+            start = datetime.combine(target, start_clock, tzinfo=self.timezone)
+            end = datetime.combine(target, end_clock, tzinfo=self.timezone)
+            if end_clock == start_clock and not range_match:
+                end = start
+            elif end <= start:
+                end += timedelta(days=1)
+
+            return TemporalResult(
+                expression=original,
+                start=start,
+                end=end,
+                all_day=False,
+            )
 
         # --------------------------------------------------------
         # Relative duration
@@ -328,7 +500,7 @@ class TemporalResolver:
         match = re.fullmatch(
             rf"(today|tomorrow|tmr|yesterday|"
             rf"next\s+(?:{wd})|"
-            rf"(?:(on|this|next)\s+(?:week\s+)?)?(?:{wd}))\s+"
+            rf"(?:(on|this(?:\s+week)?|next(?:\s+week)?)\s+)?(?:{wd}))\s+"
             r"(?:from\s+)?(.+?)\s+(?:to|until|till)\s+(.+)",
             text,
         )
@@ -716,7 +888,7 @@ class TemporalResolver:
         # --------------------------------------------------------
 
         match = re.fullmatch(
-            rf"(?:(on|this|next)(?:\s+week)?\s+)?"
+            rf"(?:(on|this(?:\s+week)?|next(?:\s+week)?)\s+)?"
             rf"({wd})\s+at\s+(.+)",
             text,
         )
@@ -858,7 +1030,7 @@ class TemporalResolver:
         # --------------------------------------------------------
 
         match = re.fullmatch(
-            rf"(?:(on|this|next)(?:\s+week)?\s+)?({wd})",
+            rf"(?:(on|this(?:\s+week)?|next(?:\s+week)?)\s+)?({wd})",
             text,
         )
 
@@ -985,7 +1157,18 @@ class TemporalResolver:
         # This weekend
         # --------------------------------------------------------
 
-        if text == "this weekend":
+        weekend_match = re.fullmatch(
+            r"this\s+weekend(?:\s+at\s+(.+))?",
+            text,
+        )
+        if weekend_match:
+            weekend_clock = (
+                self._parse_clock(weekend_match.group(1))
+                if weekend_match.group(1)
+                else None
+            )
+            if weekend_match.group(1) and weekend_clock is None:
+                return None
             weekday = now.weekday()
 
             if weekday in (5, 6):
@@ -1000,28 +1183,41 @@ class TemporalResolver:
 
             sunday = saturday + timedelta(days=1)
 
-            start = datetime.combine(
-                saturday,
-                time.min,
-                tzinfo=self.timezone,
-            )
-
-            end = datetime.combine(
-                sunday,
-                time.max,
-                tzinfo=self.timezone,
-            )
-
-            # "this weekend" said on a Sunday: Saturday is gone; the
-            # remaining weekend is the rest of TODAY.
-            if start < now:
-                start = now
+            if weekend_clock is not None:
+                # A timed phrase names one occurrence, not a two-day range:
+                # choose the next Saturday/Sunday occurrence in this weekend,
+                # or the next weekend if both have already passed.
+                saturday_moment = datetime.combine(
+                    saturday, weekend_clock, tzinfo=self.timezone
+                )
+                sunday_moment = datetime.combine(
+                    sunday, weekend_clock, tzinfo=self.timezone
+                )
+                if saturday_moment >= now:
+                    start = saturday_moment
+                elif sunday_moment >= now:
+                    start = sunday_moment
+                else:
+                    start = saturday_moment + timedelta(days=7)
+                end = start
+                all_day = False
+            else:
+                start = datetime.combine(
+                    saturday, time.min, tzinfo=self.timezone
+                )
+                end = datetime.combine(
+                    sunday, time.max, tzinfo=self.timezone
+                )
+                # "this weekend" said on a Sunday: the window begins now.
+                if start < now:
+                    start = now
+                all_day = True
 
             return TemporalResult(
                 expression=original,
                 start=start,
                 end=end,
-                all_day=True,
+                all_day=all_day,
             )
 
         # --------------------------------------------------------

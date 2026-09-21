@@ -59,6 +59,12 @@ STATE_VOCAB: dict[str, tuple[str, str]] = {
     "healed": ("good", "well"),
     "better": ("good", "well"),
     "healthy": ("good", "well"),
+    "alright": ("good", "well"),
+    "fine": ("good", "well"),
+    "doing well": ("good", "well"),
+    "okay": ("good", "well"),
+    "ok": ("good", "well"),
+    "well": ("good", "well"),
     # mood: sad (bad) vs happy (good)
     "sad": ("bad", "sad"),
     "upset": ("bad", "sad"),
@@ -92,8 +98,23 @@ for _w in INJURY_WORDS:
     STATE_VOCAB[_w] = ("bad", "ill")
 
 _STATE_WORD_RE = re.compile(
-    r"\b(" + "|".join(STATE_VOCAB) + r")\b", re.I
+    r"\b(" + "|".join(sorted(STATE_VOCAB, key=len, reverse=True)) + r")\b", re.I
 )
+
+# Common speech-to-text/transcription swaps for relationship words. These
+# are deliberately limited to close-role vocabulary and only normalize the
+# role after "my", so ordinary names and facts are never silently rewritten.
+_ROLE_ALIASES = {
+    "sistser": "sister", "sisterr": "sister", "siter": "sister",
+    "brohter": "brother", "broter": "brother", "mtoher": "mother",
+    "motheer": "mother", "fater": "father", "daugher": "daughter",
+}
+
+def _normalize_role_typos(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        token = match.group(1).lower()
+        return "my " + _ROLE_ALIASES.get(token, token)
+    return re.sub(r"\bmy\s+([a-z]+)\b", replace, text, flags=re.I)
 
 # families that supersede each other: new group vs old group
 CONTRADICTING_FAMILIES: dict[str, str] = {
@@ -212,6 +233,7 @@ def parse_state_statement(text: str) -> dict[str, Any] | None:
     lowered = original.lower().rstrip(".!?").strip()
     if not lowered:
         return None
+    lowered = _normalize_role_typos(lowered)
 
     role: str | None = None
     name: str | None = None
@@ -345,7 +367,23 @@ def store_state(engine, statement: dict, raw_text: str) -> dict[str, Any]:
 
     if name is None and role and engine.semantic is not None:
         try:
-            name = engine.semantic.entities.get(role)
+            candidates = engine.semantic.entities.candidates(role)
+            if len(candidates) > 1:
+                return {
+                    "ok": False,
+                    "operation": "NEEDS_CLARIFICATION",
+                    "record_type": "person",
+                    "about": f"user's {role}",
+                    "role": role,
+                    "candidates": candidates,
+                    "question": (
+                        f"Which {role} do you mean: "
+                        + " or ".join(candidates)
+                        + "?"
+                    ),
+                    "superseded": [],
+                }
+            name = candidates[0] if candidates else None
         except Exception:  # noqa: BLE001
             name = None
 
@@ -378,7 +416,8 @@ def store_state(engine, statement: dict, raw_text: str) -> dict[str, Any]:
     except Exception:  # noqa: BLE001
         rows = []
 
-    norm_new = re.sub(r"[^a-z0-9]", "", raw_text.lower())
+    canonical_text = _normalize_role_typos(raw_text.strip())
+    norm_new = re.sub(r"[^a-z0-9]", "", canonical_text.lower())
 
     for row_id, ktype, raw in rows:
         if int(row_id) == 0:
@@ -440,7 +479,7 @@ def store_state(engine, statement: dict, raw_text: str) -> dict[str, Any]:
             )
             superseded.append(int(row_id))
 
-    value_text = raw_text.strip().rstrip(".!?")
+    value_text = canonical_text.rstrip(".!?")
     data = {
         "value": value_text,
         "subject": subject,
@@ -504,33 +543,56 @@ def find_states(engine, query: str | None = None) -> dict[str, Any]:
         rows = []
 
     q = (query or "").lower()
-    states = []
-    for row_id, raw, created_at, updated_at in rows:
+    clarification = None
+    if q and engine.semantic is not None:
         try:
-            data = raw if isinstance(raw, dict) else json.loads(raw or "{}")
+            for role in re.findall(r"\bmy\s+(%s)\b" % _ROLES_RE, q):
+                candidates = engine.semantic.entities.candidates(role)
+                named = [name for name in candidates if re.search(
+                    rf"\b{re.escape(name.lower())}\b", q
+                )]
+                if len(candidates) > 1 and not named:
+                    clarification = {
+                        "role": role,
+                        "candidates": candidates,
+                        "question": (
+                            f"Which {role} do you mean: "
+                            + " or ".join(candidates)
+                            + "?"
+                        ),
+                    }
+                    break
         except Exception:  # noqa: BLE001
-            continue
-        if q:
-            haystack = json.dumps(data, default=str).lower()
-            if not any(
-                token in haystack
-                for token in re.findall(r"[a-z]+", q)
-                if len(token) > 2
-            ):
+            clarification = None
+
+    states = []
+    if clarification is None:
+        for row_id, raw, created_at, updated_at in rows:
+            try:
+                data = raw if isinstance(raw, dict) else json.loads(raw or "{}")
+            except Exception:  # noqa: BLE001
                 continue
-        states.append(
-            {
-                "record_id": int(row_id),
-                "value": data.get("value", ""),
-                "subject": data.get("subject", ""),
-                "name": data.get("name"),
-                "role": data.get("role"),
-                "state": data.get("state", ""),
-                "valence": data.get("valence", "neutral"),
-                "created_at": created_at,
-                "updated_at": updated_at,
-            }
-        )
+            if q:
+                haystack = json.dumps(data, default=str).lower()
+                if not any(
+                    token in haystack
+                    for token in re.findall(r"[a-z]+", q)
+                    if len(token) > 2
+                ):
+                    continue
+            states.append(
+                {
+                    "record_id": int(row_id),
+                    "value": data.get("value", ""),
+                    "subject": data.get("subject", ""),
+                    "name": data.get("name"),
+                    "role": data.get("role"),
+                    "state": data.get("state", ""),
+                    "valence": data.get("valence", "neutral"),
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                }
+            )
 
     # ---- moments: superseded history rendered with explicit dates ----
     # "my sister is cured" closes the sick records; a later "how is my
@@ -549,4 +611,6 @@ def find_states(engine, query: str | None = None) -> dict[str, Any]:
         "states": states,
         "moments": moments,
         "query": query,
+        "needs_clarification": clarification is not None,
+        "clarification": clarification,
     }

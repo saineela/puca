@@ -1,25 +1,17 @@
-from .clock import (
-    SystemClock,
-    SimulatedClock,
-)
+"""Trigger-driven foundation for proactive nix_core interactions."""
 
-from .engine import (
-    NixDecisionEngine,
-)
-
-from .events import (
-    Observation,
-)
-
-from .state import (
-    WorldState,
-)
-
+from .core_boundary import CoreBoundary
+from .engine import DecisionEngine
+from .triggers import CorePromptRequest, DecisionOutcome, DecisionTrigger
+from .user_state import Energy, Presence, UserStateSnapshot
 
 __all__ = [
-    "SystemClock",
-    "SimulatedClock",
-    "NixDecisionEngine",
-    "Observation",
-    "WorldState",
+    "CoreBoundary",
+    "CorePromptRequest",
+    "DecisionEngine",
+    "DecisionOutcome",
+    "DecisionTrigger",
+    "Energy",
+    "Presence",
+    "UserStateSnapshot",
 ]

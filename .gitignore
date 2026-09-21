@@ -76,10 +76,17 @@ secrets.json
 /backups/
 /nix_backups/
 
-# Runtime logs and request traces
+# Runtime logs, request traces, service state, and temporary evaluation output
 logs/
 *.log
 *.jsonl
+*.pid
+*.sock
+*.tmp
+*.temp
+.nix-runtime/
+.runtime/
+/tmp/
 
 # Downloaded model weights, adapters, datasets, and generated artifacts
 /nix_knowledge/models/
@@ -96,6 +103,7 @@ models/
 
 # OS/editor files
 .DS_Store
+._*
 Thumbs.db
 .vscode/
 .idea/

@@ -239,6 +239,15 @@ def test_recurring_create(resolver):
     }
 
 
+@pytest.mark.parametrize(
+    "utterance",
+    ["who am I", "do you know who I am", "do you know me", "what do you know about me"],
+)
+def test_identity_recall_is_a_name_fact_lookup(resolver, utterance):
+    routed = route(utterance, resolver)
+    assert routed == ("find_facts", {"query": "name"})
+
+
 def test_recall_about(resolver):
     routed = route("what do you remember about robotics", resolver)
 

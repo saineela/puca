@@ -205,6 +205,38 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if parsed.path == "/sessions":
+            core = _get_core()
+            core.maintain()
+            sessions = []
+            for stat in core.sessions.session_stats():
+                turns = core.sessions.list_turns(
+                    session_tag=stat["session_tag"],
+                    include_pruned=True,
+                    limit=500,
+                )
+                sessions.append({
+                    **stat,
+                    "session_tag": stat["session_tag"],
+                    "turn_count": len(turns),
+                    "first_turn": stat.get("first_turn"),
+                    "last_turn": stat.get("last_turn"),
+                    "turns": [
+                        {
+                            "id": turn.id,
+                            "session_tag": turn.session_tag,
+                            "role": turn.role,
+                            "content": turn.content,
+                            "created_at": turn.created_at.isoformat(),
+                            "pruned": turn.pruned,
+                            "refs": turn.refs,
+                        }
+                        for turn in turns
+                    ],
+                })
+            self._json({"ok": True, "sessions": sessions})
+            return
+
         if parsed.path == "/stats":
             self._json(_get_actions().stats())
             return

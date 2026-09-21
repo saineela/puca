@@ -13,6 +13,13 @@ from ..operations import KnowledgeOperation
 _MAX_OCCURRENCES_PER_RECORD = 60
 
 
+def _display_moment(moment: datetime) -> str:
+    """Render an aware moment with an unambiguous local date and time."""
+    date_part = moment.strftime("%A, %B %d, %Y").replace(" 0", " ")
+    time_part = moment.strftime("%I:%M:%S %p").lstrip("0")
+    return f"{date_part} at {time_part}"
+
+
 def _parse_moment(value: Any, context: TemporalContext) -> datetime | None:
     """
     Parse an ISO-8601 moment (or a natural-language expression)
@@ -91,22 +98,51 @@ def _entry(
     context: TemporalContext,
     occurrence: bool,
 ) -> dict[str, Any]:
+    relative = context.describe(
+        start=start,
+        end=end if end > start else None,
+        all_day=all_day,
+    )
+
+    # Keep both the user's relative wording and absolute local timestamps.
+    # Core/Casper must use these fields instead of guessing what "tmr" or
+    # "tomorrow" means from its own clock.
     return {
         "record_id": record.id,
         "title": data.get("title"),
         "start": start.isoformat(),
         "end": end.isoformat(),
+        "start_date": start.date().isoformat(),
+        "start_time": start.strftime("%H:%M:%S"),
+        "end_date": end.date().isoformat(),
+        "end_time": end.strftime("%H:%M:%S"),
+        "start_local": _display_moment(start),
+        "end_local": _display_moment(end),
+        "timezone": str(context.timezone),
         "all_day": all_day,
         "status": data.get("status", "scheduled"),
         "temporal_expression": data.get("temporal_expression"),
         "recurring": bool(data.get("recurring")),
         "recurrence": data.get("recurrence"),
         "occurrence": occurrence,
-        "when": context.describe(
-            start=start,
-            end=end if end > start else None,
-            all_day=all_day,
-        ),
+        "when": relative,
+        "temporal_grounding": {
+            "original_expression": data.get("temporal_expression"),
+            "relative_label": relative,
+            "timezone": str(context.timezone),
+            "start": {
+                "iso": start.isoformat(),
+                "date": start.date().isoformat(),
+                "time": start.strftime("%H:%M:%S"),
+                "local": _display_moment(start),
+            },
+            "end": {
+                "iso": end.isoformat(),
+                "date": end.date().isoformat(),
+                "time": end.strftime("%H:%M:%S"),
+                "local": _display_moment(end),
+            },
+        },
     }
 
 

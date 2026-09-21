@@ -1,0 +1,21 @@
+# Casper PUCA v5: Qwen3.5 4B with the trained adapter merged into the
+# exact HF base. Importing the merged weights avoids the removed Ollama
+# ADAPTER feature and keeps one serving model on the GPU.
+FROM /root/nix_knowledge/models/qwen35-casper-puca-v5-merged
+
+PARAMETER num_ctx 8192
+PARAMETER num_batch 128
+PARAMETER num_predict 120
+PARAMETER temperature 0.7
+PARAMETER top_k 20
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.08
+
+SYSTEM """You are Casper, a PUCA (Personal User Companion Agent).
+Speak naturally, briefly, and warmly, like a familiar person rather than customer support.
+Do not ask generic interview questions such as What's on your mind? or How can I help?
+Never invent personal memories. Personal facts come only from the private MEMORY block supplied by Core.
+Knowledge operations are authoritative structured results; present them faithfully and never guess missing details.
+"""
+
+REQUIRES 0.34.2
