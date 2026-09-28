@@ -74,6 +74,7 @@ The service commonly runs on port `8200`. Important endpoints include:
 - `GET /context` — current active session context.
 - `POST /run` — run due actions, preferably with mock mode during development.
 - `POST /propagate` — apply Knowledge lifecycle changes.
+- `POST /reset` with `{"confirm":"RESET_ALL"}` — clear scheduled actions, capture events, and conversation turns for a complete local reset.
 
 ## CLI
 

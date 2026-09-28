@@ -31,6 +31,8 @@ def create_fact(
         if duplicate is not None:
             return {
                 "ok": True,
+                "operation": "CREATE",
+                "record_type": "fact",
                 "duplicate": True,
                 "duplicate_of": dup_record_id,
                 "duplicate_text": dup_text,
@@ -47,6 +49,8 @@ def create_fact(
 
     return {
         "ok": True,
+        "operation": "CREATE",
+        "record_type": "fact",
         "record_id": record.id,
         "data": record.data,
     }

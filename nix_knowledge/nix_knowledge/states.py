@@ -32,6 +32,29 @@ from typing import Any
 # Vocabulary
 # ----------------------------------------------------------------------
 
+CLOSE_PEOPLE_ROLES = frozenset({
+    "sister", "brother", "mom", "mum", "mother", "dad", "father",
+    "wife", "husband", "son", "daughter", "grandma", "grandmother",
+    "grandpa", "grandfather", "partner", "best friend",
+})
+
+
+def follow_up_eligible(data: dict[str, Any]) -> bool:
+    """Return the single authoritative caring-follow-up decision.
+
+    A follow-up is permitted only for a close/loved person whose current
+    state is an active problem and whose prior concern has not been answered.
+    The helper also derives the value for records written by older versions.
+    """
+    closeness = str(data.get("relationship_closeness") or "").lower()
+    policy = str(data.get("follow_up_policy") or "").lower()
+    close = closeness in {"close", "loved"} or policy == "only_if_close_and_unwell_or_problem"
+    active_problem = bool(data.get("follow_up_needed")) and str(
+        data.get("valence") or ""
+    ).lower() == "bad"
+    answered = bool(data.get("follow_up_answered"))
+    return close and active_problem and not answered
+
 PEOPLE_ROLES = (
     "sister", "brother", "mom", "mum", "mother", "dad", "father",
     "wife", "husband", "son", "daughter", "grandma", "grandmother",
@@ -480,6 +503,8 @@ def store_state(engine, statement: dict, raw_text: str) -> dict[str, Any]:
             superseded.append(int(row_id))
 
     value_text = canonical_text.rstrip(".!?")
+    close_person = bool(role in CLOSE_PEOPLE_ROLES)
+    follow_up_needed = statement["valence"] == "bad"
     data = {
         "value": value_text,
         "subject": subject,
@@ -487,6 +512,20 @@ def store_state(engine, statement: dict, raw_text: str) -> dict[str, Any]:
         "state": statement["state"],
         "valence": statement["valence"],
         "learned_from": raw_text.strip()[:200],
+        # Follow-up is a separate policy variable, not an inference Casper
+        # should rediscover from prose. A new state update answers any prior
+        # concern; only a close person's active problem is eligible again.
+        "relationship_closeness": "close" if close_person else "ordinary",
+        "follow_up_policy": "only_if_close_and_unwell_or_problem",
+        "follow_up_needed": follow_up_needed,
+        "follow_up_answered": not follow_up_needed,
+        "follow_up_eligible": close_person and follow_up_needed,
+        "follow_up_reason": (
+            "active_unwell_or_problem"
+            if close_person and follow_up_needed
+            else "already_answered_or_not_close"
+        ),
+        "follow_up_last_asked_at": None,
     }
     if role:
         data["role"] = role

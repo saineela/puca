@@ -290,6 +290,11 @@ class TemporalContext:
             step = timedelta(days=1)
         elif recurrence == "weekly":
             step = timedelta(weeks=1)
+        elif isinstance(recurrence, str) and recurrence.startswith("interval_") and recurrence.endswith("_days"):
+            try:
+                step = timedelta(days=int(recurrence[len("interval_"):-len("_days")]))
+            except (TypeError, ValueError):
+                return []
         else:
             return []
 

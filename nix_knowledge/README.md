@@ -68,6 +68,8 @@ The HTTP API is implemented by `scripts/knowledge_api.py`. Common endpoints incl
 - `GET /digest` — compact verified context for chat composition.
 - `GET /memory_block` — grounded context for Core.
 - `GET /keys` — profile/person key retrieval.
+- `POST /delete_record` — delete one record and its derived semantic/entity index entries.
+- `POST /reset` with `{"confirm":"RESET_ALL"}` — clear all Knowledge records, audit history, semantic vectors, and entity indexes.
 
 Start it from the repository root:
 
@@ -75,7 +77,7 @@ Start it from the repository root:
 python nix_knowledge/scripts/knowledge_api.py
 ```
 
-The database path is controlled by `NIX_KNOWLEDGE_DB` or `NIX_DATA_DIR`. Do not point tests at a personal live database.
+The database path is controlled by `NIX_KNOWLEDGE_DB` or `NIX_DATA_DIR`. Do not point tests at a personal live database. The reset endpoint is intentionally confirmation-gated and should only be exposed behind a trusted local dashboard.
 
 ## Neural and symbolic parsing
 
@@ -85,8 +87,9 @@ The engine uses a hybrid approach:
 2. Temporal symbolic parsing resolves dates, offsets, ranges, and day parts.
 3. Core's deterministic route and Knowledge symbolic rules handle high-confidence requests.
 4. Nix_predictor (Qwen 2.5 0.5B) handles indirect and multi-intent requests through constrained function calls.
-5. Validation prevents partial model proposals from silently discarding dates, titles, locations, or time ranges.
-6. Structured output is returned to Core with absolute timestamps and operation metadata.
+5. The Event/Alert Intent Gate detects explicit reminder, alert, notify, and recurring-action intent so a model proposal cannot downgrade an actionable request into a plain fact.
+6. Validation prevents partial model proposals from silently discarding dates, titles, locations, or time ranges.
+7. Structured output is returned to Core with absolute timestamps, recurrence metadata, event-intent confidence, and operation metadata.
 
 The local model files and Casper/QLoRA resources live under `models/` and are ignored by Git. Training and evaluation scripts are under `scripts/nixlm/`.
 

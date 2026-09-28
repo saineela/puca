@@ -143,6 +143,21 @@ def test_typo_ridden_weekend_request(resolver):
     assert arguments["temporal_expression"] == "this weekend"
 
 
+def test_casual_lead_in_and_article_free_meeting_create(resolver):
+    routed = route(
+        "alright bro, I have a TSA meeting tmr from 4pm to 6pm",
+        resolver,
+    )
+
+    assert routed == (
+        "create_calendar_event",
+        {
+            "title": "TSA meeting",
+            "temporal_expression": "tmr from 4pm to 6pm",
+        },
+    )
+
+
 def test_tomorrow_leading_clause(resolver):
     routed = route(
         "tomorrow I have a dentist appointment",
@@ -185,7 +200,7 @@ def test_time_range_create(resolver):
     name, arguments = routed
 
     assert name == "create_calendar_event"
-    assert arguments["title"] == "frc presentation"
+    assert arguments["title"] == "FRC presentation"
     assert arguments["temporal_expression"] == "today from 7pm to 8pm"
 
     resolved = resolver.resolve(arguments["temporal_expression"], now=NOW)
@@ -234,7 +249,7 @@ def test_recurring_create(resolver):
 
     assert name == "create_calendar_event"
     assert arguments == {
-        "title": "ftc meeting",
+        "title": "FTC meeting",
         "temporal_expression": "every monday",
     }
 

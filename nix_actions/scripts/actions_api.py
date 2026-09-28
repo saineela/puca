@@ -115,6 +115,25 @@ _core: NixCore | None = None
 _actions: ActionsEngine | None = None
 
 
+def _reset_store() -> dict[str, int]:
+    """Clear scheduled actions and conversation turns for a fresh user state."""
+    core = _get_core()
+    actions = _get_actions()
+    turns = core.sessions.connection.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
+    scheduled = actions.connection.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
+    captures = actions.connection.execute("SELECT COUNT(*) FROM capture_events").fetchone()[0]
+    with core.sessions.connection:
+        core.sessions.connection.execute("DELETE FROM turns")
+    with actions.connection:
+        actions.connection.execute("DELETE FROM actions")
+        actions.connection.execute("DELETE FROM capture_events")
+    return {
+        "conversation_turns": int(turns),
+        "scheduled_actions": int(scheduled),
+        "capture_events": int(captures),
+    }
+
+
 def _get_core() -> NixCore:
     global _core
     if _core is None:
@@ -189,7 +208,21 @@ class Handler(BaseHTTPRequestHandler):
             )
             core = _get_core()
             core.maintain()
-            turns = core.sessions.context_window(limit=limit)
+            filters = parse_qs(parsed.query)
+            location = filters.get("location", [""])[0].strip()
+            conversation_id = filters.get("conversation_id", [""])[0].strip()
+            turns = core.sessions.context_window(
+                limit=limit,
+                location=location if "location" in filters else None,
+                conversation_id=(
+                    conversation_id if "conversation_id" in filters else None
+                ),
+            )
+            if "location" in filters or "conversation_id" in filters:
+                # A partial scope must never fall back to the shared daily or
+                # weekly session; that would reintroduce cross-chat leakage.
+                if not location or not conversation_id:
+                    turns = []
             self._json(
                 {
                     "turns": [
@@ -198,6 +231,7 @@ class Handler(BaseHTTPRequestHandler):
                             "content": turn.content,
                             "session": turn.session_tag,
                             "created_at": turn.created_at.isoformat(),
+                            "refs": turn.refs,
                         }
                         for turn in turns
                     ]
@@ -246,6 +280,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         payload = self._read_json()
+
+        if path == "/reset":
+            if payload.get("confirm") != "RESET_ALL":
+                self._json({"ok": False, "error": "confirmation required"}, 400)
+                return
+            try:
+                self._json({"ok": True, **_reset_store()})
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
+            return
 
         if path == "/log":
             role = str(payload.get("role") or "user")

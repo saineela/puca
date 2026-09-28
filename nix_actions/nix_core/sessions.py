@@ -224,6 +224,8 @@ class SessionStore:
         session_bucket: str = "week",
         limit: int = 50,
         now: datetime | None = None,
+        location: str | None = None,
+        conversation_id: str | None = None,
     ) -> list[SessionTurn]:
         """
         The turns nix_core may treat as context: only the current
@@ -233,11 +235,21 @@ class SessionStore:
         moment = now or datetime.now(tz)
         tag = session_tag_for(moment, bucket=session_bucket)
 
-        return self.list_turns(
+        turns = self.list_turns(
             session_tag=tag,
             include_pruned=False,
-            limit=limit,
+            limit=limit if location is None and conversation_id is None else 500,
         )
+        if location is not None or conversation_id is not None:
+            if not location or not conversation_id:
+                return []
+            turns = [
+                turn for turn in turns
+                if turn.refs.get("location") == location
+                and str(turn.refs.get("conversation_id") or "") == conversation_id
+            ]
+            turns = turns[-limit:]
+        return turns
 
     # ------------------------------------------------------------------
     # Pruning

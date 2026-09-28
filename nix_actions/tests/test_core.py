@@ -71,6 +71,48 @@ def test_turns_land_in_current_session(core):
     assert response.session_tag == week_tag
 
 
+def test_context_window_scopes_source_and_conversation(core):
+    core.sessions.add_turn(
+        role="user",
+        content="dashboard thread one",
+        refs={"location": "dashboard", "conversation_id": "dash-1"},
+    )
+    core.sessions.add_turn(
+        role="assistant",
+        content="dashboard reply one",
+        refs={"location": "dashboard", "conversation_id": "dash-1"},
+    )
+    core.sessions.add_turn(
+        role="user",
+        content="dashboard thread two",
+        refs={"location": "dashboard", "conversation_id": "dash-2"},
+    )
+    core.sessions.add_turn(
+        role="user",
+        content="API thread one",
+        refs={"location": "openai-api", "conversation_id": "api-1"},
+    )
+
+    thread_one = core.sessions.context_window(
+        location="dashboard",
+        conversation_id="dash-1",
+    )
+    assert [turn.content for turn in thread_one] == [
+        "dashboard thread one",
+        "dashboard reply one",
+    ]
+    assert core.sessions.context_window(
+        location="openai-api",
+        conversation_id="api-1",
+    )[0].content == "API thread one"
+    assert core.sessions.context_window(
+        location="dashboard",
+        conversation_id="missing-thread",
+    ) == []
+    assert core.sessions.context_window(location="dashboard") == []
+    assert len(core.sessions.context_window()) == 4
+
+
 def test_context_window_excludes_pruned(core):
     core.handle_request(text="tell me about the robotics class")
 

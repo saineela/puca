@@ -82,6 +82,13 @@ _REMINDER_PREFIX_RE = re.compile(
 )
 
 
+_CASUAL_LEAD_IN_RE = re.compile(
+    r"^(?:(?:alright|all\s+right|okay|ok|hey|hi|hello|yo)\s+)?"
+    r"(?:bro|dude|man)\s*[,!:]\s*",
+    re.IGNORECASE,
+)
+
+
 _MONTHS = (
     "january|february|march|april|may|june|july|august|"
     "september|october|november|december"
@@ -97,13 +104,28 @@ def _clean_request(text: str) -> str:
         value,
         flags=re.IGNORECASE,
     )
+    value = _CASUAL_LEAD_IN_RE.sub("", value)
     value = _COMMAND_PREFIX_RE.sub("", value)
     value = _REMINDER_PREFIX_RE.sub("", value)
+    # Preserve event words but ignore common conversational framing when
+    # symbolically recovering title + time from casual voice transcripts.
+    value = re.sub(r"^(?:i\s+have|i've\s+got|i\s+got)\s+", "", value, flags=re.IGNORECASE)
     return value.strip(" ,:;")
 
 
 def _clean_title(title: Any) -> str:
-    return " ".join(str(title or "").strip().rstrip(".!?").split()).strip(" ,:;")
+    value = " ".join(str(title or "").strip().rstrip(".!?").split())
+    # Speech-style filler often leaks from a selector proposal into the
+    # title: "dentist appointment which is happening in 2 days". The date
+    # belongs in the temporal expression, not in the event name.
+    value = re.sub(
+        r"\s+(?:which|that)\s+is\s+(?:happening|scheduled|planned)\b",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(r"\s+\b(?:happening|scheduled|planned)\b$", "", value, flags=re.IGNORECASE)
+    return value.strip(" ,:;")
 
 
 def _resolve(resolver, expression: str, now: datetime | None):

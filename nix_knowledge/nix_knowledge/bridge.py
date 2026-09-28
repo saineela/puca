@@ -67,7 +67,10 @@ def schedule_event_actions(
     recurring = bool(data.get("recurring"))
     recurrence = data.get("recurrence") if recurring else None
 
-    if recurring and recurrence not in {"daily", "weekly"}:
+    if recurring and not (
+        recurrence in {"daily", "weekly"}
+        or (isinstance(recurrence, str) and recurrence.startswith("interval_") and recurrence.endswith("_days"))
+    ):
         return {
             "ok": False,
             "reason": (

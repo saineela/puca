@@ -46,6 +46,7 @@ dist/
 
 # Virtual environments
 .venv/
+.venvs/
 venv/
 env/
 nix_env/
@@ -60,9 +61,23 @@ nix_env/
 *.pfx
 credentials.json
 secrets.json
+hf_token
+hf_token.*
+HF_TOKEN
+HF_TOKEN.*
+huggingface_token
+huggingface_token.*
+HUGGINGFACE_TOKEN
+HUGGINGFACE_TOKEN.*
+.hf_token
+.hf_token.*
+.HF_TOKEN
+.HF_TOKEN.*
 
 # Local runtime data
 /data/
+/nix_core/data/
+*.npz
 *.db
 *.db-shm
 *.db-wal
@@ -106,6 +121,8 @@ logs/
 **/tensorboard/
 
 # Downloaded model weights, adapters, datasets, and generated artifacts
+# Keep release cards tracked; keep local upload staging and weight files out of Git.
+/.hf-release-staging/
 /nix_knowledge/models/
 /nix_knowledge/NVIDIA-Linux-*.run
 models/
@@ -128,7 +145,12 @@ models/
 # Hugging Face, PyTorch, CUDA, Triton, and compiler caches
 /.huggingface/
 /huggingface/
+/.hf_home/
+/hf_home/
 **/.huggingface/
+**/.hf_home/
+**/hf_home/
+**/hf_cache/
 **/huggingface_cache/
 **/transformers_cache/
 **/torch_extensions/
@@ -139,6 +161,7 @@ models/
 **/.cache/
 **/compile_cache/
 **/compiled_models/
+/unsloth_compiled_cache/
 
 # OS/editor files
 .DS_Store

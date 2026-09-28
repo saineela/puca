@@ -8,8 +8,8 @@ requests and routes them. The heavyweight components run as services:
     and the model-backed fallback classifier)   -> KNOWLEDGE_API_URL
   - nix_actions API    (action scheduler, capture service, sessions)
     -> ACTIONS_API_URL
-  - Ollama + SearXNG   (chatty / internet model, zero user knowledge)
-    -> OLLAMA_API_URL
+  - Configured conversation-model backend (local Transformers, Ollama, or
+    Tabby-compatible transport) -> backend-specific API/configuration
 
 This file lives in the user's deployment, so every value can be
 overridden with environment variables.
@@ -31,6 +31,10 @@ ASSISTANT_ROLE = "PUCA (Personal User Companion Agent)"
 # websocket message: {"token": "..."}.
 # No usable default: deployments must provide their own secret.
 AUTH_TOKEN = os.environ.get("NIX_AUTH_TOKEN", "")
+# OpenAI-compatible clients (Open WebUI, SDKs) use this independent key.
+# Empty means trusted local/LAN mode; set it for exposed deployments.
+OPENAI_API_KEY = os.environ.get("NIX_OPENAI_API_KEY", "")
+OPENAI_API_ALLOW_ORIGIN = os.environ.get("NIX_OPENAI_API_ALLOW_ORIGIN", "*")
 
 WS_HOST = os.environ.get("NIX_WS_HOST", "0.0.0.0")
 WS_PORT = int(os.environ.get("NIX_WS_PORT", "9000"))
@@ -72,24 +76,33 @@ TABBY_API_URL = os.environ.get(
 )
 TABBY_MODEL = os.environ.get("NIX_TABBY_MODEL", "casper-puca-v5")
 TABBY_API_KEY = os.environ.get("NIX_TABBY_API_KEY", "")
-# Backends: transformers (verified local LoRA), tabby (ExLlama server),
-# or ollama (legacy compatibility).
+# Backends: transformers (local LoRA selector), tabby (OpenAI-compatible
+# server transport), or ollama (legacy compatibility). This code setting is
+# not evidence of the backend used by any hosted process.
 CASPER_BACKEND = os.environ.get("NIX_CASPER_BACKEND", "transformers").lower()
 # Ollama remains an explicit fallback/diagnostic backend.
 OLLAMA_MODEL = os.environ.get("NIX_OLLAMA_MODEL", "qwen3.5:4b")
-# Fast conversational mode; deterministic services handle reasoning-heavy
-# knowledge operations separately.
-OLLAMA_THINK = os.environ.get("NIX_OLLAMA_THINK", "0") == "1"
-# Nix_predictor: the local Qwen2.5 0.5B selector handles ambiguous and
-# multi-intent routing after deterministic safety rules. It is intentionally
-# small, constrained to Knowledge function calls, and capped separately from
-# Casper. Set the Core flag to 0 only for a no-selector diagnostic run.
+# Casper is a non-thinking conversational model. These names remain as
+# compatibility constants for older imports, but environment variables cannot
+# re-enable hidden reasoning in the Casper path.
+OLLAMA_THINK = False
+ADAPTIVE_THINKING_GATE = False
+# Legacy Qwen2.5 0.5B Knowledge gate (disabled by default). Core routing is
+# deterministic first; do not enable this model gate without an explicit,
+# separately approved comparison.
 USE_NEURAL_INTENT = os.environ.get("NIX_CORE_USE_NEURAL_INTENT", "0") == "1"
 USE_KNOWLEDGE_MODEL_GATE = os.environ.get(
-    "NIX_CORE_USE_KNOWLEDGE_MODEL_GATE", "1"
+    "NIX_CORE_USE_KNOWLEDGE_MODEL_GATE", "0"
 ) == "1"
-# Parallel warm-up initializes Casper and Nix_predictor concurrently; they
-# never perform two generations for the same request.
+# Optional tiny CPU-first neural fallback for genuinely ambiguous routes.
+# It loads only a small NumPy artifact; if absent or uncertain, Core uses
+# the existing safe fallback. This can replace the Qwen route gate without
+# affecting Knowledge's symbolic tool validation.
+USE_CUSTOM_ROUTING_PREDICTOR = os.environ.get(
+    "NIX_CORE_USE_CUSTOM_ROUTING_PREDICTOR", "1"
+) == "1"
+# Optional startup warm-up for configured local models. This does not change
+# which model the official selector is configured to choose.
 WARMUP_MODELS = os.environ.get("NIX_CORE_WARMUP_MODELS", "1") == "1"
 KNOWLEDGE_VRAM_FRACTION = float(
     os.environ.get("NIX_KNOWLEDGE_VRAM_FRACTION", "0.30")

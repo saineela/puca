@@ -51,6 +51,19 @@ def extract_temporal_suffix(
     return None
 
 
+def _preserve_title_acronyms(title: str, request: str) -> str:
+    """Keep explicitly capitalized acronyms in stored calendar titles."""
+    for acronym in re.findall(r"\b[A-Z]{2,}\b", request):
+        title = re.sub(
+            rf"\b{re.escape(acronym)}\b",
+            acronym,
+            title,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    return title
+
+
 def extract_temporal_prefix(
     text: str,
     resolver,
@@ -541,7 +554,9 @@ def route(
     unambiguous requests. Returns None to defer to the model.
     """
     text = request.strip()
-    lowered = text.lower().rstrip(".!?")
+    # Retain acronym capitalization for stored event titles while matching
+    # and parsing temporal language case-insensitively.
+    lowered = text.rstrip(".!?")
     # Common speech-to-text spelling; keep the symbolic calendar rules
     # deterministic instead of delegating a simple window to the selector.
     lowered = re.sub(r"\bcalender\b", "calendar", lowered)
@@ -554,11 +569,23 @@ def route(
     # Voice transcripts often retain conversational lead-ins when the
     # Knowledge service is called directly (Core normally removes some
     # of these first). Keep the service boundary equally tolerant.
-    for prefix in ("real quick", "quickly", "ok so", "okay so", "hey", "okay", "ok", "so"):
-        marker = prefix + " "
-        if lowered.startswith(marker):
-            lowered = lowered[len(marker):].lstrip(" ,:-")
+    for prefix in (
+        "real quick", "quickly", "ok so", "okay so", "hey",
+        "okay", "ok", "so", "alright bro", "all right bro",
+        "okay bro", "ok bro", "hey bro", "hi bro", "hello bro",
+        "yo bro", "bro", "alright dude", "all right dude", "dude",
+        "alright man", "all right man", "man",
+    ):
+        marker = re.match(
+            rf"^{re.escape(prefix)}(?:\s*[,!:]\s*|\s+)",
+            lowered,
+            re.IGNORECASE,
+        )
+        if marker:
+            lowered = lowered[marker.end():].lstrip(" ,:-")
             break
+
+    lowered = lowered.lower()
 
     # Polite command wrappers: "can you remind me to...", "could you
     # please cancel my...". The request starts after the wrapper.
@@ -777,6 +804,7 @@ def route(
 
             if split is not None and split[0]:
                 title, expression = split
+                title = _preserve_title_acronyms(title, text)
                 return (
                     "create_calendar_event",
                     {
@@ -805,6 +833,7 @@ def route(
             title, expression = split
 
             if title:
+                title = _preserve_title_acronyms(title, text)
                 return (
                     "create_calendar_event",
                     {
@@ -833,6 +862,7 @@ def route(
 
                 if suffix_split is not None and suffix_split[0]:
                     title, trailing = suffix_split
+                    title = _preserve_title_acronyms(title, text)
                     return (
                         "create_calendar_event",
                         {
@@ -844,7 +874,7 @@ def route(
                 return (
                     "create_calendar_event",
                     {
-                        "title": rest,
+                        "title": _preserve_title_acronyms(rest, text),
                         "temporal_expression": expression,
                     },
                 )

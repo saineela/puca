@@ -40,21 +40,49 @@ from config import (
     OLLAMA_MODEL,
     OLLAMA_KEEP_ALIVE,
     OLLAMA_NUM_BATCH,
-    OLLAMA_NUM_CTX,
     OLLAMA_THINK,
+    OLLAMA_NUM_CTX,
     TIMEZONE,
     ASSISTANT_NAME,
     ASSISTANT_ROLE,
     CASPER_BACKEND,
     USE_NEURAL_INTENT,
     USE_KNOWLEDGE_MODEL_GATE,
+    USE_CUSTOM_ROUTING_PREDICTOR,
     WARMUP_MODELS,
 )
 from context import select_context
 from request_log import log_request, make_entry
 from router import CHAT, KNOWLEDGE, UNKNOWN, classify
+from routing_engine import CoreRoutingEngine
 from tone_policy import conversation_policy
 from tabby_client import TabbyClient
+from puca_v4_contract import infer_envelope, verify_reply
+from text_cleanup import clean_response_text
+
+
+def _active_assistant_identity() -> tuple[str, str, str]:
+    """Return the active conversational backend's name, role, and model ID."""
+    if CASPER_BACKEND == "transformers":
+        try:
+            from assistant_model import (
+                assistant_name_for_model,
+                selected_model as selected_official_model,
+            )
+
+            model_id = selected_official_model()
+            name = assistant_name_for_model(model_id)
+            role = (
+                "warm, curious conversational companion with a distinct personality"
+                if name == "Luna"
+                else ASSISTANT_ROLE
+            )
+            return name, role, model_id
+        except Exception:
+            pass
+    if CASPER_BACKEND == "tabby":
+        return ASSISTANT_NAME, ASSISTANT_ROLE, "tabby"
+    return ASSISTANT_NAME, ASSISTANT_ROLE, OLLAMA_MODEL
 
 
 # ----------------------------------------------------------------------
@@ -116,6 +144,20 @@ class KnowledgeClient:
             return response.json().get("route") or CHAT
         except Exception:
             return CHAT
+
+    def thinking_decision(self, text: str) -> dict[str, Any]:
+        """Ask Qwen2.5 0.5B for a reasoning budget only for hard-looking text."""
+        try:
+            response = requests.post(
+                f"{self.base_url}/thinking",
+                json={"text": text},
+                timeout=15,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data if isinstance(data, dict) else {"think": False, "mode": "FAST"}
+        except Exception:
+            return {"ok": False, "think": False, "mode": "FAST", "source": "fallback"}
 
     def digest(self) -> str:
         """
@@ -242,18 +284,45 @@ class ActionsClient:
         except Exception:
             pass
 
-    def context(self, limit: int = CONTEXT_WINDOW) -> list[dict[str, Any]]:
-        """Un-pruned turns of the current session, oldest first."""
+    def context(
+        self,
+        limit: int = CONTEXT_WINDOW,
+        *,
+        location: str | None = None,
+        conversation_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Read context, optionally scoped to one source and conversation."""
+        params: dict[str, Any] = {"limit": limit}
+        if location is not None:
+            params["location"] = location
+        if conversation_id is not None:
+            params["conversation_id"] = conversation_id
         try:
             response = requests.get(
                 f"{self.base_url}/context",
-                params={"limit": limit},
+                params=params,
                 timeout=10,
             )
             response.raise_for_status()
             return response.json().get("turns", [])
         except Exception:
             return []
+
+    def context_for(
+        self,
+        *,
+        location: str,
+        conversation_id: str | None,
+        limit: int = CONTEXT_WINDOW,
+    ) -> list[dict[str, Any]]:
+        """Fail closed when a tracked source has no stable conversation ID."""
+        if not conversation_id:
+            return []
+        return self.context(
+            limit=limit,
+            location=location,
+            conversation_id=conversation_id,
+        )
 
 
 # ----------------------------------------------------------------------
@@ -321,7 +390,10 @@ class OllamaClient:
             "keep_alive": OLLAMA_KEEP_ALIVE,
             # Global thinking is only an opt-in ceiling. Simple requests
             # explicitly pass think=False even if the deployment enabled it.
-            "think": OLLAMA_THINK if think is None else bool(think),
+            # Casper thinking is disabled globally. Keep the field explicit
+            # for Ollama-compatible servers that otherwise enable it by
+            # default, regardless of deployment environment variables.
+            "think": False,
             "options": {
                 "num_ctx": OLLAMA_NUM_CTX,
                 "num_batch": OLLAMA_NUM_BATCH,
@@ -357,7 +429,8 @@ class OllamaClient:
         """One-shot generation (used for chat-route error fallbacks)."""
         return self.chat(
             system_prompt=(
-                f"You are {ASSISTANT_NAME}, a {ASSISTANT_ROLE}. "
+                f"You are {_active_assistant_identity()[0]}, a "
+                f"{_active_assistant_identity()[1]}. "
                 "Be concise and natural; do not ask generic follow-up questions."
             ),
             history=[],
@@ -821,30 +894,119 @@ def should_delegate_to_knowledge(text: str) -> bool:
     return bool(parse_state_statement and parse_state_statement(normalized))
 
 
-# Product identity is a protected fact, not a model-generated biography.
-# Keeping it deterministic prevents Casper from confusing the Qwen model's
-# original developer with the person who built this PUCA system.
+# Product identity is a Core-owned fact, not a model-generated biography.
+# A configured profile name is a conversational preference, not authentication.
 _CREATOR_IDENTITY_RE = re.compile(
     r"^(?:"
     r"who\s+(?:created|made|built|developed)\s+"
-    r"(?:casper|you|nix|this|it|this\s+puca|the\s+puca|"
+    r"(?:casper|luna|you|nix|this|it|this\s+puca|the\s+puca|"
     r"you\s+casper|casper\s+you|"
     r"this\s+system|the\s+system)|"
-    r"who\s+is\s+(?:your|casper's|nix's)\s+"
+    r"who\s+is\s+(?:your|casper's|luna's|nix's)\s+"
     r"(?:creator|developer|author|builder|maker)|"
     r"who\s+is\s+the\s+"
     r"(?:creator|developer|author|builder|maker)\s+of\s+"
-    r"(?:casper|nix|you|this|it|this\s+puca|the\s+puca|"
+    r"(?:casper|luna|nix|you|this|it|this\s+puca|the\s+puca|"
     r"this\s+system|the\s+system)|"
     r"who\s+developed\s+this\s+puca|"
     r"who\s+made\s+you"
-    r")\s*(?:casper|nix)?\s*[?!.,]*$",
+    r")\s*(?:casper|luna|nix)?\s*[?!.,]*$",
     re.IGNORECASE,
 )
-
 _CREATOR_IDENTITY_REPLY = (
     "Created and Built by Sai Neela, and living in NIX's PUCA system."
 )
+_LUNA_CREATOR_IDENTITY_REPLY = (
+    "NIX PUCA was created by Sai Neela; I'm Luna, here in NIX with you."
+)
+_LUNA_IDENTITY_REPLY = "I'm Luna."
+_USER_PROFILE_IDENTITY_RE = re.compile(
+    r"^(?:who\s+am\s+i|what(?:'s|\s+is)\s+my\s+name|"
+    r"do\s+you\s+know\s+(?:who\s+)?i\s+am|do\s+you\s+know\s+my\s+name)\s*[?!.,]*$",
+    re.IGNORECASE,
+)
+_USER_PROFILE_IDENTITY_RULE = "configured_user_identity"
+_USER_PROFILE_INTRODUCTION_RULE = "configured_user_introduction"
+_USER_PROFILE_INTRODUCTION_RE = re.compile(
+    r"^(?:i\s+am|i['’]m|my\s+name\s+is|call\s+me|this\s+is)\s+"
+    r"(?P<name>[\w][\w'’ .-]{0,78})[?!.,]*$",
+    re.IGNORECASE,
+)
+
+
+def is_user_profile_identity_request(text: str) -> bool:
+    """Recognize direct questions answered by the configured preferred name."""
+    normalized = " ".join((text or "").split())
+    return bool(_USER_PROFILE_IDENTITY_RE.match(normalized))
+
+
+def _configured_user_name() -> str:
+    """Read the NIX-instance profile name without inferring user identity."""
+    try:
+        from user_profile import get_user_name
+
+        return get_user_name()
+    except Exception:
+        return ""
+
+
+def _matches_configured_user_introduction(text: str, profile_name: str) -> bool:
+    """Match a first-person name introduction to the Settings preference."""
+    match = _USER_PROFILE_INTRODUCTION_RE.match(" ".join((text or "").split()))
+    if not match or not profile_name:
+        return False
+
+    def name_key(value: str) -> str:
+        return "".join(char.casefold() for char in value if char.isalnum())
+
+    introduced = name_key(match.group("name"))
+    configured_parts = profile_name.split()
+    return introduced in {
+        name_key(profile_name),
+        name_key(configured_parts[0]) if configured_parts else "",
+    }
+
+
+def _identity_context_for_model(assistant_name: str, assistant_role: str) -> str:
+    """Supply the selected model's persona and trusted NIX/profile facts."""
+    if assistant_name == "Luna":
+        try:
+            from luna_model import LUNA_SYSTEM_PROMPT
+
+            persona = LUNA_SYSTEM_PROMPT
+        except Exception:
+            persona = (
+                "You are Luna. You are the user's conversational companion. Be warm, "
+                "natural, and concise; answer the latest user message directly. Do not "
+                "invent memories, real-world actions, relationships, or a human biography. "
+                "Use only facts supplied in this conversation or trusted context. If asked "
+                "your name, say Luna. If you do not know something, say so briefly."
+            )
+    else:
+        persona = (
+            f"You are {assistant_name}, a warm, upbeat {assistant_role} "
+            "running on the user's private home server. "
+            f"Your name is {assistant_name}."
+        )
+
+    system_identity = (
+        "TRUSTED NIX FACT: NIX PUCA was created by Sai Neela. "
+        "Do not treat a preferred name as identity verification."
+        if assistant_name == "Luna"
+        else "TRUSTED NIX FACT: NIX PUCA was created and built by Sai Neela. "
+        "Do not treat a preferred name as identity verification."
+    )
+    profile_name = _configured_user_name()
+    if profile_name:
+        profile = (
+            "The user's preferred name in NIX Settings is "
+            f"{json.dumps(profile_name, ensure_ascii=False)}."
+        )
+    else:
+        profile = ""
+    return "\n\n".join(part for part in (persona, system_identity, profile) if part)
+
+
 _ASSISTANT_IDENTITY_RE = re.compile(
     r"^(?:(?:bro|hey|hi|yo)\s+)?(?:who\s+are\s+you(?:\s+again)?|"
     r"who\s+is\s+casper(?:\s+again)?|what\s+are\s+you)\s*[?!.,]*$",
@@ -854,6 +1016,31 @@ _ASSISTANT_IDENTITY_REPLY = (
     "I'm Casper, Sai's PUCA (Personal User Companion Agent) living in NIX."
 )
 
+# Short creative prompts are not personal-memory requests. This guard prevents
+# a small Knowledge selector from turning "tell me a story using my name" into
+# a fabricated fact write.
+_CREATIVE_CHAT_RE = re.compile(
+    r"\b(?:tell|write|make|create)\s+(?:me\s+)?(?:a\s+)?"
+    r"(?:story|poem|joke|song|riddle|bedtime\s+story)\b",
+    re.IGNORECASE,
+)
+_SOCIAL_COMPANION_REPLIES = (
+    # These are deliberately short conversational acts, not a second
+    # assistant persona. They prevent a weak adapter from emitting identity
+    # disclaimers for ordinary social turns.
+    (re.compile(r"^(?:hello|hey|hi)\s*[,!? ]*(?:are\s+you\s+alive|you\s+there)[.!?]*$", re.I),
+     "Yeah, I’m here."),
+    (re.compile(r"\b(?:gotchu|got\s+you),?\s+good\s+to\s+know\s+you\s+casper\b", re.I),
+     "Yep. Good to know you too."),
+    (re.compile(r"\bcasper\b.*\b(?:sweet|kind|nice)\b", re.I),
+     "That’s sweet of you to say."),
+    (re.compile(r"^(?:i['’]?m|i am)\s+your\s+father[.!?]*$", re.I),
+     "That explains the dramatic entrance. Hi, Dad."),
+)
+_GENERIC_UNCERTAIN_REPLY_RE = re.compile(
+    r"^(?:i['’]?m|i am)\s+not\s+sure\s+how\s+to\s+answer\s+that(?:\s+yet)?[.!?]*$",
+    re.IGNORECASE,
+)
 
 def is_creator_identity_request(text: str) -> bool:
     """Recognize creator questions that must use the canonical identity."""
@@ -862,7 +1049,73 @@ def is_creator_identity_request(text: str) -> bool:
 
 
 def is_assistant_identity_request(text: str) -> bool:
-    return bool(_ASSISTANT_IDENTITY_RE.match(" ".join((text or "").split())))
+    normalized = " ".join((text or "").split())
+    if _ASSISTANT_IDENTITY_RE.match(normalized):
+        return True
+    # Handle conversational extensions such as "Who are you? An alien?"
+    # as one identity turn instead of splitting the tail into Knowledge.
+    return bool(re.match(
+        r"^who\s+are\s+you\?\s*(?:an?\s+\w+(?:\s+\w+)?\??)?$",
+        normalized,
+        re.IGNORECASE,
+    ))
+
+
+def creative_chat_request(text: str) -> bool:
+    return bool(_CREATIVE_CHAT_RE.search(" ".join((text or "").split())))
+
+
+def social_companion_reply(text: str) -> str | None:
+    normalized = " ".join((text or "").split())
+    for pattern, reply in _SOCIAL_COMPANION_REPLIES:
+        if pattern.search(normalized):
+            return reply
+    return None
+
+
+_LOW_STAKES_PREFERENCE_RE = re.compile(
+    r"\b(?:do\s+you\s+)?prefer\s+(?P<first>[^?]+?)\s+or\s+(?P<second>[^?]+?)[.!?]*$",
+    re.IGNORECASE,
+)
+
+
+def low_stakes_preference_reply(text: str, memory: str = "") -> str | None:
+    """Answer harmless preference prompts without claiming human experience.
+
+    This is intentionally limited to food/drink comparisons. It cannot choose
+    medication, finances, safety actions, or other consequential options. If
+    the private memory says the user values healthy/diet-conscious choices, the
+    healthier-sounding option is preferred; otherwise Casper gives a light,
+    subjective conversational pick rather than refusing to engage.
+    """
+    normalized = " ".join((text or "").split())
+    match = _LOW_STAKES_PREFERENCE_RE.search(normalized)
+    if not match:
+        return None
+    first = match.group("first").strip(" ,")
+    second = match.group("second").strip(" ,")
+    combined = f"{first} {second}".casefold()
+    food_signal = re.search(
+        r"\b(?:popsicle|popsicles|ice cream|candy|snack|drink|smoothie|"
+        r"dessert|cake|cookie|cookies|chocolate|strawberry)\b",
+        combined,
+    )
+    if not food_signal:
+        return None
+    health_focused = bool(re.search(
+        r"\b(?:diet|healthy|healthier|nutrition|calorie|calories|eat\s+well|"
+        r"low[- ]?sugar|sugar[- ]?free)\b",
+        memory,
+        re.IGNORECASE,
+    ))
+    if health_focused:
+        fruit_option = next(
+            (option for option in (first, second)
+             if re.search(r"\b(?:strawberry|fruit|yogurt|water|smoothie)\b", option, re.I)),
+            second,
+        )
+        return f"I’d go with {fruit_option}—it sounds like the better fit for your healthier choice."
+    return f"I’d pick {second}; that one sounds especially good."
 
 
 _GENERIC_INTERVIEW_RE = re.compile(
@@ -877,15 +1130,42 @@ _INTERNAL_ROUTE_LEAK_RE = re.compile(
     r"(?:^|\s)(?:CHAT|KNOWLEDGE)\s+rule:\s*[^\n]+",
     re.IGNORECASE,
 )
+_NONESSENTIAL_QUESTION_RE = re.compile(
+    r"(?:do\s+you\s+want\s+to\s+talk(?:\s+about\s+[^?]+)?|"
+    r"would\s+you\s+like\s+to\s+talk(?:\s+about\s+[^?]+)?|"
+    r"(?:can|could)\s+you\s+tell\s+me\s+more|"
+    r"want\s+to\s+talk\s+about\s+it)\s*\?*\s*$",
+    re.IGNORECASE,
+)
 
 
-def suppress_internal_route_metadata(reply: str) -> str:
+def strip_model_control_traces(reply: str) -> str:
+    """Remove hidden reasoning/template artifacts before user rendering."""
+    text = str(reply or "")
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"<\|(?:im_start|im_end|eot_id)\|>", "", text, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def suppress_internal_route_metadata(
+    reply: str, *, assistant_name: str | None = None
+) -> str:
     """Never expose Core routing labels as a user-facing answer."""
     text = re.sub(r"\s+", " ", (reply or "")).strip()
     if not _INTERNAL_ROUTE_LEAK_RE.search(text):
         return text
     cleaned = _INTERNAL_ROUTE_LEAK_RE.sub("", text).strip(" -:;,.")
-    return cleaned or _ASSISTANT_IDENTITY_REPLY
+    fallback = f"I'm {assistant_name}, your personal companion." if assistant_name else _ASSISTANT_IDENTITY_REPLY
+    return cleaned or fallback
+
+
+def suppress_nonessential_questions(reply: str, *, avoid: bool) -> str:
+    """Remove model-added emotional questions when the user needs quiet."""
+    text = re.sub(r"\s+", " ", (reply or "")).strip()
+    if not avoid or not text or not _NONESSENTIAL_QUESTION_RE.search(text):
+        return text
+    cleaned = _NONESSENTIAL_QUESTION_RE.sub("", text).strip(" .,!;:")
+    return cleaned or "Okay. I’ll keep this brief."
 
 
 def suppress_generic_interview(reply: str) -> str:
@@ -925,21 +1205,47 @@ class Brain:
             self.ollama = ollama
         elif CASPER_BACKEND == "transformers":
             # Lazy wrapper: importing Core does not allocate GPU memory.
-            from casper_model import get_casper_client
+            from assistant_model import (
+                get_chat_client,
+                selected_model,
+                select_model,
+            )
 
-            class _LazyCasper:
-                model = "casper-puca-qlora-v5"
+            class _LazyOfficialAssistant:
                 api_url = "local://transformers"
 
-                def chat(self, **kwargs):
-                    return get_casper_client().chat(**kwargs)
+                @property
+                def model(self):
+                    return selected_model()
 
-            self.ollama = _LazyCasper()
+                def select_model(self, model_name: str):
+                    return select_model(model_name)
+
+                def chat(self, **kwargs):
+                    # Keep the process-wide slot until generation completes;
+                    # only the selected official adapter can be resident.
+                    from model_slot import GPU_SLOT
+                    with GPU_SLOT:
+                        return get_chat_client().chat(**kwargs)
+
+            self.ollama = _LazyOfficialAssistant()
         elif CASPER_BACKEND == "tabby":
             self.ollama = TabbyClient()
         else:
             self.ollama = OllamaClient()
         self.log_requests = log_requests
+        self.routing_engine = CoreRoutingEngine()
+        self.routing_predictor = None
+        if USE_CUSTOM_ROUTING_PREDICTOR:
+            try:
+                from routing_predictor import load_repository_predictor
+
+                self.routing_predictor = load_repository_predictor()
+            except Exception:
+                # A missing/corrupt optional artifact must never prevent Core
+                # from serving; the symbolic route and safe chat fallback stay
+                # available.
+                self.routing_predictor = None
         # Pending person clarifications are conversational state, not durable
         # knowledge. They are keyed by the voice/dashboard conversation ID so
         # the next answer ("Maanvi", "the second one") can complete the prior
@@ -960,9 +1266,9 @@ class Brain:
 
         casper_loader = None
         if CASPER_BACKEND == "transformers":
-            from casper_model import get_casper_client
+            from assistant_model import get_chat_client
 
-            casper_loader = get_casper_client
+            casper_loader = get_chat_client
         # The Knowledge selector is not part of the default route path. Do
         # not warm it merely because the console starts; that would allocate
         # a second model for a job Core's deterministic hybrid already does.
@@ -1039,6 +1345,23 @@ class Brain:
                 )
         return f"{request} about {name}"
 
+    def _log_turn(
+        self,
+        *,
+        role: str,
+        content: str,
+        refs: dict[str, Any] | None = None,
+        location: str = "unknown",
+        conversation_id: str | None = None,
+    ) -> None:
+        """Keep source and conversation identity attached to stored turns."""
+        turn_refs = dict(refs or {})
+        if location and location != "unknown":
+            turn_refs.setdefault("location", location)
+        if conversation_id:
+            turn_refs.setdefault("conversation_id", str(conversation_id))
+        self.actions.log_turn(role=role, content=content, refs=turn_refs)
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
@@ -1057,13 +1380,78 @@ class Brain:
         Returns {"route", "reply", "rule", "details"}.
         """
         clean = (text or "").strip()
+        if session_context is None and location and location != "unknown":
+            # Persistent history must stay within its source and conversation.
+            # API callers pass their own OpenAI messages explicitly; dashboard
+            # and other tracked clients can only read their matching thread.
+            context_for = getattr(self.actions, "context_for", None)
+            session_context = (
+                context_for(location=location, conversation_id=conversation_id)
+                if callable(context_for)
+                else []
+            )
         t0 = time.perf_counter()
         entry: dict[str, Any] | None = None
         clauses: list[str] = [clean]
 
         def _finish(response: dict[str, Any]) -> dict[str, Any]:
-            """Log once, then return. Covers every exit path."""
+            """Attach routing telemetry, log once, then return.
+
+            Every exit path must expose the actual local routing decision.
+            Downstream model/Knowledge time is never inferred as routing time.
+            """
             nonlocal entry
+            details = response.setdefault("details", {})
+            assistant_name, _assistant_role, official_model = _active_assistant_identity()
+            details.setdefault("assistant_name", assistant_name)
+            details.setdefault("official_model", official_model)
+            details.setdefault("backend", CASPER_BACKEND)
+            response["reply"] = clean_response_text(response.get("reply") or "")
+            if "routing_engine" not in details:
+                if len(clauses) > 1:
+                    clause_decisions = [
+                        self.routing_engine.decide(clause)
+                        for clause in clauses
+                    ]
+                    routes = list(dict.fromkeys(
+                        decision.route for decision in clause_decisions
+                    ))
+                    details["routing_engine"] = {
+                        "route": "+".join(routes) or UNKNOWN,
+                        "confidence": round(
+                            min(
+                                (decision.confidence for decision in clause_decisions),
+                                default=0.0,
+                            ),
+                            3,
+                        ),
+                        "reason": "multi_clause",
+                        "rule": "multi_clause",
+                        "requires_knowledge": any(
+                            decision.requires_knowledge
+                            for decision in clause_decisions
+                        ),
+                        "requires_model": any(
+                            decision.requires_model
+                            for decision in clause_decisions
+                        ),
+                        "safety": "normal",
+                        "latency_ms": round(
+                            sum(
+                                decision.latency_ms
+                                for decision in clause_decisions
+                            ),
+                            3,
+                        ),
+                        "clauses": [
+                            decision.as_dict()
+                            for decision in clause_decisions
+                        ],
+                    }
+                else:
+                    details["routing_engine"] = self.routing_engine.decide(
+                        clean
+                    ).as_dict()
             if entry is None and self.log_requests:
                 entry = make_entry(
                     request=clean,
@@ -1120,33 +1508,107 @@ class Brain:
                 "original_request": pending["request"],
                 "completed_request": completed_request,
             }
-            self.actions.log_turn(
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=response["reply"],
                 refs={"route": response.get("route"), "continuation": True},
             )
             return _finish(response)
 
-        # Do not ask Casper to recall its own product identity. This is a
-        # protected Core fact and must never be replaced by a route label,
-        # model name, or the base model's upstream developer.
-        if is_creator_identity_request(clean) or is_assistant_identity_request(clean):
+        profile_name = _configured_user_name()
+        if is_user_profile_identity_request(clean):
             identity_reply = (
-                _CREATOR_IDENTITY_REPLY
-                if is_creator_identity_request(clean)
-                else _ASSISTANT_IDENTITY_REPLY
+                f"You're {profile_name}."
+                if profile_name
+                else "I don't have a preferred name set in NIX Settings yet."
             )
-            identity_rule = (
-                "creator_identity"
-                if is_creator_identity_request(clean)
-                else "assistant_identity"
-            )
-            self.actions.log_turn(
+            identity_rule = _USER_PROFILE_IDENTITY_RULE
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
                 role="user",
                 content=clean,
-                refs={"route": CHAT, "rule": "creator_identity"},
+                refs={"route": CHAT, "rule": identity_rule},
             )
-            self.actions.log_turn(
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=identity_reply,
+                refs={"route": CHAT, "rule": identity_rule},
+            )
+            return _finish(
+                {
+                    "route": CHAT,
+                    "reply": identity_reply,
+                    "rule": identity_rule,
+                    "details": {
+                        "deterministic": True,
+                        "model_called": False,
+                        "profile_source": "instance_settings",
+                    },
+                }
+            )
+
+        if _matches_configured_user_introduction(clean, profile_name):
+            identity_reply = f"Got it, {profile_name}."
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=clean,
+                refs={"route": CHAT, "rule": _USER_PROFILE_INTRODUCTION_RULE},
+            )
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=identity_reply,
+                refs={"route": CHAT, "rule": _USER_PROFILE_INTRODUCTION_RULE},
+            )
+            return _finish(
+                {
+                    "route": CHAT,
+                    "reply": identity_reply,
+                    "rule": _USER_PROFILE_INTRODUCTION_RULE,
+                    "details": {
+                        "deterministic": True,
+                        "model_called": False,
+                        "profile_source": "instance_settings",
+                    },
+                }
+            )
+
+        # Product identity is a protected Core fact. The configured user is
+        # not required to be the creator, and neither identity is inferred.
+        if is_creator_identity_request(clean) or is_assistant_identity_request(clean):
+            assistant_name, _assistant_role, _model_id = _active_assistant_identity()
+            if is_creator_identity_request(clean):
+                identity_reply = (
+                    _LUNA_CREATOR_IDENTITY_REPLY
+                    if assistant_name == "Luna"
+                    else _CREATOR_IDENTITY_REPLY
+                )
+                identity_rule = "creator_identity"
+            else:
+                identity_reply = (
+                    _LUNA_IDENTITY_REPLY
+                    if assistant_name == "Luna"
+                    else _ASSISTANT_IDENTITY_REPLY
+                )
+                identity_rule = "assistant_identity"
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=clean,
+                refs={"route": CHAT, "rule": identity_rule},
+            )
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=identity_reply,
                 refs={"route": CHAT, "rule": identity_rule},
@@ -1164,7 +1626,101 @@ class Brain:
                 }
             )
 
+        # Small relational remarks should not spend a generation or get
+        # interpreted as a personal-memory write. Keep them bounded and
+        # human, especially for playful lines such as "I am your father".
+        social_reply = (
+            social_companion_reply(clean)
+            if _active_assistant_identity()[0] != "Luna"
+            else None
+        )
+        if social_reply:
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=clean,
+                refs={"route": CHAT, "rule": "social_companion"},
+            )
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=social_reply,
+                refs={"route": CHAT},
+            )
+            return _finish({
+                "route": CHAT,
+                "reply": social_reply,
+                "rule": "social_companion",
+                "details": {
+                    "model_called": False,
+                    "routing_engine": self.routing_engine.decide(clean).as_dict(),
+                },
+            })
+
+        # Harmless preference questions should feel conversational. Keep the
+        # choice bounded to food/drink and consult only the private memory
+        # signal relevant to the choice; consequential decisions still go
+        # through the normal Knowledge/Core policy.
+        preference_reply = (
+            low_stakes_preference_reply(clean, self.knowledge.memory_block(clean))
+            if _active_assistant_identity()[0] != "Luna"
+            else None
+        )
+        if preference_reply:
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=clean,
+                refs={"route": CHAT, "rule": "low_stakes_preference"},
+            )
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=preference_reply,
+                refs={"route": CHAT},
+            )
+            return _finish({
+                "route": CHAT,
+                "reply": preference_reply,
+                "rule": "low_stakes_preference",
+                "details": {
+                    "model_called": False,
+                    "safety_scope": "food_drink_only",
+                    "routing_engine": self.routing_engine.decide(clean).as_dict(),
+                },
+            })
+
+        # Creative requests must remain chat when they are the whole turn.
+        # A mixed request such as "remember X and tell me a joke" must still
+        # reach the clause router so the durable-memory operation is preserved.
         clauses = split_clauses(clean)
+        if len(clauses) == 1 and creative_chat_request(clean):
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=clean,
+                refs={"route": CHAT, "rule": "creative_request_guard"},
+            )
+            response = self._handle_chat(
+                clean,
+                session_context=session_context,
+                conversation_id=conversation_id,
+            )
+            response["rule"] = "creative_request_guard"
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=response["reply"],
+                refs={"route": CHAT},
+            )
+            return _finish(response)
+
         if len(clauses) > 1:
             return _finish(
                 self._handle_multi_clause(
@@ -1176,14 +1732,35 @@ class Brain:
                 )
             )
 
+        decision = self.routing_engine.decide(clean)
+        route = decision.route
+        features = {
+            "route": decision.route,
+            "rule": decision.rule,
+            "confidence": decision.confidence,
+            "reason": decision.reason,
+            "requires_model": decision.requires_model,
+            "routing_latency_ms": decision.latency_ms,
+        }
+        # The explicit Core personal-memory contract remains authoritative over
+        # a generic classifier result.
         if should_delegate_to_knowledge(clean):
-            route, features = KNOWLEDGE, {"rule": "core_personal_memory_contract"}
-        else:
-            route, features = classify(clean)
+            route = KNOWLEDGE
+            features.update(route=KNOWLEDGE, rule="core_personal_memory_contract")
         rule = features.get("rule")
 
         if route == UNKNOWN:
-            if USE_KNOWLEDGE_MODEL_GATE:
+            custom_prediction = None
+            if self.routing_predictor is not None:
+                try:
+                    custom_prediction = self.routing_predictor.predict(clean)
+                except Exception:
+                    custom_prediction = None
+            if custom_prediction and not custom_prediction.get("abstained"):
+                route = str(custom_prediction["route"])
+                rule = "custom_neural_router"
+                features["custom_router"] = custom_prediction
+            elif USE_KNOWLEDGE_MODEL_GATE:
                 route = self.knowledge.classify(clean)
                 rule = "model_classifier"
             else:
@@ -1193,7 +1770,9 @@ class Brain:
                 route = CHAT
                 rule = "core_abstained_model_gate_disabled"
 
-        self.actions.log_turn(
+        self._log_turn(
+            location=location,
+            conversation_id=conversation_id,
             role="user",
             content=clean,
             refs={"route": route, "rule": rule, "location": location},
@@ -1213,11 +1792,15 @@ class Brain:
                 conversation_id=conversation_id,
             )
 
-        self.actions.log_turn(
+        response.setdefault("details", {})["routing_engine"] = decision.as_dict()
+        self._log_turn(
+            location=location,
+            conversation_id=conversation_id,
             role="assistant",
             content=response["reply"],
             refs={"route": route},
         )
+
 
         return _finish(response)
 
@@ -1241,19 +1824,35 @@ class Brain:
         """
         routes = []
         for clause in clauses:
+            clause_decision = self.routing_engine.decide(clause)
+            route = clause_decision.route
+            features = {
+                "rule": clause_decision.rule,
+                "confidence": clause_decision.confidence,
+                "reason": clause_decision.reason,
+            }
             if should_delegate_to_knowledge(clause):
                 route, features = KNOWLEDGE, {"rule": "core_personal_memory_contract"}
-            else:
-                route, features = classify(clause)
             if route == UNKNOWN:
-                route = (
-                    self.knowledge.classify(clause)
-                    if USE_KNOWLEDGE_MODEL_GATE
-                    else CHAT
-                )
+                custom_prediction = None
+                if self.routing_predictor is not None:
+                    try:
+                        custom_prediction = self.routing_predictor.predict(clause)
+                    except Exception:
+                        custom_prediction = None
+                if custom_prediction and not custom_prediction.get("abstained"):
+                    route = str(custom_prediction["route"])
+                else:
+                    route = (
+                        self.knowledge.classify(clause)
+                        if USE_KNOWLEDGE_MODEL_GATE and clause_decision.requires_model
+                        else CHAT
+                    )
             routes.append(route)
 
-        self.actions.log_turn(
+        self._log_turn(
+            location=location,
+            conversation_id=conversation_id,
             role="user",
             content=original,
             refs={
@@ -1283,12 +1882,14 @@ class Brain:
                 replies.append(chat_result["reply"])
 
         merged = " ".join(part.strip() for part in replies if part.strip())
-
-        self.actions.log_turn(
+        self._log_turn(
+            location=location,
+            conversation_id=conversation_id,
             role="assistant",
             content=merged,
             refs={"route": "multi"},
         )
+
 
         return {
             "route": "+".join(dict.fromkeys(routes)),
@@ -1403,6 +2004,11 @@ class Brain:
             else knowledge_payload
         )
         operation = str(result.get("operation") or "")
+        envelope = infer_envelope(
+            request,
+            knowledge_result=knowledge_payload,
+            authoritative_context=deterministic,
+        )
         is_clarification = operation == "NEEDS_CLARIFICATION"
         is_sensitive_write = (
             operation == "CREATE" and result.get("record_type") == "fact"
@@ -1457,36 +2063,55 @@ class Brain:
         memory_context = " ".join((knowledge_context or "").split())[:6000]
         memory_context = memory_context or "(no additional Knowledge memory context)"
         temporal_grounding = _temporal_grounding_block(knowledge_payload)
+        assistant_name, assistant_role, _model_id = _active_assistant_identity()
+        luna_formatter_prompt = (
+            assistant_name == "Luna"
+            and not is_clarification
+            and not is_empty_or_failed
+            and operation not in {"FIND", "READ", "RECALL"}
+        )
 
         try:
             composed = self.ollama.chat(
                 system_prompt=(
-                    f"You are {ASSISTANT_NAME}, a warm, upbeat {ASSISTANT_ROLE} "
-                    "running on the user's private home server. Your "
-                    f"name is {ASSISTANT_NAME}. Never call yourself an AI, model, "
-                    "or assistant system. A background knowledge system "
-                    "just completed the user's request and produced a "
-                    "confirmed result. The RAW USER REQUEST and recent "
-                    "conversation context below are grounding inputs; use "
-                    "them to understand the user's intent, but never invent "
-                    "facts beyond the authoritative result. Write ONE short, warm, natural "
-                    f"reply confirming it to the user, in {ASSISTANT_NAME}'s voice.\n"
-                    "Rules:\n"
-                    "- ONE sentence, no lists, no markdown.\n"
-                    "- Match the emotional tone of the news: celebrate "
-                    "good news warmly, be gentle and caring about bad "
-                    "news.\n"
-                    "- Phrase it fresh; do NOT repeat the confirmed "
-                    "result text verbatim.\n"
-                    "- Keep every name, title, number and time from "
-                    "the user's request (render times naturally, e.g. "
-                    "'this afternoon', 'tomorrow at 3pm').\n"
-                    "- For relative words such as tomorrow, tmr, today, or "
-                    "next week, use the TEMPORAL GROUNDING block below; "
-                    "the Knowledge clock and ISO timestamps are authoritative.\n"
-                    "- Never invent anything new.\n"
-                    f"- {format_policy}\n"
-                    "- No offers of further help, no sign-offs."
+                    _identity_context_for_model(assistant_name, assistant_role)
+                    + (
+                        "\n\nThe Knowledge request completed. Tell the user what happened naturally, "
+                        "using the confirmed result below."
+                        if assistant_name == "Luna"
+                        else "\n\nA background knowledge system "
+                        "just completed the user's request and produced a "
+                        "confirmed result. Never call yourself an AI, model, "
+                        "or assistant system. The RAW USER REQUEST and recent "
+                    )
+                    + (
+                        "\n\nHere is the confirmed result from NIX. Tell the user about it "
+                        "in your usual voice, staying faithful to the facts."
+                        if luna_formatter_prompt
+                        else (
+                            "conversation context below are grounding inputs; use "
+                            "them to understand the user's intent, but never invent "
+                            "facts beyond the authoritative result. Write ONE short, warm, natural "
+                            f"reply confirming it to the user, in {assistant_name}'s voice.\n"
+                            "Rules:\n"
+                            "- ONE sentence, no lists, no markdown.\n"
+                            "- Match the emotional tone of the news: celebrate "
+                            "good news warmly, be gentle and caring about bad "
+                            "news.\n"
+                            "- Phrase it fresh; do NOT repeat the confirmed "
+                            "result text verbatim.\n"
+                            "- Keep every name, title, number and time from "
+                            "the user's request (render times naturally, e.g. "
+                            "'this afternoon', 'tomorrow at 3pm').\n"
+                            "- For relative words such as tomorrow, tmr, today, or "
+                            "next week, use the TEMPORAL GROUNDING block below; "
+                            "the Knowledge clock and ISO timestamps are authoritative.\n"
+                            "- Never invent anything new.\n"
+                            f"- {format_policy}\n"
+                            "- No offers, no sign-offs.\n\n"
+                            f"{envelope.as_prompt_block()}"
+                        )
+                    )
                 ),
                 history=recent_context,
                 user_text=(
@@ -1507,14 +2132,15 @@ class Brain:
         except Exception:
             return deterministic
 
+        composed = clean_response_text(composed)
         if not composed:
             return deterministic
 
         # bound the ramble: more than ~2 sentences or 320 chars means
         # the chat model wandered; the deterministic text is better.
         if (
-            len(composed) > 320
-            or len(re.findall(r"[.!?]", composed)) > 2
+            (len(composed) > 320 or len(re.findall(r"[.!?]", composed)) > 2)
+            and not luna_formatter_prompt
         ):
             return deterministic
 
@@ -1544,7 +2170,7 @@ class Brain:
                 " ".join(det_words[i : i + 7])
                 for i in range(len(det_words) - 6)
             }
-            if any(gram in haystack for gram in grams):
+            if any(gram in haystack for gram in grams) and not luna_formatter_prompt:
                 return deterministic
 
         hard, soft = self._critical_tokens(request, deterministic)
@@ -1553,7 +2179,7 @@ class Brain:
             return [token for token in tokens if token not in text_low]
 
         # Hard anchors (names, codes): must be there, no negotiation.
-        if _missing(haystack, hard):
+        if _missing(haystack, hard) and not luna_formatter_prompt:
             return deterministic
 
         # Soft anchors (title words): the model may legitimately
@@ -1564,10 +2190,20 @@ class Brain:
             try:
                 composed = self.ollama.chat(
                     system_prompt=(
-                        f"You are {ASSISTANT_NAME}, a {ASSISTANT_ROLE}. Confirm a "
-                        "completed request in ONE short sentence. "
-                        "Mention exactly these details, phrased naturally. "
-                        f"{format_policy} No offers."
+                        _identity_context_for_model(assistant_name, assistant_role)
+                        + "\n\n"
+                        + (
+                            "Please keep these details from the confirmed result: "
+                        if luna_formatter_prompt
+                        else f"You are {assistant_name}, a {assistant_role}. Confirm a "
+                            "completed request in ONE short sentence. "
+                        )
+                        + (
+                            "Please keep these details from the confirmed result."
+                            if luna_formatter_prompt
+                            else "Mention exactly these details, phrased naturally. "
+                            + f"{format_policy} No offers."
+                        )
                     ),
                     history=recent_context,
                     user_text=(
@@ -1593,10 +2229,28 @@ class Brain:
                 return deterministic
 
             haystack = composed.lower()
-            if _missing(haystack, hard) or _missing(haystack, soft):
+            if (_missing(haystack, hard) or _missing(haystack, soft)) and not luna_formatter_prompt:
                 return deterministic
 
-        return composed
+        valid, _failures = verify_reply(
+            envelope,
+            composed,
+            deterministic=deterministic,
+            knowledge_result=knowledge_payload,
+        )
+        # Sensitive fact writes retain Core's exact stored-value rendering;
+        # Casper must not paraphrase or obscure what was persisted.
+        if is_sensitive_write:
+            return deterministic
+        if luna_formatter_prompt:
+            return clean_response_text(composed)
+        return clean_response_text(composed) if valid else clean_response_text(deterministic)
+
+    def _compose_reply_timed(self, *args, **kwargs) -> tuple[str, float]:
+        """Run the active assistant's Knowledge formatter and measure it."""
+        started = time.perf_counter()
+        reply = self._compose_reply(*args, **kwargs)
+        return reply, round((time.perf_counter() - started) * 1000, 1)
 
     def _handle_knowledge(
         self,
@@ -1610,8 +2264,9 @@ class Brain:
         try:
             payload = self.knowledge.process(text)
         except Exception as exc:
-            deterministic = (
-                f"{ASSISTANT_NAME} Alert: the knowledge engine is unreachable "
+            assistant_name, _assistant_role, active_model_id = _active_assistant_identity()
+            deterministic = clean_response_text(
+                f"{assistant_name} Alert: the knowledge engine is unreachable "
                 f"right now. ({type(exc).__name__})"
             )
             payload = {
@@ -1621,7 +2276,7 @@ class Brain:
                     "error": deterministic,
                 }
             }
-            reply = self._compose_reply(
+            reply, formatter_ms = self._compose_reply_timed(
                 text,
                 deterministic,
                 knowledge_result=payload,
@@ -1631,29 +2286,53 @@ class Brain:
             )
             return {
                 "route": KNOWLEDGE,
-                "rule": "knowledge_api_unreachable_composed",
+                "rule": f"{active_model_id}_knowledge_api_unreachable_composed",
                 "reply": reply,
                 "details": {
                     "error": str(exc),
                     "core_formatter": {
                         "attempted": True,
+                        "assistant_name": assistant_name,
+                        "official_model": active_model_id,
                         "model": self.ollama.model,
                         "think": False,
                         "conversation_id": conversation_id,
+                        "latency_ms": formatter_ms,
                     },
+                    "formatter_ms": formatter_ms,
                 },
             }
 
         deterministic = format_knowledge_result(payload)
         result = payload.get("result") or {}
         self._remember_clarification(conversation_id, text, result)
-        # Read the post-operation Knowledge memory block as a separate,
-        # bounded grounding input. This lets Casper understand both the
-        # structured result and the surrounding person/state/profile context.
-        try:
-            knowledge_context = self.knowledge.memory_block(text)
-        except Exception:
+        # Fact writes already have an authoritative deterministic response and
+        # do not need a post-write memory read or Casper generation. Event,
+        # person-state, clarification, and lookup results still receive the
+        # full grounded formatter path.
+        # Older Knowledge services returned only {ok, record_id, data} for
+        # create_fact. Keep the fast path compatible with that payload while
+        # preferring the explicit operation contract from current Knowledge.
+        is_fact_write = (
+            (
+                result.get("operation") == "CREATE"
+                and result.get("record_type") == "fact"
+            )
+            or (
+                result.get("ok") is True
+                and result.get("record_type") in (None, "fact")
+                and result.get("record_id") is not None
+                and isinstance(result.get("data"), dict)
+                and "value" in result["data"]
+            )
+        )
+        if is_fact_write:
             knowledge_context = ""
+        else:
+            try:
+                knowledge_context = self.knowledge.memory_block(text)
+            except Exception:
+                knowledge_context = ""
 
         # Core owns presentation for every structured Knowledge result.
         # Failed operations, empty lookups, clarifications, and sensitive
@@ -1716,9 +2395,9 @@ class Brain:
             )
         ):
             # Knowledge was consulted, so its authoritative miss still
-            # crosses the same Casper final-response boundary. Do not silently
-            # switch to a second world-answer path after /process.
-            reply = self._compose_reply(
+            # crosses the same active-assistant response boundary. Do not
+            # silently switch to another world-answer path after /process.
+            reply, formatter_ms = self._compose_reply_timed(
                 text,
                 deterministic,
                 knowledge_result=payload,
@@ -1728,32 +2407,44 @@ class Brain:
             )
             return {
                 "route": KNOWLEDGE,
-                "rule": "knowledge_miss_composed",
+                "rule": f"{_active_assistant_identity()[2]}_knowledge_miss_composed",
                 "reply": reply,
                 "details": {
                     **dict(payload),
                     "knowledge_fallback": deterministic,
                     "core_formatter": {
                         "attempted": True,
+                        "assistant_name": _active_assistant_identity()[0],
+                        "official_model": _active_assistant_identity()[2],
                         "model": self.ollama.model,
                         "think": False,
                         "conversation_id": conversation_id,
                         "fallback_to_deterministic": reply == deterministic,
+                        "latency_ms": formatter_ms,
                     },
+                    "formatter_ms": formatter_ms,
                 },
             }
 
-        # Knowledge is never the final speaker. Every successful, empty,
-        # clarifying, failed, and sensitive result crosses this Core formatter;
-        # the formatter's Ollama call is explicitly think=False.
-        reply = self._compose_reply(
-            text,
-            deterministic,
-            knowledge_result=payload,
-            conversation_context=session_context,
-            knowledge_context=knowledge_context,
-            raw_user_request=raw_request,
-        )
+        # Sensitive fact writes already have an authoritative deterministic
+        # rendering and are intentionally never rephrased by Casper. This
+        # avoids a needless 4B generation (and any leakage risk) for simple
+        # memory writes such as “remember that I like tea”.
+        if is_fact_write:
+            reply = deterministic
+            formatter_ms = 0.0
+        else:
+            # Knowledge is never the final speaker. Successful events,
+            # current-state results, clarifications, misses, and failures
+            # cross this Core formatter; it is explicitly non-thinking.
+            reply, formatter_ms = self._compose_reply_timed(
+                text,
+                deterministic,
+                knowledge_result=payload,
+                conversation_context=session_context,
+                knowledge_context=knowledge_context,
+                raw_user_request=raw_request,
+            )
 
         # Mood detection for the console filler + mood sound: a fast
         # neural read (no LLM). Best-effort - failures stay neutral.
@@ -1788,12 +2479,17 @@ class Brain:
             }
 
         details = dict(payload)
+        assistant_name, _assistant_role, active_model_id = _active_assistant_identity()
         details["core_formatter"] = {
-            "attempted": True,
+            "attempted": not is_fact_write,
+            "assistant_name": assistant_name,
+            "official_model": active_model_id,
             "model": self.ollama.model,
             "think": False,
             "fallback_to_deterministic": reply == deterministic,
+            "latency_ms": formatter_ms,
         }
+        details["formatter_ms"] = formatter_ms
 
         return {
             "route": KNOWLEDGE,
@@ -1812,11 +2508,21 @@ class Brain:
     # ------------------------------------------------------------------
 
     def _chat_system_prompt(self, current_text: str | None = None) -> str:
+        assistant_name, assistant_role, _model_id = _active_assistant_identity()
         # Prefer the full MEMORY block (facts + moments + emotional
         # state + pending); fall back to the plain digest when the
         # knowledge service predates it or is unreachable.
         block = self.knowledge.memory_block(current_text)
         digest = block or self.knowledge.digest()
+
+        if assistant_name == "Luna":
+            prompt = _identity_context_for_model(assistant_name, assistant_role)
+            if digest:
+                prompt += (
+                    "\n\nRelevant context already shared with NIX (use only if it helps with this message):\n"
+                    f"{digest}"
+                )
+            return prompt
 
         # Wall-clock awareness: the chat model has no clock of its own
         # and is constantly asked time-relative questions ("what time
@@ -1837,12 +2543,21 @@ class Brain:
             else {}
         )
         policy = conversation_policy(current_text or "", intent)
+        envelope = infer_envelope(
+            current_text or "(empty)",
+            emotion="distressed" if policy["state"] in {"high_distress", "unwell_or_distressed"} else "tired" if policy["state"] == "tired" else "positive" if policy["state"] == "positive" else "neutral",
+        )
 
-        prompt = (
-            f"You are {ASSISTANT_NAME}, a {ASSISTANT_ROLE} running on a private "
+        capability_instruction = (
+            f"You are {assistant_name}, a {assistant_role} running on a private "
             "home server. You can answer general questions, chat, and "
-            "you have web search available. Answer in one or two short "
-            "sentences. Do not append unnecessary offers or questions; "
+            "you have web search available. "
+        )
+        prompt = (
+            _identity_context_for_model(assistant_name, assistant_role)
+            + "\n\n"
+            + capability_instruction
+            + "Answer in one or two short sentences. Do not append unnecessary offers or questions; "
             "ask at most one relevant question when the attunement policy "
             "explicitly permits it.\n\n"
             f"Today is {clock} ({TIMEZONE}). This is authoritative: "
@@ -1850,8 +2565,8 @@ class Brain:
             "never say you cannot know or access them. Use it for "
             "any time-relative question (now, today, tomorrow).\n\n"
             "CONVERSATION STYLE (sound natural, not like customer support):\n"
-            "You are Casper, a PUCA (Personal User Companion Agent), not a "
-            "generic AI assistant. Your identity is steady, warm, honest, and "
+            f"Your name is {assistant_name}. You are a conversational companion, "
+            "not a generic AI assistant. Your identity is steady, warm, honest, and "
             "non-intrusive.\n"
             "Speak like a warm, familiar person: use contractions, natural "
             "rhythm, and simple wording. Do not start every reply with "
@@ -1864,11 +2579,22 @@ class Brain:
             "or 'How about we chat about something else?' as a generic ending. "
             "After a complete reply, stop. Ask a question only when the user "
             "explicitly requests conversation, a required detail is missing, "
-            "or safety requires it.\n\n"
+            "or safety requires it.\n"
+            "MEMORY-PLUS-CHAT RULE: Memory is grounding, not a reason to start "
+            "a new topic. Answer the current request first and do not ask about "
+            "a remembered person merely because they appear in MEMORY. A caring "
+            "follow-up is allowed only when the current person-state metadata says "
+            "eligible=true: the person is close/loved, their CURRENT state is "
+            "unwell, sick, distressed, or problematic, and follow_up_answered=false. "
+            "If eligible=false, do not ask about that person. Never repeat a "
+            "follow-up after the user has answered it, and never use superseded "
+            "history to make eligibility true. If the user has already answered "
+            "that follow-up, do not ask it again.\n\n"
             "CONVERSATION ATTUNEMENT (follow this before stylistic instincts):\n"
             f"Detected interaction state: {policy['state']}\n"
             f"Priority: {policy['priority']}\n"
-            f"{policy['instruction']}"
+            f"{policy['instruction']}\n\n"
+            f"{envelope.as_prompt_block()}"
         )
 
         if digest:
@@ -1877,20 +2603,31 @@ class Brain:
                 "states, preferences, dates, and schedules come only from the "
                 "MEMORY block or a deterministic Knowledge reply. Do not say "
                 "you lack access to personal memory when a matching entry is "
-                "present. Do not infer identity from casual chat. If the "
+                "present. Accept a user's first-person self-introduction "
+                "without challenging it; that conversational acknowledgment "
+                "does not authenticate them or grant permissions. If the "
                 "memory is empty or does not answer the question, say that "
                 "plainly instead of guessing.\n\n"
                 "MEMORY (from their private knowledge base - use it "
                 "when relevant, never invent more; attune your tone to "
                 "an emotional state line when one is present, and use "
                 "exact dates from recent history):\n"
+                "CURRENT-STATE PRIORITY: a line under 'How your people are "
+                "doing right now' is the only current person state. The "
+                "'Recent history' section contains superseded or past states "
+                "for timeline context only; never treat a historical sick, "
+                "sad, or unavailable state as current when a newer current "
+                "state says the person is better, fine, or well, and do not "
+                "ask a caring follow-up based only on superseded history.\n"
                 f"{digest}"
             )
         else:
             prompt += (
-                "\n\nYou have no stored knowledge about this user. "
-                "If they ask about their own life, say you don't "
-                "have that stored yet."
+                "\n\nNo personal Knowledge-store details are available for "
+                "this request. The user's preferred name, if configured, is "
+                "provided separately in the trusted NIX Settings profile above. "
+                "For other personal details that are not stored, say so plainly "
+                "instead of guessing."
             )
 
         return prompt
@@ -1922,34 +2659,53 @@ class Brain:
                     conversation_id=conversation_id,
                 )
 
-        history = (
-            session_context
-            if session_context is not None
-            else self.actions.context()
-        )
+        history = session_context or []
 
+        # Official conversation models use a no-hidden-reasoning policy.
+        # Complex work stays in structured Core/Knowledge/Actions code.
+        think = False
+        assistant_name, assistant_role, active_model_id = _active_assistant_identity()
+        thinking_source = f"{assistant_name.lower()}_thinking_disabled"
         try:
-            think = OLLAMA_THINK and request_requires_thinking(text)
             reply = self.ollama.chat(
                 system_prompt=self._chat_system_prompt(current_text=text),
                 history=history,
                 user_text=text,
                 think=think,
             )
-            reply = suppress_internal_route_metadata(
-                suppress_generic_interview(reply)
-            )
+            reply = strip_model_control_traces(reply)
+            if assistant_name != "Luna":
+                reply = suppress_nonessential_questions(
+                    suppress_internal_route_metadata(
+                        suppress_generic_interview(reply),
+                        assistant_name=assistant_name,
+                    ),
+                    avoid=conversation_policy(text).get("avoid_nonessential_questions", False),
+                )
+            reply = clean_response_text(reply)
+            # For simple relational/social turns, replace the model's generic
+            # uncertainty with a bounded natural response. This fixes the
+            # observed "you are sweet" and "good to know you" failures without
+            # adding another generation.
+            social_reply = social_companion_reply(text) if assistant_name != "Luna" else None
+            if social_reply:
+                # High-confidence social turns have a known conversational
+                # act. Do not let the adapter decorate them with product
+                # copy such as “digital companion” or a generic interview.
+                reply = social_reply
             # Small local models occasionally answer a direct question with
             # a conversational deflection. Spend one bounded retry on a
             # clearly constrained request instead of teaching the model to
             # hallucinate an answer or making the user repeat themselves.
             if (
-                reply.strip().endswith("?")
+                assistant_name != "Luna"
+                and reply.strip().endswith("?")
                 and re.search(r"\b(?:one|single)\s+word\b", text, re.I)
             ):
                 reply = self.ollama.chat(
                     system_prompt=(
-                        "Answer the user's factual question directly. "
+                        _identity_context_for_model(assistant_name, assistant_role)
+                        + "\n\nAnswer the user's factual question directly. "
                         "Return exactly one word and nothing else. Do not "
                         "ask a question or request more context."
                     ),
@@ -1961,27 +2717,26 @@ class Brain:
         except Exception as exc:
             return {
                 "route": CHAT,
-                "rule": f"{CASPER_BACKEND}_unreachable",
+                "rule": f"{active_model_id}_unreachable",
                 "reply": (
-                    f"{ASSISTANT_NAME} Alert: Unable to reach the chat model "
+                    f"{assistant_name} Alert: Unable to reach the chat model "
                     f"({self.ollama.model}) right now. "
                     f"({type(exc).__name__})"
                 ),
                 "details": {"error": str(exc)},
             }
 
-        result = {
-            "route": CHAT,                "rule": (
-                    "casper_transformers"
-                    if CASPER_BACKEND == "transformers"
-                    else f"casper_{CASPER_BACKEND}"
-                ),
+        result = {            "route": CHAT,
+            "rule": f"{active_model_id}_{CASPER_BACKEND}_chat",
+            "reply": clean_response_text(reply) or "(empty reply from chat model)",
 
-            "reply": reply or "(empty reply from chat model)",
             "details": {
                 "model": self.ollama.model,
                 "backend": CASPER_BACKEND,
-                "think": bool(OLLAMA_THINK and request_requires_thinking(text)),
+                "assistant_name": assistant_name,
+                "official_model": active_model_id,
+                "think": think,
+                "thinking_source": thinking_source,
                 "knowledge_context": "injected_into_system_prompt",
                 "conversation_id": conversation_id,
             },

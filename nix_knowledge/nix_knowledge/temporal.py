@@ -1228,6 +1228,41 @@ class TemporalResolver:
         # every sunday
         # --------------------------------------------------------
 
+        interval_match = re.fullmatch(
+            r"every\s+(\d+)\s+days(?:\s+at\s+(.+))?",
+            text,
+        )
+        if interval_match:
+            interval = int(interval_match.group(1))
+            if interval < 1 or interval > 365:
+                return None
+            clock_expression = interval_match.group(2)
+            clock = self._parse_clock(clock_expression) if clock_expression else None
+            if clock_expression and clock is None:
+                return None
+            all_day = clock is None
+            days_ahead = 0
+            if clock is not None:
+                today_at_clock = now.replace(
+                    hour=clock.hour, minute=clock.minute, second=0, microsecond=0
+                )
+                if today_at_clock <= now:
+                    days_ahead = interval
+            candidate_date = now.date() + timedelta(days=days_ahead)
+            if clock is None:
+                start, end = self._day_bounds(candidate_date)
+            else:
+                start = datetime.combine(candidate_date, clock, tzinfo=self.timezone)
+                end = start
+            return TemporalResult(
+                expression=original,
+                start=start,
+                end=end,
+                all_day=all_day,
+                recurring=True,
+                recurrence=f"interval_{interval}_days",
+            )
+
         match = re.fullmatch(
             rf"every\s+"
             rf"(day|daily|{wd})"

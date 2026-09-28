@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -184,49 +185,105 @@ class KnowledgeNeedle:
         engine: KnowledgeEngine,
         timezone: str = "America/Chicago",
         actions_engine: Any | None = None,
+        load_model: bool | None = None,
     ):
         self.engine = engine
+        if load_model is None:
+            load_model = os.environ.get("NIX_KNOWLEDGE_MODEL_GATE", "0") == "1"
         self.temporal = TemporalResolver(timezone=timezone)
         self.context = TemporalContext(timezone=timezone)
         self.timezone = timezone
         self.actions_engine = actions_engine
 
-        print("Loading Qwen2.5 0.5B...")
+        self.tokenizer = None
+        self.model = None
+        if load_model:
+            print("Loading Qwen2.5 0.5B...")
 
-        # This API normally runs separately from Core/Casper. Keep its model
-        # on an explicit small GPU budget so both services can stay warm. A
-        # device-map limit is safer than a process-wide allocator fraction:
-        # the console may embed the HTTP handler in the same Python process.
-        max_memory = None
-        if torch.cuda.is_available():
-            max_memory = {
-                0: os.environ.get("NIX_KNOWLEDGE_GPU_MEMORY", "2GiB"),
-                "cpu": os.environ.get("NIX_KNOWLEDGE_CPU_MEMORY", "16GiB"),
+            # The selector is now opt-in. When enabled, keep it on an
+            # explicit small GPU budget so it cannot consume Casper's headroom.
+            max_memory = None
+            if torch.cuda.is_available():
+                max_memory = {
+                    0: os.environ.get("NIX_KNOWLEDGE_GPU_MEMORY", "2GiB"),
+                    "cpu": os.environ.get("NIX_KNOWLEDGE_CPU_MEMORY", "16GiB"),
+                }
+
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                MODEL_PATH,
+                local_files_only=True,
+            )
+
+            load_kwargs: dict[str, Any] = {
+                "dtype": "auto",
+                "device_map": "auto",
+                "local_files_only": True,
             }
-
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_PATH,
-            local_files_only=True,
-        )
-
-        load_kwargs: dict[str, Any] = {
-            "dtype": "auto",
-            "device_map": "auto",
-            "local_files_only": True,
-        }
-        if max_memory is not None:
-            load_kwargs["max_memory"] = max_memory
-        self.model = AutoModelForCausalLM.from_pretrained(
-            MODEL_PATH,
-            **load_kwargs,
-        )
-
-        self.model.eval()
+            if max_memory is not None:
+                load_kwargs["max_memory"] = max_memory
+            self.model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                **load_kwargs,
+            )
+            self.model.eval()
+            print("Qwen2.5 0.5B loaded.")
 
         self.tools = self._build_tool_schemas()
         self.tool_functions = self._build_tool_functions()
 
-        print("Qwen2.5 0.5B loaded.")
+    # ------------------------------------------------------------------
+    # Adaptive thinking gate
+    # ------------------------------------------------------------------
+
+    def decide_thinking(self, text: str) -> dict[str, Any]:
+        """Return the permanent non-thinking policy for Casper callers.
+
+        Knowledge may still expose this compatibility endpoint, but no
+        selector decision is allowed to enable hidden Casper reasoning.
+        """
+        return {"ok": True, "think": False, "mode": "FAST", "source": "casper_thinking_disabled"}
+
+    def _legacy_decide_thinking_disabled(self, text: str) -> dict[str, Any]:
+        """Retained implementation for source compatibility; never called."""
+        if self.model is None or self.tokenizer is None:
+            return {"ok": False, "think": False, "mode": "FAST", "source": "model_disabled"}
+        normalized = " ".join((text or "").split()).lower()
+        if re.match(r"^(?:hi|hello|hey|yo|thanks|thank you|okay|ok|good morning|good night)[!.?, ]*$", normalized):
+            return {"ok": True, "think": False, "mode": "FAST", "source": "deterministic_simple"}
+        if re.search(r"\b(?:analy[sz]e|debug|architect(?:ure)?|design|derive|prove|compare|contrast|trade[- ]offs?|step[- ]by[- ]step|refactor|code review|calculate|strategy)\b", normalized):
+            return {"ok": True, "think": True, "mode": "THINK", "source": "deterministic_complex"}
+        prompt = (
+            "Classify the user's request for reasoning budget. Output exactly "
+            "THINK or FAST. Use THINK only for genuinely complex analysis, "
+            "multi-step debugging, difficult comparisons, mathematical proofs, "
+            "architecture design, or code reasoning. Use FAST for greetings, "
+            "emotion, ordinary conversation, memory, reminders, factual lookup, "
+            "and simple questions.\n\nUser request: " + text
+        )
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            kwargs = {"tokenize": False, "add_generation_prompt": True}
+            try:
+                rendered = self.tokenizer.apply_chat_template(messages, **kwargs)
+            except Exception:
+                rendered = prompt
+            device = next(self.model.parameters()).device
+            inputs = self.tokenizer(rendered, return_tensors="pt").to(device)
+            with torch.inference_mode():
+                output = self.model.generate(
+                    **inputs,
+                    max_new_tokens=4,
+                    do_sample=False,
+                    use_cache=True,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                )
+            generated = output[0][inputs["input_ids"].shape[1]:]
+            verdict = self.tokenizer.decode(generated, skip_special_tokens=True).strip().upper()
+            if verdict.startswith("THINK"):
+                return {"ok": True, "think": True, "mode": "THINK", "source": "qwen2.5-0.5b"}
+            return {"ok": True, "think": False, "mode": "FAST", "source": "qwen2.5-0.5b"}
+        except Exception as exc:
+            return {"ok": False, "think": False, "mode": "FAST", "source": "fallback", "error": type(exc).__name__}
 
     # ------------------------------------------------------------------
     # Tool schemas
@@ -933,6 +990,57 @@ class KnowledgeNeedle:
             [],
         )
 
+        # Natural-language cancellation names are rarely exact copies of
+        # the stored title: "delete my reminder for taking medicienes"
+        # should resolve to an event stored as "take medicines". Only use
+        # fuzzy matching after exact/substring lookup fails, and require a
+        # strong unique score so unrelated reminders are never cancelled.
+        if not events:
+            all_events = find_calendar_events(self.engine).get("events", [])
+
+            def normalized_words(value: str) -> list[str]:
+                value = str(value or "").lower()
+                value = re.sub(r"\b(?:reminder|remind|alert|notification|for|about|my|the|a|an)\b", " ", value)
+                value = value.replace("medicienes", "medicines").replace("medication", "medicine")
+                words = re.findall(r"[a-z]+", value)
+                normalized: list[str] = []
+                for word in words:
+                    if word == "taking":
+                        word = "take"
+                    elif word.endswith("ies") and len(word) > 4:
+                        word = word[:-3] + "y"
+                    elif word.endswith("s") and len(word) > 3:
+                        word = word[:-1]
+                    normalized.append(word)
+                return normalized
+
+            query_words = normalized_words(title)
+            scored: list[tuple[float, dict[str, Any]]] = []
+            for candidate in all_events:
+                if candidate.get("status", "scheduled") == "cancelled":
+                    continue
+                candidate_words = normalized_words(candidate.get("title", ""))
+                if not query_words or not candidate_words:
+                    continue
+                matches = [
+                    max(
+                        difflib.SequenceMatcher(None, word, other).ratio()
+                        for other in candidate_words
+                    )
+                    for word in query_words
+                ]
+                coverage = sum(score >= 0.72 for score in matches) / len(matches)
+                average = sum(matches) / len(matches)
+                score = (coverage * 0.7) + (average * 0.3)
+                if coverage >= 0.75 and score >= 0.78:
+                    scored.append((score, candidate))
+
+            scored.sort(key=lambda item: item[0], reverse=True)
+            if scored:
+                best_score = scored[0][0]
+                tied = [event for score, event in scored if best_score - score < 0.05]
+                events = tied if len(tied) > 1 else [scored[0][1]]
+
         # Cancelled events are historical records; when a live event
         # with the same title exists, mutations should target it.
         live = [
@@ -1478,6 +1586,9 @@ The pattern for every response is:
         user_request: str,
     ) -> dict[str, Any] | None:
 
+        if self.model is None or self.tokenizer is None:
+            return None
+
         messages = [
             {
                 "role": "system",
@@ -1854,6 +1965,22 @@ The pattern for every response is:
         # ---- 2. route + execute ---------------------------------------
         payload = self._process_route(user_request)
 
+        # Surface the gate decision for Core/dashboard observability without
+        # making it another source of temporal truth.
+        try:
+            from .event_intent import detect_event_intent
+            detected_event = detect_event_intent(user_request)
+            result_for_metadata = payload.get("result")
+            if isinstance(result_for_metadata, dict) and detected_event.requires_event:
+                result_for_metadata["event_intent"] = {
+                    "requires_event": True,
+                    "kind": detected_event.kind,
+                    "confidence": detected_event.confidence,
+                    "reason": detected_event.reason,
+                }
+        except Exception:
+            pass
+
         # Every response crosses the same temporal contract, including
         # facts, misses, clarifications, and non-calendar operations. This
         # gives Core one authoritative reference clock for words such as
@@ -1907,7 +2034,10 @@ The pattern for every response is:
 
         # Deterministic routing first: lexically unambiguous requests
         # never touch the model (faster, perfectly consistent).
+        from .event_intent import detect_event_intent
         from .rules import decompose, route
+
+        event_intent = detect_event_intent(user_request)
 
         # Compound requests ("... and ...") split into independently
         # routed subtasks, each executed and reported separately.
@@ -1985,7 +2115,16 @@ The pattern for every response is:
             self.temporal,
         )
 
-        if routed is not None:
+        # Third hybrid layer: explicit reminder/alert language outranks a
+        # mistaken fact proposal. The gate supplies only raw title/time text;
+        # _prepare_calendar_arguments still resolves and validates all time.
+        if event_intent.requires_event:
+            name = "create_calendar_event"
+            arguments = {
+                "title": event_intent.title,
+                "temporal_expression": event_intent.temporal_expression,
+            }
+        elif routed is not None:
             name, arguments = routed
         else:
             tool_call = self._generate_tool_call(

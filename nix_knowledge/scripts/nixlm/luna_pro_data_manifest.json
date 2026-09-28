@@ -1,0 +1,215 @@
+{
+  "manifest_version": 2,
+  "archive_status": "retired_non_actionable",
+  "retirement_directive": "Luna Pro v1 is retired. Preserve this manifest and associated research artifacts for provenance only; do not execute its build/training workflow or reuse/adapt its data or training approach for any model. Luna work is V6-only and no Luna training is authorized. All Luna dataset-builder CLI entry points are disabled; helpers remain only for archival review.",
+  "model": "Llama Luna Pro",
+  "distribution_model_name": "Llama Luna Pro",
+  "product_label_can_remain": "Luna Pro",
+  "status": "archived_retired_non_actionable",
+  "created_utc": "2026-09-23",
+  "base_model_candidate": {
+    "repo": "meta-llama/Llama-3.2-3B-Instruct",
+    "local_path": "nix_knowledge/models/llama-3.2-3b-unsloth-instruct",
+    "snapshot_repo": "unsloth/Llama-3.2-3B-Instruct",
+    "snapshot_revision": "006f5dcd1393c3add266de40994ba96225e9689d",
+    "license": "Llama 3.2 Community License",
+    "release_conditions": [
+      "Any distributed model trained with Llama materials or outputs must have a model name beginning with Llama; use the distribution identifier Llama Luna Pro.",
+      "When distributing Llama materials or a derivative model/adapter, provide the applicable Llama Community License agreement and prominently display Built with Llama on a related page or documentation.",
+      "Include Meta's required Llama attribution Notice when distributing Llama materials; document whether the release includes base weights or only an adapter.",
+      "Comply with the applicable Meta Acceptable Use Policy, current license text, and laws before release."
+    ]
+  },
+  "method": "Fresh rank-16 4-bit QLoRA SFT adapter from the local Instruct base, not a continuation from luna-instruct-v1 or either flawed V6 adapter.",
+  "user_requested_sources": {
+    "meta_seamless_interaction": {
+      "status": "excluded_from_text_sft",
+      "reason": "The Meta source describes the Seamless Interaction multimodal audio/video behavior corpus rather than an ordinary chat-text SFT set. Its CC-BY-NC 4.0 license is incompatible with the intended distributable/open posture; it also includes participant data and requires separate consent/privacy/terms review.",
+      "url": "https://ai.meta.com/blog/seamless-interaction-natural-conversational-dynamics/",
+      "license_url": "https://raw.githubusercontent.com/facebookresearch/seamless_interaction/main/LICENSE"
+    },
+    "defined_ai_article": {
+      "status": "not_a_dataset",
+      "reason": "The provided URL is a third-party overview article discussing multiple datasets, not a dataset or a grant of rights to the datasets it mentions.",
+      "url": "https://defined.ai/blog/open-source-datasets-for-conversational-ai-advantages-and-limitations"
+    },
+    "human_chat_txt": {
+      "status": "unavailable_in_workspace",
+      "user_path": "C:\\Users\\Sai Neela\\Downloads\\human_chat.txt",
+      "note": "The Linux workspace search did not find this file. It must be made available locally and its source, provenance, privacy, and license reviewed before use."
+    }
+  },
+  "candidate_train_mix": [
+    {
+      "name": "topical_chat",
+      "repo": "alexa/Topical-Chat",
+      "loader": "jsonl_url",
+      "url": "https://huggingface.co/datasets/Conversational-Reasoning/Topical-Chat/resolve/{revision}/train.jsonl",
+      "config": null,
+      "split": "train",
+      "revision": "fee4a71dd8ce5b471dd46e1b7aab2acbd1b9e1be",
+      "license": "Community Data License Agreement - Sharing, Version 1.0 (CDLA-Sharing); require notices, attribution, and share-alike compliant publication of redistributed enhanced dataset; model/adaptation obligations require separate legal review",
+      "license_url": "https://huggingface.co/datasets/Conversational-Reasoning/Topical-Chat/raw/fee4a71dd8ce5b471dd46e1b7aab2acbd1b9e1be/LICENSE",
+      "max_scan": 8628,
+      "shuffle_buffer": 4096,
+      "target_cap": 600,
+      "category": "topical_human_conversation",
+      "quality_filter": ["only the pinned training conversations; never validation/test or reading-set files", "require both named conversation-level ratings (agent_1 and agent_2) to be Good/Excellent", "retain only exchange pairs whose assistant-side turns are partner-rated Good/Excellent and cite Personal Knowledge exclusively", "reject user turns asking Luna for human-only preferences, biography, identity, habits, or lived experience; reject assistant targets that ask the user for human-only preferences or experiences, along with elliptical personal replies; reject any assistant target that uses first-person pronouns except narrow explicit uncertainty replies", "stop extraction at the first rejected assistant target; never train on follow-up suffix turns without their omitted context", "conversation-wide rejection for URLs, current/local or stale-factual topics, high-stakes or sensitive-domain content, action claims, or malformed records", "group every retained segment by original conversation ID before train/dev split", "preserve provider/source attribution and obey CDLA-Sharing publication terms"],
+      "persona_mapping_note": "This is human-human dialogue. The first participant is represented as user and the second as assistant only after personal-experience questions in either role and first-person assistant targets are screened; retained data still requires review and does not establish model-response quality.",
+      "release_review": "CDLA-Sharing is not an Apache/MIT-style permissive license. Review the license text, source lineage and whether downstream model/adapter distribution is permitted under the license before release. Pair-level extraction does not resolve whether training/distributing the resulting model or adapter is permitted; obtain legal review before training or release.",
+      "role_in_mix": "Human-human topical turn-taking and natural multi-turn dynamics"
+    },
+    {
+      "name": "smol_magpie_ultra",
+      "repo": "HuggingFaceTB/smoltalk",
+      "config": "smol-magpie-ultra",
+      "split": "train",
+      "revision": "5feaf2fd3ffca7c237fc38d1861bc30365d48ffa",
+      "license": "Apache-2.0 for this new SmolTalk-generated subset per its card and author license discussion; it was generated from Llama outputs, so retain provenance, comply with applicable Llama terms, and obtain release/legal review rather than treating the dataset tag as complete clearance",
+      "generator": "meta-llama/Llama-3.1-405B-Instruct-FP8; filtered with Llama-3.1-8B-Instruct and Llama-Guard-3-8B, with ArmoRM quality scoring and gte-large-en-v1.5 semantic deduplication per the SmolLM2 paper",
+      "max_scan": 100000,
+      "shuffle_buffer": 20000,
+      "target_cap": 2200,
+      "category": "general_instruction",
+      "quality_filter": ["quality in good or excellent", "allowlist only coding, summarization, editing, brainstorming, creative-writing, data-analysis, and rewriting categories; reject open-domain math, information-seeking, travel/planning, general advice, role-play, and reasoning unless independently reviewed", "valid alternating user/assistant messages", "per-message and total-token bounds", "boilerplate/repetition/high-stakes/action-claim/fabricated-paranormal/current-local/research-claim screens", "exact and near-duplicate checks"],
+      "category_allowlist": ["coding", "summarization", "editing", "brainstorming", "creative-writing", "data-analysis", "rewrite"],
+      "release_review": "Llama-generated outputs and Llama-based filtering are documented; retain output/model provenance and verify applicable Llama terms/notice obligations before distribution",
+      "role_in_mix": "Curated coding, data-analysis, writing, and creativity tasks; intentionally exclude weakly grounded categories pending human validation"
+    },
+    {
+      "name": "smol_constraints",
+      "repo": "HuggingFaceTB/smoltalk",
+      "config": "smol-constraints",
+      "split": "train",
+      "revision": "5feaf2fd3ffca7c237fc38d1861bc30365d48ffa",
+      "license": "Apache-2.0 for this new SmolTalk-generated subset per its card and author license discussion; the paper documents Qwen-generated instruction/response pairs and IFEval 10-gram decontamination; confirm upstream terms before external release",
+      "generator": "Qwen/Qwen2.5-72B-Instruct generated instructions and responses; conflict/incorrect-response filtering and IFEval 10-gram decontamination per the SmolLM2 paper",
+      "max_scan": 25000,
+      "shuffle_buffer": 20000,
+      "target_cap": 250,
+      "category": "constraint_following",
+      "quality_filter": ["single user/assistant pair", "token bound", "fail-closed validation of supported objective constraints", "exact and near-duplicate checks", "never use IFEval examples as SFT rows"],
+      "role_in_mix": "Small constraint-following supplement"
+    },
+    {
+      "name": "smol_rewrite",
+      "repo": "HuggingFaceTB/smoltalk",
+      "config": "smol-rewrite",
+      "split": "train",
+      "revision": "5feaf2fd3ffca7c237fc38d1861bc30365d48ffa",
+      "license": "Apache-2.0 for this new SmolTalk-generated subset per its card and author license discussion; its synthetic source texts use PersonaHub and FinePersonas personas, whose upstream terms/source lineage need separate review before release",
+      "generator": "Qwen/Qwen2.5-72B-Instruct generated persona-conditioned source texts and rewrite outputs using PersonaHub and Argilla FinePersonas personas per the SmolLM2 paper",
+      "max_scan": 25000,
+      "shuffle_buffer": 20000,
+      "target_cap": 350,
+      "category": "rewrite",
+      "quality_filter": ["preserve source task instructions in the user prompt", "token bound", "filter high-stakes, boilerplate, unsupported action claims", "exact and near-duplicate checks"],
+      "release_review": "Review PersonaHub and FinePersonas persona/source terms independently; the SmolTalk Apache-2.0 tag is not treated as independent legal clearance for all upstream lineage",
+      "role_in_mix": "Controlled tone and rewrite transformations"
+    },
+    {
+      "name": "smol_summarize",
+      "repo": "HuggingFaceTB/smoltalk",
+      "config": "smol-summarize",
+      "split": "train",
+      "revision": "5feaf2fd3ffca7c237fc38d1861bc30365d48ffa",
+      "license": "Apache-2.0 for this new SmolTalk-generated subset per its card and author license discussion; its synthetic source texts use PersonaHub and FinePersonas personas, whose upstream terms/source lineage need separate review before release",
+      "generator": "Qwen/Qwen2.5-72B-Instruct generated persona-conditioned source texts and summaries using PersonaHub and Argilla FinePersonas personas per the SmolLM2 paper",
+      "max_scan": 25000,
+      "shuffle_buffer": 20000,
+      "target_cap": 250,
+      "category": "summarization",
+      "quality_filter": ["preserve source task instructions in the user prompt", "token bound", "filter high-stakes, boilerplate, unsupported action claims", "exact and near-duplicate checks"],
+      "release_review": "Review PersonaHub and FinePersonas persona/source terms independently; the SmolTalk Apache-2.0 tag is not treated as independent legal clearance for all upstream lineage",
+      "role_in_mix": "Small concise summarization supplement"
+    },
+    {
+      "name": "everyday_conversations",
+      "repo": "HuggingFaceTB/everyday-conversations-llama3.1-2k",
+      "config": null,
+      "split": "train_sft",
+      "revision": "14f543216b9ba42b6b951dc5bd199460d193b162",
+      "license": "Apache-2.0 per the dataset card; generated by Llama-3.1-70B-Instruct, so retain Llama-output provenance and apply relevant upstream terms conservatively",
+      "generator": "meta-llama/Llama-3.1-70B-Instruct",
+      "max_scan": 2260,
+      "shuffle_buffer": 2260,
+      "target_cap": 350,
+      "category": "everyday_conversation",
+      "quality_filter": ["remove the fixed greeting pair that occurs in every source conversation", "keep complete role-alternating later turns", "short-token bound", "filter repetitive, medical, high-stakes, local/current offer, travel, weather, location-dependent, historical/research, and weakly grounded advice claims", "exact and near-duplicate checks"],
+      "role_in_mix": "Short natural conversation and basic multi-turn coverage"
+    },
+    {
+      "name": "project_authored_grounding_curriculum",
+      "repo": "local project-authored rows",
+      "revision": "builder and manifest SHA-256 recorded at build time",
+      "license": "project-authored; fictional entities only; no personal logs or evaluation answers",
+      "target_cap": 14,
+      "required_slices": ["memory present/missing/irrelevant/conflicting", "clarification and continuation", "latest explicit correction wins", "action pending/success/failure lifecycle with exact units", "identity boundary", "natural tone and ordinary chat"],
+      "quality_filter": ["complete trajectories", "factual evidence and explicit success-result validator", "review every authored target", "group all examples by authored category before train/dev split"],
+      "role_in_mix": "Small high-signal Luna-specific pilot curriculum"
+    }
+  ],
+  "target_final_sizes": {
+    "candidate_rows_upper_bound": 4014,
+    "expected_candidate_rows_approx": 3600,
+    "train_fraction_approx": 0.88,
+    "dev_fraction_approx": 0.12,
+    "test": "separate untouched user-authored fictional panel; never sampled from public source test splits into training or selection"
+  },
+  "excluded_from_first_run": [
+    {"repo": "HuggingFaceH4/no_robots", "reason": "CC-BY-NC 4.0 conflicts with the intended open release posture; existing V3 contains a small sample, but that snapshot will not be reused."},
+    {"repo": "mlabonne/FineTome-100k", "reason": "The dataset card/API do not declare a dataset license; its source mix/provenance requires clearance. V3 contains examples; do not reuse them in the new release-intended data."},
+    {"repo": "HuggingFaceH4/ultrafeedback_binarized", "reason": "Preference pairs are not ordinary SFT; chosen completions were model-generated and GPT-4-scored, the card notes corrected labels and TruthfulQA contamination history, and source/model provenance is not in the public output schema. Defer preference tuning."},
+    {"repo": "lmsys/lmsys-chat-1m", "reason": "Real user conversation corpus with separate dataset license/acceptance terms and privacy/safety review requirements; exclude from open release preparation."},
+    {"repo": "Magpie-Align/Magpie-Pro-300K-Filtered", "reason": "Dataset license is llama3, output/data derived from Llama-3-70B, and duplicates the chosen Smol-Magpie role. Avoid additional licensing/provenance burden and mixture redundancy."},
+    {"repo": "Open-Orca/SlimOrca", "reason": "GPT-4-augmented outputs and upstream FLAN-source license mixing; not needed for the first curated mix."},
+    {"repo": "garage-bAInd/Open-Platypus", "reason": "Mixture includes non-commercial/unlicensed component datasets and is reasoning-heavy; do not incorporate without source-by-source clearance."},
+    {"repo": "OpenAssistant/oasst1", "reason": "Apache-2.0 and human annotated but substantial non-English/branch structure and PII labels require tree reconstruction, language/privacy/rating filters, and sample review; defer."},
+    {"repo": "google/IFEval",      "reason": "Evaluation benchmark only. Its pinned prompts are loaded only for contamination checks and are never emitted as SFT examples."
+},
+    {"repo": "allenai/ultrafeedback_binarized_cleaned or argilla/ultrafeedback-binarized-preferences-cleaned", "reason": "Potential future preference stage only; independently review source mix, license, preference quality, and model-output provenance."}
+  ],
+  "build_constraints": {
+    "preserve_v3_read_only": true,
+    "preserve_all_existing_adapters_and_reports": true,
+    "new_artifact_prefix": "luna_pro_sft_v1",
+    "no_upload_or_publication_during_preparation": true,
+    "record_exact_dataset_revisions_and_source_row_hashes": true,
+    "record_source_and_output_hashes": true,
+    "exact_and_near_duplicate_checks": true,
+    "benchmark_and_eval_leakage_audit": true,
+    "response_only_loss": "Use token-verified assistant-span masks from the exact current Llama chat template. Do not assume TRL assistant_only_loss is valid: the local Llama template has no {%- generation %} markers.",
+    "validation": "Before training or data release, inspect the stratified source samples and every project-authored row; validate role alternation, UTF-8, no empty targets, per-message and total lengths, EOS/EOT and target-only labels, unsupported memory/action claims, benchmark collisions, and group-aware train/dev separation."
+  },
+  "initial_training_hypothesis_archived_not_authorized": {
+    "quantization": "NF4 4-bit QLoRA",
+    "lora_rank": 16,
+    "lora_alpha": 16,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "micro_batch": 1,
+    "gradient_accumulation": 8,
+    "effective_batch": 8,
+    "max_seq_length": 1536,
+    "learning_rate": "Start with a controlled low-rate pilot comparison; do not copy the LumiChats 2e-4 setting without local evidence",
+    "epochs": "One pass with checkpointed held-out evaluation; not fixed 60 steps",
+    "selection": "paired behavioral and safety metrics, not lowest training loss",
+    "hardware": "RTX 4060 8 GB; single process/model, inspect nvidia-smi before each load"
+  },
+  "research_refs": {
+    "smoltalk_card": "https://huggingface.co/datasets/HuggingFaceTB/smoltalk",
+    "smoltalk_paper": "https://arxiv.org/html/2502.02737",
+    "smoltalk_license_discussion": "https://huggingface.co/datasets/HuggingFaceTB/smoltalk/discussions/7",
+    "finepersonas_card": "https://huggingface.co/datasets/argilla/FinePersonas-v0.1",
+    "personahub_paper": "https://arxiv.org/abs/2406.20094",
+    "everyday_card": "https://huggingface.co/datasets/HuggingFaceTB/everyday-conversations-llama3.1-2k",
+    "no_robots_card": "https://huggingface.co/datasets/HuggingFaceH4/no_robots",
+    "fine_tome_card": "https://huggingface.co/datasets/mlabonne/FineTome-100k",
+    "ultrafeedback_card": "https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized",
+    "ifeval_card": "https://huggingface.co/datasets/google/IFEval",
+    "llama_3_1_license": "https://raw.githubusercontent.com/meta-llama/llama-models/main/models/llama3_1/LICENSE",
+    "llama_3_2_license": "https://raw.githubusercontent.com/meta-llama/llama-models/main/models/llama3_2/LICENSE",
+    "unsloth_install": "https://unsloth.ai/docs/get-started/install/linux",
+    "unsloth_lora_guide": "https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide",
+    "trl_sft_guide": "https://huggingface.co/docs/trl/en/sft_trainer"
+  }
+}

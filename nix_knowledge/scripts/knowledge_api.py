@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sqlite3
 import sys
 import threading
 from datetime import datetime, timedelta
@@ -64,10 +66,32 @@ ACTIONS_DB = os.environ.get(
     str(DATA_DIR / "actions.db"),
 )
 
-# Nix_predictor is the local Qwen2.5 0.5B constrained function selector.
-# Deterministic rules remain the safety/fast path, while the predictor handles
-# indirect and multi-intent requests. Set to 0 only for diagnostics.
-MODEL_GATE_ENV = "NIX_KNOWLEDGE_MODEL_GATE"  # "1" force, "0" disable
+# Nix_predictor is an optional local Qwen2.5 0.5B constrained function
+# selector. It is disabled by default so Casper can use the GPU alone;
+# deterministic rules and symbolic validation remain authoritative.
+MODEL_GATE_ENV = "NIX_KNOWLEDGE_MODEL_GATE"  # legacy explicit override
+
+
+def _model_gate_enabled() -> bool:
+    """Return the shared opt-in selector flag.
+
+    ``NIX_KNOWLEDGE_MODEL_GATE`` remains a backwards-compatible override;
+    otherwise Core's shared flag controls whether Qwen may be loaded.
+    """
+    value = os.environ.get(MODEL_GATE_ENV)
+    if value is None:
+        value = os.environ.get("NIX_CORE_USE_KNOWLEDGE_MODEL_GATE", "0")
+    return value == "1"
+
+# Direct API callers may bypass nix_core. Keep obvious conversation and
+# creative requests out of the Knowledge predictor even at this boundary.
+_DIRECT_CHAT_GUARD_RE = re.compile(
+    r"^(?:hi|hello|hey|yo|good\s+(?:morning|afternoon|evening)|"
+    r"tell\s+me\s+(?:a\s+)?(?:short\s+)?(?:joke|story|poem|riddle)|"
+    r"write\s+(?:a\s+)?(?:story|poem|song)|"
+    r"make\s+me\s+(?:a\s+)?(?:joke|story|riddle))\b",
+    re.IGNORECASE,
+)
 
 _state_lock = threading.Lock()
 _needle = None          # KnowledgeNeedle, lazy-loaded on first use
@@ -85,9 +109,9 @@ def _get_actions_engine() -> ActionsEngine:
 
 def _get_needle():
     """
-    Lazy KnowledgeNeedle: the Qwen model only loads when a request
-    actually needs it, so /process on deterministic rules and /digest
-    stay fast even on a cold start.
+    Lazy KnowledgeNeedle. The Qwen selector is loaded only when the
+    explicit model-gate flag is enabled; deterministic /process routes,
+    /digest, and symbolic validation do not require a second GPU model.
     """
     global _needle
     if _needle is None:
@@ -99,6 +123,10 @@ def _get_needle():
                     KnowledgeEngine(KNOWLEDGE_DB),
                     timezone=TIMEZONE,
                     actions_engine=_get_actions_engine(),
+                    # The Qwen selector is opt-in. Symbolic rules, temporal
+                    # validation, and tool execution work without loading a
+                    # second GPU model; ambiguous requests safely abstain.
+                    load_model=_model_gate_enabled(),
                 )
     return _needle
 
@@ -120,6 +148,9 @@ def classify(text: str) -> dict:
     decides with a constrained prompt. The model only ever answers
     knowledge or chat.
     """
+    if _DIRECT_CHAT_GUARD_RE.match(" ".join((text or "").split())):
+        return {"route": "chat", "reason": "direct_chat_guard"}
+
     from nix_knowledge.rules import route
 
     try:
@@ -136,8 +167,7 @@ def classify(text: str) -> dict:
             "function": routed[0],
         }
 
-    gate = os.environ.get(MODEL_GATE_ENV, "1")
-    if gate == "0":
+    if not _model_gate_enabled():
         return {"route": "chat", "reason": "rules_abstained_gate_off"}
 
     try:
@@ -282,6 +312,92 @@ def build_digest() -> str:
         engine.close()
 
 
+def _delete_record(record_id: int) -> int:
+    """Delete one record and its derived semantic/entity evidence."""
+    global _needle
+    with _state_lock:
+        engine = _needle.engine if _needle is not None else KnowledgeEngine(KNOWLEDGE_DB)
+        owns_engine = _needle is None
+        try:
+            if engine.database.fetchone(
+                "SELECT id FROM knowledge WHERE id = ?", (int(record_id),)
+            ) is None:
+                return 0
+            engine.database.execute(
+                "DELETE FROM knowledge WHERE id = ?", (int(record_id),)
+            )
+            if _needle is not None and engine.semantic is not None:
+                engine.semantic.delete_record(int(record_id))
+            else:
+                base = Path(KNOWLEDGE_DB)
+                vector_path = base.with_name(base.stem + "_vectors.db")
+                entity_path = base.with_name(base.stem + "_entities.db")
+                for path, statements in (
+                    (vector_path, [("DELETE FROM semantic_chunks WHERE record_id = ?", (int(record_id),))]),
+                    (entity_path, [
+                        ("DELETE FROM entities WHERE record_id = ?", (int(record_id),)),
+                        ("DELETE FROM entity_aliases WHERE record_id = ?", (int(record_id),)),
+                    ]),
+                ):
+                    if path.exists():
+                        try:
+                            connection = sqlite3.connect(path)
+                            for query, params in statements:
+                                connection.execute(query, params)
+                            connection.commit()
+                            connection.close()
+                        except sqlite3.Error:
+                            pass
+            return 1
+        finally:
+            if owns_engine:
+                engine.close()
+
+
+def _reset_store() -> dict[str, int]:
+    """Clear all durable Knowledge data and every derived index."""
+    global _needle, _intent_classifier
+    with _state_lock:
+        if _needle is not None:
+            try:
+                _needle.engine.close()
+            except Exception:
+                pass
+            _needle = None
+
+        engine = KnowledgeEngine(KNOWLEDGE_DB)
+        try:
+            records = engine.database.fetchone(
+                "SELECT COUNT(*) AS count FROM knowledge"
+            )["count"]
+            changes = engine.database.fetchone(
+                "SELECT COUNT(*) AS count FROM knowledge_changes"
+            )["count"]
+            engine.database.execute("DELETE FROM knowledge")
+            engine.database.execute("DELETE FROM knowledge_changes")
+        finally:
+            engine.close()
+
+        # The semantic service uses sibling SQLite files. Removing them is
+        # intentional: it guarantees that deleted people/states cannot be
+        # returned by vector search or the entity registry on the next load.
+        sidecars = []
+        base = Path(KNOWLEDGE_DB)
+        if base.suffix == ".db":
+            sidecars = [
+                base.with_name(base.stem + "_vectors.db"),
+                base.with_name(base.stem + "_entities.db"),
+            ]
+        for path in sidecars:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+
+        _intent_classifier = None
+        return {"knowledge_records": int(records), "knowledge_changes": int(changes)}
+
+
 def build_memory_block(current_text: str | None = None) -> str:
     """
     Full MEMORY block for NixLM: facts + people + current states +
@@ -419,7 +535,7 @@ class Handler(BaseHTTPRequestHandler):
                     "service": "nix_knowledge",
                     "timezone": TIMEZONE,
                     "knowledge_records": records,
-                    "model_loaded": _needle is not None,
+                    "model_loaded": bool(_needle is not None and _needle.model is not None),
                     "actions_db": ACTIONS_DB,
                 }
             )
@@ -435,13 +551,39 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/warmup":
             try:
                 _get_needle()
-                self._json({"ok": True, "model_loaded": True})
+                self._json({
+                    "ok": True,
+                    "model_loaded": bool(_needle is not None and _needle.model is not None),
+                })
             except Exception as exc:
                 self._json({
                     "ok": False,
                     "model_loaded": False,
                     "error": f"{type(exc).__name__}: {exc}",
                 }, 503)
+            return
+
+        if path == "/delete_record":
+            record_id = payload.get("id")
+            if record_id is None:
+                self._json({"ok": False, "error": "missing id"}, 400)
+                return
+            try:
+                deleted = _delete_record(int(record_id))
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
+                return
+            self._json({"ok": True, "deleted": deleted})
+            return
+
+        if path == "/reset":
+            if payload.get("confirm") != "RESET_ALL":
+                self._json({"ok": False, "error": "confirmation required"}, 400)
+                return
+            try:
+                self._json({"ok": True, **_reset_store()})
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
             return
 
         if path == "/process":
@@ -480,6 +622,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             self._json(classify(text))
+            return
+
+        if path == "/thinking":
+            if not text:
+                self._json({"ok": False, "error": "missing text"}, 400)
+                return
+            try:
+                needle = _get_needle()
+                with _state_lock:
+                    self._json(needle.decide_thinking(text))
+            except Exception as exc:
+                self._json({"ok": False, "think": False, "mode": "FAST", "source": "fallback", "error": type(exc).__name__})
             return
 
         if path == "/digest":

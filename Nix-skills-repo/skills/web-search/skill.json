@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "nix-skill",
+  "id": "web-search",
+  "name": "Web Search",
+  "version": "0.1.0",
+  "description": "A starter package describing a future web-search connector for NIX PUCA.",
+  "category": "Research",
+  "publisher": "NIX Skills Example",
+  "license": "MIT",
+  "icon": "⌕",
+  "tags": [
+    "search",
+    "research",
+    "web"
+  ],
+  "permissions": [
+    "Would request access to public web pages if a reviewed search connector is added."
+  ],
+  "files": [
+    "README.md",
+    "instructions.md"
+  ]
+}

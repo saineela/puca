@@ -172,7 +172,10 @@ def _entries_for_record(
     if end is None:
         end = start
 
-    if recurring and recurrence in {"daily", "weekly"} and query is not None:
+    if recurring and (
+        recurrence in {"daily", "weekly"}
+        or (isinstance(recurrence, str) and recurrence.startswith("interval_") and recurrence.endswith("_days"))
+    ) and query is not None:
         occurrences = context.occurrence_window(
             start=start,
             end=end,
