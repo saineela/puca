@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "kind": "nix-skills-repository",
+  "name": "Example NIX Skills",
+  "description": "A local example of the community skill repository format.",
+  "publisher": "NIX Skills Example",
+  "skills": [
+    {
+      "manifest": "skills/web-search/skill.json"
+    }
+  ]
+}

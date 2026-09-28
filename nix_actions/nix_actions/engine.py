@@ -338,10 +338,14 @@ class ActionsEngine:
                 f"Valid types: {sorted(VALID_ACTION_TYPES)}"
             )
 
-        if recurrence is not None and recurrence not in {
-            "daily",
-            "weekly",
-        }:
+        valid_interval = (
+            isinstance(recurrence, str)
+            and recurrence.startswith("interval_")
+            and recurrence.endswith("_days")
+            and recurrence[len("interval_"):-len("_days")].isdigit()
+            and 1 <= int(recurrence[len("interval_"):-len("_days")]) <= 365
+        )
+        if recurrence is not None and recurrence not in {"daily", "weekly"} and not valid_interval:
             raise ValueError(
                 f"Unsupported recurrence: {recurrence}"
             )
@@ -850,6 +854,11 @@ class ActionsEngine:
             step = timedelta(days=1)
         elif action.recurrence == "weekly":
             step = timedelta(weeks=1)
+        elif isinstance(action.recurrence, str) and action.recurrence.startswith("interval_") and action.recurrence.endswith("_days"):
+            try:
+                step = timedelta(days=int(action.recurrence[len("interval_"):-len("_days")]))
+            except (TypeError, ValueError):
+                return None
         else:
             return None
 

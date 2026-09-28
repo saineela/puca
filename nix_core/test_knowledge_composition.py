@@ -99,6 +99,8 @@ def test_knowledge_result_is_always_composed_by_core_with_all_grounding_inputs()
     assert "AUTHORITATIVE KNOWLEDGE RESULT" in prompt
     assert "feeling better" in prompt
     assert response["details"]["core_formatter"]["think"] is False
+    assert response["details"]["formatter_ms"] >= 0
+    assert response["details"]["core_formatter"]["latency_ms"] == response["details"]["formatter_ms"]
 
 
 def test_event_composition_receives_authoritative_clock_and_absolute_event_time():
@@ -138,6 +140,8 @@ def test_event_composition_receives_authoritative_clock_and_absolute_event_time(
     assert "2026-09-21T09:00:00-05:00" in prompt
     assert "2026-09-21T11:00:00-05:00" in prompt
     assert response["details"]["core_formatter"]["think"] is False
+    assert "PUCA_POLICY_V4" in composer.calls[0]["system_prompt"]
+    assert "response_act=answer" in composer.calls[0]["system_prompt"]
 
 
 def test_knowledge_api_failure_also_crosses_core_composer():
@@ -181,7 +185,50 @@ def test_multi_clause_knowledge_clause_uses_original_request_and_context():
     )
 
     assert response["route"] == "knowledge+chat"
-    knowledge_call = composer.calls[0]
-    assert knowledge_call["think"] is False
-    assert "remember that I like tea and tell me a joke" in knowledge_call["user_text"]
-    assert "Earlier context" in knowledge_call["user_text"]
+    # Fact writes use the exact deterministic stored-value response; only the
+    # independent joke clause needs Casper generation.
+    assert len(composer.calls) == 1
+    chat_call = composer.calls[0]
+    assert chat_call["think"] is False
+    assert chat_call["user_text"] == "tell me a joke"
+    assert response["details"]["routing_engine"]["latency_ms"] >= 0
+
+
+def test_legacy_fact_payload_skips_casper_and_reports_zero_formatter_time():
+    # Older Knowledge API versions omitted operation/record_type. Core must
+    # still recognize the create_fact shape and avoid a full Casper call.
+    payload = {
+        "result": {
+            "ok": True,
+            "record_id": 42,
+            "data": {"value": "I like tea"},
+        }
+    }
+    composer = Composer("This should never be used.")
+    brain = _brain(payload, composer)
+
+    response = brain.handle(text="remember that I like tea")
+
+    assert composer.calls == []
+    assert response["details"]["core_formatter"]["attempted"] is False
+    assert response["details"]["formatter_ms"] == 0.0
+    assert response["details"]["routing_engine"]["latency_ms"] >= 0
+
+
+def test_multi_clause_pipeline_has_real_routing_metadata():
+    payload = {
+        "result": {
+            "ok": True,
+            "operation": "CREATE",
+            "record_type": "fact",
+            "data": {"value": "I like tea"},
+        }
+    }
+    brain = _brain(payload, Composer("A joke."))
+
+    response = brain.handle(text="remember that I like tea and tell me a joke")
+    routing = response["details"]["routing_engine"]
+
+    assert routing["rule"] == "multi_clause"
+    assert routing["latency_ms"] >= 0
+    assert len(routing["clauses"]) == 2

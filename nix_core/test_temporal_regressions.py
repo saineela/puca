@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "nix_knowledge" / "nix
 from brain import format_knowledge_result, is_assistant_identity_request, is_creator_identity_request
 from rules import route
 from temporal import TemporalResolver
-from temporal_hybrid import repair_calendar_arguments
+from temporal_hybrid import parse_event, repair_calendar_arguments
 
 
 TZ = ZoneInfo("America/Chicago")
@@ -77,6 +77,21 @@ def test_partial_selector_does_not_drop_five_day_offset():
     assert parsed.resolved.start.date().isoformat() == "2026-09-25"
     assert parsed.resolved.start.hour == 9
     assert parsed.resolved.end.hour == 11
+
+
+def test_selector_filler_does_not_pollute_event_title():
+    resolver = TemporalResolver(timezone="America/Chicago")
+    parsed = parse_event(
+        "Schedule my dentist appointment which is happening in 2 days",
+        resolver,
+        proposal={
+            "title": "dentist appointment which is happening",
+            "temporal_expression": "in 2 days",
+        },
+    )
+    assert parsed is not None
+    assert parsed.title == "dentist appointment"
+    assert parsed.slots["offset_amount"] == "2"
 
 
 def test_event_baseline_exposes_absolute_local_dates():

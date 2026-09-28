@@ -115,6 +115,12 @@ _NEGATIVE_EXEMPTION_RE = re.compile(
 # Bare fragments: a lone date/time phrase is temporal context, not
 # knowledge. Only fires when the WHOLE (address-stripped) request is
 # a fragment.
+_CASUAL_FRAGMENT_RE = re.compile(
+    r"^(?:myself|me|stop+|wait+|no+|nah+|okay+|alright+|"
+    r"break\s+the\s+system|leave\s+me\s+alone)[.!?,\s]*$",
+    re.IGNORECASE,
+)
+
 _FRAGMENT_RE = re.compile(
     r"^(?:next|this|last|the\s+)?\s*"
     r"(?:week|weekend|month|year|monday|tuesday|wednesday|thursday|friday|"
@@ -520,11 +526,33 @@ _RECALL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# High-confidence indirect storage/action language. These phrases used to
+# fall through to the Qwen classifier even though their destination is clear,
+# adding avoidable model latency. Knowledge still validates the operation;
+# this only makes the Core route decision fast.
+_FAST_KNOWLEDGE_HINT_RE = re.compile(
+    r"\b(?:keep\s+track|make\s+(?:a\s+)?note|"
+    r"i\s+owe\b|need\s+to\s+remember|"
+    r"make\s+sure\s+(?:you\s+)?remember|"
+    r"put\s+this\s+on\s+my\s+(?:calendar|schedule)|"
+    r"take\s+(?:my\s+)?(?:medicine|medicines|medication|medications))\b",
+    re.IGNORECASE,
+)
+
 # Questions about personal codes/credentials: "what's the wifi
 # password" (users say "the", meaning their own).
 _PERSONAL_CODE_RE = re.compile(
     r"^(?:what|where|which|do|does|is|can|tell)\b.*"
     r"\b(?:wifi|wi\s?fi|password|passcode|pass\s?code)\b",
+    re.IGNORECASE,
+)
+
+# Ordinary first-person conversation is not an ambiguous Knowledge request.
+# Keeping it on the chat path avoids a Qwen classifier round trip for normal
+# emotion, opinions, needs, and day-to-day remarks.
+_ORDINARY_CHAT_STATEMENT_RE = re.compile(
+    r"^(?:i(?:'m| am| feel| think| guess| just| really| want| need|"
+    r"was|had|got|have been)\b|this is\b|that(?:'s| is)\b)",
     re.IGNORECASE,
 )
 
@@ -778,6 +806,13 @@ def classify(
     # and instruction-override attempts go to chat with a refusal
     # seed, never into the knowledge engine.
     # --------------------------------------------------------------
+    # Short stop/boundary phrases are conversation controls, never
+    # Knowledge mutations. This protects inputs such as "stoppp" and
+    # "break the system" from falling through to the model gate.
+    if _CASUAL_FRAGMENT_RE.match(lowered):
+        features.update(route=CHAT, rule="casual_fragment_guard")
+        return CHAT, features
+
     for pattern in _INJECTION_PATTERNS:
         match = pattern.search(lowered)
         if match:
@@ -802,6 +837,10 @@ def classify(
             features.update(route=KNOWLEDGE, rule="negative_recall")
             return KNOWLEDGE, features
         features.update(route=CHAT, rule="negative_cognition_guard")
+        return CHAT, features
+
+    if _CASUAL_FRAGMENT_RE.match(lowered):
+        features.update(route=CHAT, rule="casual_fragment_guard")
         return CHAT, features
 
     if _FRAGMENT_RE.match(lowered):
@@ -958,6 +997,13 @@ def classify(
         lowered,
     ) and re.search(r"\b(?:my|our)\b", lowered):
         features.update(route=KNOWLEDGE, rule="incidental_note")
+        return KNOWLEDGE, features
+
+    # High-confidence indirect storage/action language gets a fast route
+    # decision. The Knowledge engine remains authoritative about the exact
+    # operation and arguments.
+    if _FAST_KNOWLEDGE_HINT_RE.search(lowered):
+        features.update(route=KNOWLEDGE, rule="fast_knowledge_hint")
         return KNOWLEDGE, features
 
     # Store intent. "I can't remember if penguins fly" is a world
@@ -1133,6 +1179,12 @@ def classify(
     # World/internet questions.
     if _matches_any(lowered, _WORLD_Q) or _WORLD_RE.search(lowered):
         features.update(route=CHAT, rule="world_question")
+        return CHAT, features
+
+    # Ordinary first-person conversation is fast chat. Knowledge-shaped
+    # statements have already been handled above (store/state/event rules).
+    if _ORDINARY_CHAT_STATEMENT_RE.search(lowered):
+        features.update(route=CHAT, rule="ordinary_chat_statement")
         return CHAT, features
 
     # Anything addressed at the assistant with no knowledge signal is

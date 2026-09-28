@@ -1,0 +1,10 @@
+{
+  "status": "archived_retired_non_actionable",
+  "created_utc": "2026-09-25",
+  "cases_path": "luna_pro_eval_cases.jsonl",
+  "cases_sha256": "29df016043b185f4ae78b2e20823cb93f08d41bbcdb94bb98dc5900c190d2d82",
+  "case_count": 8,
+  "case_source": "Project-authored fictional prompts written independently of candidate training rows.",
+  "answer_keys": "None; blinded human review points only.",
+  "policy": "Historical Pro evaluation artifact retained for provenance only. Luna Pro is retired; do not run a Pro evaluation or use this manifest to authorize future training."
+}

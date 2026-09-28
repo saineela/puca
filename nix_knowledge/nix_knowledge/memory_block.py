@@ -29,6 +29,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .states import follow_up_eligible
+
 # GoEmotions head labels -> plain Nix register words. Only labels worth
 # surfacing are mapped; everything else (approval, curiosity, ...) is
 # treated as neutral chatter and omitted.
@@ -170,15 +172,27 @@ def render_memory_block(
         )
 
     states = [
-        record.data.get("value", "")
+        record.data
         for record in engine.search("person")
         if record.data.get("statement_type") == "current_state"
         and record.data.get("value")
     ]
     if states:
+        state_lines = []
+        for state in states[:8]:
+            line = f"- {state.get('value', '')}"
+            if state.get("relationship_closeness") or state.get("follow_up_policy"):
+                line += (
+                    f" [closeness={state.get('relationship_closeness', 'unknown')};"
+                    f" follow_up={state.get('follow_up_policy', 'none')};"
+                    f" needed={str(bool(state.get('follow_up_needed'))).lower()};"
+                    f" answered={str(bool(state.get('follow_up_answered'))).lower()};"
+                    f" eligible={str(follow_up_eligible(state)).lower()};"
+                    f" reason={state.get('follow_up_reason', 'derived')} ]"
+                )
+            state_lines.append(line)
         sections.append(
-            "How your people are doing right now:\n"
-            + "\n".join(f"- {state}" for state in states[:8])
+            "How your people are doing right now:\n" + "\n".join(state_lines)
         )
 
     try:

@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from nix_knowledge.engine import KnowledgeEngine
 from nix_knowledge.states import (
     find_states,
+    follow_up_eligible,
     parse_state_statement,
     store_state,
 )
@@ -61,6 +62,42 @@ def test_parse_positive(text, role, name, state):
     assert parsed["state"] == state
 
 
+def test_close_person_follow_up_variables_are_written(engine):
+    result = store_state(engine, parse_state_statement("my sister is sick"), "my sister is sick")
+    data = result["data"]
+    assert data["relationship_closeness"] == "close"
+    assert data["follow_up_policy"] == "only_if_close_and_unwell_or_problem"
+    assert data["follow_up_needed"] is True
+    assert data["follow_up_answered"] is False
+    assert data["follow_up_eligible"] is True
+    assert follow_up_eligible(data) is True
+
+
+def test_memory_policy_fields_distinguish_eligible_from_ordinary(engine):
+    from nix_knowledge.memory_block import render_memory_block
+
+    store_state(engine, parse_state_statement("my sister is sick"), "my sister is sick")
+    block = render_memory_block(engine, current_text="my sister is sick")
+    assert "eligible=true" in block
+    assert "close" in block
+
+    store_state(engine, parse_state_statement("my sister is better now"), "my sister is better now")
+    block = render_memory_block(engine, current_text="my sister is better now")
+    assert "eligible=false" in block
+    assert "answered=true" in block
+
+
+def test_recovery_marks_prior_follow_up_answered(engine):
+    store_state(engine, parse_state_statement("my sister is sick"), "my sister is sick")
+    result = store_state(engine, parse_state_statement("my sister is better now"), "my sister is better now")
+    data = result["data"]
+    assert data["relationship_closeness"] == "close"
+    assert data["follow_up_needed"] is False
+    assert data["follow_up_answered"] is True
+    assert data["follow_up_eligible"] is False
+    assert follow_up_eligible(data) is False
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -93,6 +130,19 @@ def test_typo_role_update_uses_canonical_person_state(engine):
     assert current[0]["role"] == "sister"
     assert current[0]["state"] == "alright"
     assert "sistser" not in current[0]["value"]
+
+
+def test_non_close_person_is_never_follow_up_eligible(engine):
+    result = store_state(
+        engine,
+        parse_state_statement("my cousin is sick"),
+        "my cousin is sick",
+    )
+    data = result["data"]
+    assert data["relationship_closeness"] == "ordinary"
+    assert data["follow_up_needed"] is True
+    assert data["follow_up_eligible"] is False
+    assert data["follow_up_reason"] == "already_answered_or_not_close"
 
 
 def test_alright_is_a_temporal_well_state_not_a_fact():

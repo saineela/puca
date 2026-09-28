@@ -151,6 +151,56 @@ def test_clarification_answer_continues_original_state_request():
     assert second["reply"] == "Updated: maanvi is now alright."
 
 
+def test_turn_logging_keeps_dashboard_and_api_conversation_metadata():
+    actions = FakeActions()
+    brain = Brain(
+        knowledge=FakeKnowledge({"result": {"ok": True}}),
+        actions=actions,
+        ollama=NoChat(),
+        log_requests=False,
+    )
+
+    brain.handle(
+        text="Who are you?",
+        location="openai-api",
+        conversation_id="api-thread-42",
+    )
+
+    assert [turn["role"] for turn in actions.turns] == ["user", "assistant"]
+    assert all(turn["refs"]["location"] == "openai-api" for turn in actions.turns)
+    assert all(
+        turn["refs"]["conversation_id"] == "api-thread-42"
+        for turn in actions.turns
+    )
+
+
+def test_brain_loads_only_source_and_conversation_scoped_history():
+    class ScopedActions(FakeActions):
+        def __init__(self):
+            super().__init__()
+            self.context_calls = []
+
+        def context_for(self, *, location, conversation_id):
+            self.context_calls.append((location, conversation_id))
+            return [{"role": "user", "content": "same thread history"}]
+
+    actions = ScopedActions()
+    brain = Brain(
+        knowledge=FakeKnowledge({"result": {"ok": True}}),
+        actions=actions,
+        ollama=NoChat(),
+        log_requests=False,
+    )
+
+    brain.handle(
+        text="Who are you?",
+        location="dashboard",
+        conversation_id="dashboard-thread-1",
+    )
+
+    assert actions.context_calls == [("dashboard", "dashboard-thread-1")]
+
+
 def test_creator_and_identity_questions_never_fall_through_to_model():
     knowledge = FakeKnowledge({"result": {"ok": True}})
     brain = Brain(
@@ -159,9 +209,14 @@ def test_creator_and_identity_questions_never_fall_through_to_model():
         ollama=NoChat(),
         log_requests=False,
     )
-    for question in ("Who created you Casper?", "Who are you?", "Who is Casper?"):
+    expectations = {
+        "Who created you Casper?": "NIX PUCA was created by Sai Neela",
+        "Who are you?": "I'm Luna",
+        "Who is Casper?": "I'm Luna",
+    }
+    for question, expected in expectations.items():
         response = brain.handle(text=question)
-        assert "Created and Built by Sai Neela" in response["reply"] or "Casper" in response["reply"]
+        assert expected in response["reply"]
         assert response["details"]["model_called"] is False
 
 

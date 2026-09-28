@@ -25,6 +25,13 @@ def date_of(resolver, expression):
     return result.start.date()
 
 
+def test_every_two_days_is_a_valid_interval_recurrence(resolver):
+    result = resolver.resolve("every 2 days at 8am", now=NOW)
+    assert result is not None
+    assert result.recurring is True
+    assert result.recurrence == "interval_2_days"
+
+
 # ---------------------------------------------------------------------
 # Bare weekday: next occurrence, today counts
 # ---------------------------------------------------------------------

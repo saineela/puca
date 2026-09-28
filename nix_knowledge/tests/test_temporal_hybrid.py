@@ -132,6 +132,18 @@ def test_hybrid_does_not_guess_unresolved_temporal_language(resolver):
     assert parsed is None
 
 
+def test_hybrid_parses_casual_tsa_meeting_with_tomorrow_time_range(resolver):
+    request = "alright bro, I have a TSA meeting tmr from 4pm to 6pm"
+
+    parsed = parse_event(request, resolver, now=NOW)
+
+    assert parsed is not None
+    assert parsed.title == "TSA meeting"
+    assert parsed.expression == "tmr from 4pm to 6pm"
+    assert parsed.resolved.start.isoformat() == "2026-09-21T16:00:00-05:00"
+    assert parsed.resolved.end.isoformat() == "2026-09-21T18:00:00-05:00"
+
+
 def test_hybrid_preserves_simple_symbolic_request(resolver):
     parsed = parse_event(
         "I have a dentist appointment tomorrow",
