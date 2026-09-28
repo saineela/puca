@@ -22,13 +22,15 @@
   <a href="nix_decision/README.md">Decision docs</a>
 </p>
 
+> ⚠️ **CRITICAL DISTINCTION:** **NIX PUCA is NOT a language model (LLM).** It is the underlying cognitive orchestrator and dynamic system behind the model. It functions like a human brain's memory, logic, and reasoning centers, feeding validated packets of "ground truth" data down to a separate conversational speech model (like Luna via Ollama) which simply handles natural language synthesis. 
+
 NIX PUCA is a modular software foundation for a **Personal User Companion Agent (PUCA)**: a self-hosted personal assistant built around explicit boundaries between conversation, durable memory, temporal interpretation, and scheduled actions. It is a Python project with local SQLite persistence and optional local or separately operated model backends.
 
 The design is intentionally more structured than a single prompt wrapped around an LLM. NIX Core routes and composes requests; NIX Knowledge stores and retrieves personal records; NIX Actions manages scheduled work. A configured conversational model can produce natural-language responses, while application code validates and manages persistence and scheduling. Deployment security and feature-specific permissions still require configuration, testing, and review.
 
 **Project identity:** The source handoff identifies Casper as the user-facing NIX PUCA identity, created and built by Sai Neela in NIX. This product identity is separate from the local Transformers selector, which currently defaults to Luna V6. These are source-level settings; they do not prove weights are present, loaded, or used by any hosted service.
 
-> **Project status:** This repository is a development foundation, not a claim of a certified, production-ready, or hosted AI product. Model quality, device compatibility, latency, VRAM use, privacy behavior, and service exposure depend on local configuration and require deployment-specific validation. **Public-release note:** no repository-level `LICENSE` is present; choose and add one before presenting the code as open source or inviting reuse/contributions.
+> **Project status:** This repository is a development foundation, not a claim of a certified, production-ready, or hosted AI product. Model quality, device compatibility, latency, VRAM use, privacy behavior, and service exposure depend on local configuration and require deployment-specific validation.
 
 ## What is a PUCA?
 
@@ -339,6 +341,18 @@ nix_decision/                   Explicit trigger/state-gate foundation (no rules
 testing-echo-connect/           Optional isolated integration prototype
 data/                           Local SQLite/runtime state (Git-ignored)
 ```
+## Roadmap
+
+### NIX Build Features Plan
+All upcoming skills are operated by the **Nix-Actions** system's underlying layer called **Nix-Skills**. (Will release instructions on how to create a new custom skill aswell! :))
+
+- [ ] **Nix App Access Skill:** Use NIX on your phone natively via the official *NIX PUCA App* on the Google Play Store.
+- [ ] **Web Search:** Integrates open-source search engines to enable real-time internet search capabilities for NIX PUCA.
+- [ ] **Presence Detection:** Uses ESP32 microcontrollers to let NIX PUCA detect exactly when the user enters or leaves a room.
+- [ ] **EchoDot Connect:** Connects NIX PUCA directly to Echo Dot (2nd Gen) hardware to give the assistant a physical home audio footprint (leveraging local methods similar to the open-source `echolocal` GitHub project).
+- [ ] **Voice System:** Enables real-time, low-latency voice conversations with your configured model, including fully customizable UI/UX design controls.
+- [ ] **Geolocation Access:** Integrates with open-source timeline software like *Reitti* to sync device location data safely. *(Requires Nix App Access Skill; only activates dynamically when the user connects to home Wi-Fi via the DNS skill).*
+- [ ] **OPNsense DNS Presence Detection Skill:** Monitors your home network via your OPNsense DNS service to automatically log when your phone connects to the local home Wi-Fi where NIX PUCA runs.
 
 ## Documentation
 
@@ -351,20 +365,24 @@ data/                           Local SQLite/runtime state (Git-ignored)
 - [`CASPER_V6_RESEARCH.md`](CASPER_V6_RESEARCH.md) — archived Casper V6 experiments and performance/evaluation caveats.
 - [`NIX-Modeldev/index.html`](NIX-Modeldev/index.html) — model lineage, dataset provenance, and research archive.
 
-## GitHub discovery and project metadata
+## License
 
-GitHub repository topics classify a repository by its actual purpose, subject area, and language. Before a public launch, consider adding this accurate set through the repository's **About → Topics** control:
+NIX PUCA is open-source software licensed under the **Apache License 2.0**. 
 
-`personal-assistant` · `personal-ai-assistant` · `personal-user-companion-agent` · `puca` · `ai-assistant` · `local-ai` · `local-llm` · `self-hosted` · `python` · `sqlite` · `conversational-ai` · `knowledge-management`
+Any modifications, distributions, or derivative works of this repository **must include prominent attribution and credit to the original creator, Sai Neela,** in accordance with Section 4(c) of the license text.
 
-These are suggested GitHub repository topics, not a claim that GitHub endorses or ranks NIX. The project-specific `PUCA` term is also useful in the project description and documentation, while generic topic labels help describe the current code to people browsing established topic pages. Because voice and smart-home integrations are roadmap items rather than released features, do not add `voice-assistant` or `smart-home` topics until those capabilities exist. The suggested set also omits `privacy-focused`: a local-first design is not itself a security guarantee, and deployment settings need a security review before making that marketing claim. Remove any topic that no longer accurately describes a released capability. The [GitHub topics documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics) notes that repositories can use up to 20 lowercase topic names (50 characters or fewer).
+```text
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-Suggested concise repository description:
+    http://apache.org
 
-> Local-first Personal User Companion Agent foundation in Python: modular conversation routing, durable personal memory, temporal grounding, and deterministic reminders.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
-Target repository URL: [`github.com/saineela/puca`](https://github.com/saineela/puca). Confirm the repository exists, is public, and this link resolves before announcing the launch. Add repository topics and description in GitHub settings; README text alone does not set GitHub's metadata or guarantee search ranking.
-
-## License and contributions
-
-No repository-level `LICENSE` file is currently present. Until a license is chosen and added, do not assume this repository grants permission to reuse or redistribute its code. Model and dataset licenses are separate and must be reviewed independently. Contributions should include focused tests and validation notes and must not add secrets, personal data, model weights, or generated datasets to Git.
+Copyright (c) 2026 Sai Neela. All rights reserved.
+```
