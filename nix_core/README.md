@@ -10,6 +10,7 @@
 - Knowledge composition: raw user request + grounded Knowledge output + current temporal context are sent to Core for final formatting.
 - Websocket gateway for voice/client integrations.
 - Browser dashboard for live testing, trace inspection, sessions, schedule, and Knowledge views.
+- Extended console launcher and the currently implemented Mobile App home-copy prototype; see [`MOBILE_APP_API.md`](MOBILE_APP_API.md) for the full proposed NIX Home API and client flows.
 - Request logging and regression analysis.
 
 Core does **not** own durable personal memory. It asks `nix_knowledge` for that information. It does not decide when reminders fire; `nix_actions` owns scheduling.
@@ -175,18 +176,19 @@ See [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for exact model paths, adapter
 |---|---|
 | Knowledge API | `nix_knowledge` HTTP service, commonly port `8100` |
 | Actions API | `nix_actions` HTTP service, commonly port `8200` |
-| Console | Browser test dashboard; the **only** port it listens on (`NIX_CONSOLE_PORT`, else random) |
+| Console | Browser test dashboard; the **only** port it listens on (`49117`, fixed) |
 | Websocket gateway | Voice/client interface, commonly port `9000` |
 
 Start the console:
 
 ```bash
-python nix_core/console.py
-```
-
-The console binds `0.0.0.0` (set `NIX_CONSOLE_HOST` to restrict it) and serves the UI, every `/api/*` route, and the `/v1` OpenAI surface on that one port. Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens exactly one listening socket — a browser needs only the console URL. The optional Testing-page runner is the sole exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
+python nix_core/console_extend.py
+```The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict it) and serves the UI, every `/api/*` route, and the `/v1` OpenAI surface on that one fixed port. There is no port override; the port remains stable across restarts and browser reloads. This enables LAN access subject to firewall/network policy but does not provide internet port forwarding.
+ Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens exactly one listening socket — a browser needs only the console URL. The optional Testing-page runner is the sole exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
 
 Useful console endpoints:
+
+- `GET /api/mobile/v1` and `GET /api/mobile/v1/home-copy` — Mobile App category index and randomized home-copy prototype, available only when started with `console_extend.py`; the full mobile API is not implemented. See [`MOBILE_APP_API.md`](MOBILE_APP_API.md).
 
 - `GET /api/health` — service, model, GPU, and timezone status
 - `GET /api/feed` — trace, turns, actions, and Knowledge summaries
@@ -296,7 +298,10 @@ The websocket subprocess suite may require the local service/model environment. 
 - `brain.py` — Core request pipeline and response composition.
 - `routing_engine.py` — independent typed Core route boundary and confidence metadata.
 - `router.py` — compatibility symbolic corpus/rule classifier used as a bounded fallback inside the routing engine.
-- `console.py` — browser dashboard and API.
+- `console.py` — unchanged base browser dashboard and API.
+- `console_extend.py` — opt-in launcher and additive HTTP route dispatch.
+- `mobile_app_api.py` — implemented home-copy catalog prototype for the future mobile category.
+- `MOBILE_APP_API.md` — mobile screen flows, proposed APIs, setup, and security contract.
 - `ws_server.py` — websocket gateway.
 - `followup.py` — short-lived continuation behavior.
 - `request_log.py` — JSONL request logging.

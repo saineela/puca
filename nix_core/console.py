@@ -8,7 +8,7 @@ scheduling, bridge propagation, session logging, and the chat model.
 
     ~/nix_knowledge/.venv/bin/python ~/nix_core/console.py
 
-- Binds to a random free port (override: NIX_CONSOLE_PORT / HOST) and
+- Binds to the stable console port (49117; host override: NIX_CONSOLE_HOST) and
   prints the URL. The browser only ever talks to this one port.
 - Uses the real nix_knowledge / nix_actions APIs when they are already
   running; otherwise runs them in-process through an internal bridge, so
@@ -28,15 +28,19 @@ HTTP surface (all JSON except "/"):
 
 from __future__ import annotations
 
+import base64
 import concurrent.futures
 import hashlib
+import io
 import json
+import math
 import os
 import random
 import re
 import shutil
 import socket
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -44,10 +48,12 @@ import threading
 import time
 import urllib.request
 import uuid
+import zipfile
+import xml.etree.ElementTree as ET
 from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 # ----------------------------------------------------------------------
 # Paths so the sibling packages import cleanly from anywhere.
@@ -59,7 +65,7 @@ DASHBOARD_PATH = os.path.join(CORE_DIR, "dashboard.html")
 MODELDEV_PATH = os.path.join(REPO_ROOT, "NIX-Modeldev", "index.html")
 DASHBOARD_PAGES = frozenset({
     "home", "models", "conversations", "memories", "people", "events",
-    "api", "docs", "settings", "skills", "release-notes",
+    "api", "docs", "settings", "skills", "devices", "skill-settings", "release-notes",
 })
 sys.path.insert(0, CORE_DIR)
 sys.path.insert(0, os.path.join(REPO_ROOT, "nix_knowledge"))
@@ -128,6 +134,9 @@ SKILL_CATALOG = {
     },
 }
 _skills_state_lock = threading.Lock()
+SKILLS_MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+SKILLS_AUTO_UPDATE_INTERVAL = 6 * 60 * 60
+SKILL_LOGO_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg", ".webp"}
 
 # ----------------------------------------------------------------------
 # In-memory trace ring: every background call lands here.
@@ -777,7 +786,8 @@ def _kb_view() -> list[dict]:
 
 
 def _people_view() -> list[dict]:
-    """People close to the user with their CURRENT state each."""
+    """Return named current states with a safe relationship fallback."""
+    from nix_knowledge.states import follow_up_eligible, state_person_label, state_person_name
     rows = _rows(
         KNOWLEDGE_DB,
         "SELECT id, data, created_at, updated_at FROM knowledge "
@@ -796,14 +806,18 @@ def _people_view() -> list[dict]:
             data = raw or {}
         if data.get("statement_type") != "current_state":
             continue
+        subject = state_person_label(data)
+        if subject is None:
+            continue
         people.append(
             {
                 "id": row.get("id"),
-                "name": data.get("name"),
-                "subject": data.get("subject", ""),
+                "name": state_person_name(data.get("name")),
+                "subject": subject,
                 "role": data.get("role"),
                 "state": data.get("state", ""),
                 "valence": data.get("valence", "neutral"),
+                "follow_up_eligible": follow_up_eligible(data),
                 "value": data.get("value", ""),
                 "updated_at": row.get("updated_at"),
             }
@@ -1127,23 +1141,33 @@ def _read_skills_state() -> dict:
         saved = {}
     installed = saved.get("installed", [])
     repositories = saved.get("repositories", [])
+    trusted = saved.get("trusted", {})
+    auto_updates = saved.get("auto_updates", {})
+    installed_versions = saved.get("installed_versions", {})
+    device_names = saved.get("device_names", {})
     return {
-        "installed": [value for value in installed if isinstance(value, str)]
-        if isinstance(installed, list) else [],
-        "repositories": [value for value in repositories if isinstance(value, dict)]
-        if isinstance(repositories, list) else [],
+        **saved,
+        "installed": [value for value in installed if isinstance(value, str)] if isinstance(installed, list) else [],
+        "repositories": [value for value in repositories if isinstance(value, dict)] if isinstance(repositories, list) else [],
+        "trusted": trusted if isinstance(trusted, dict) else {},
+        "auto_updates": {key: value for key, value in auto_updates.items() if isinstance(key, str) and isinstance(value, bool)} if isinstance(auto_updates, dict) else {},
+        "installed_versions": installed_versions if isinstance(installed_versions, dict) else {},
+        "device_names": {key: value for key, value in device_names.items() if isinstance(key, str) and isinstance(value, str)} if isinstance(device_names, dict) else {},
+        "last_auto_update_check": saved.get("last_auto_update_check", 0) if type(saved.get("last_auto_update_check", 0)) in {int, float} else 0,
     }
 
 
 def _write_skills_state(saved: dict) -> None:
     parent = os.path.dirname(os.path.abspath(SKILLS_STATE_PATH))
-    os.makedirs(parent, exist_ok=True)
+    os.makedirs(parent, mode=0o700, exist_ok=True)
     temporary_path = f"{SKILLS_STATE_PATH}.{uuid.uuid4().hex}.tmp"
     try:
-        with open(temporary_path, "w", encoding="utf-8") as handle:
+        descriptor = os.open(temporary_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(saved, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
         os.replace(temporary_path, SKILLS_STATE_PATH)
+        os.chmod(SKILLS_STATE_PATH, 0o600)
     finally:
         if os.path.exists(temporary_path):
             os.unlink(temporary_path)
@@ -1330,8 +1354,209 @@ def _manifest_string_list(value, field: str, *, max_items: int, max_length: int)
     return result
 
 
+def _validate_skill_json_schema(schema, depth=0):
+    allowed = {"type", "properties", "required", "additionalProperties", "items", "enum", "minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems", "pattern", "oneOf"}
+    if depth > 8 or not isinstance(schema, dict) or set(schema) - allowed:
+        raise SkillRepositoryError("Skill declares an unsupported JSON schema.")
+    kind = schema.get("type")
+    if not isinstance(kind, str) or kind not in {"object", "array", "string", "integer", "number", "boolean"}:
+        raise SkillRepositoryError("Skill declares an unsupported JSON schema.")
+    if kind == "object":
+        props, required = schema.get("properties", {}), schema.get("required", [])
+        if not isinstance(props, dict) or len(props) > 32 or not isinstance(required, list) or any(not isinstance(key, str) or key not in props for key in required):
+            raise SkillRepositoryError("Skill declares invalid object schema properties.")
+        for key, value in props.items():
+            if not isinstance(key, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,47}", key):
+                raise SkillRepositoryError("Skill schema property names must be lowercase identifiers.")
+            _validate_skill_json_schema(value, depth + 1)
+    if kind == "array":
+        if "items" not in schema:
+            raise SkillRepositoryError("Skill array schema must declare item types.")
+        _validate_skill_json_schema(schema["items"], depth + 1)
+    if "oneOf" in schema:
+        alternatives = schema["oneOf"]
+        if not isinstance(alternatives, list) or not 1 <= len(alternatives) <= 16:
+            raise SkillRepositoryError("Skill declares an invalid oneOf schema.")
+        for alternative in alternatives:
+            _validate_skill_json_schema(alternative, depth + 1)
+            if alternative.get("type") != kind:
+                raise SkillRepositoryError("oneOf alternatives must use the parent schema type.")
+    if "enum" in schema and (not isinstance(schema["enum"], list) or not 1 <= len(schema["enum"]) <= 64):
+        raise SkillRepositoryError("Skill declares an invalid schema enum.")
+    if kind in {"integer", "number"}:
+        for key in ("minimum", "maximum"):
+            if key in schema and (type(schema[key]) not in {int, float} or not math.isfinite(float(schema[key]))):
+                raise SkillRepositoryError("Skill numeric schema bounds must be finite numbers.")
+        if "minimum" in schema and "maximum" in schema and schema["minimum"] > schema["maximum"]:
+            raise SkillRepositoryError("Skill numeric schema bounds are reversed.")
+    for key in ("minLength", "maxLength", "minItems", "maxItems"):
+        if key in schema and (type(schema[key]) is not int or schema[key] < 0 or schema[key] > 100000):
+            raise SkillRepositoryError("Skill schema length/item bounds are invalid.")
+    pattern = schema.get("pattern")
+    if pattern is not None:
+        if not isinstance(pattern, str) or len(pattern) > 160:
+            raise SkillRepositoryError("Skill schema pattern is invalid.")
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise SkillRepositoryError("Skill schema pattern is invalid.") from exc
+    return schema
+
+
+def _validate_skill_device_ui(device_ui, tools):
+    """Validate bounded declarative dashboard metadata against tool schemas."""
+    if device_ui is None:
+        return None
+    if not isinstance(device_ui, dict) or set(device_ui) - {"status_tool", "status_arguments", "visualization", "fields", "controls"}:
+        raise SkillRepositoryError("Skill device_ui must use supported declarative fields.")
+    tool_map = {tool["name"]: tool for tool in tools if isinstance(tool, dict)}
+    status_tool_name = device_ui.get("status_tool")
+    status_tool = tool_map.get(status_tool_name) if isinstance(status_tool_name, str) else None
+    status_arguments = device_ui.get("status_arguments")
+    if status_tool is None or not isinstance(status_arguments, dict) or not isinstance(status_tool.get("input_schema"), dict) or not isinstance(status_tool.get("result_schema"), dict):
+        raise SkillRepositoryError("Skill device_ui must declare a status tool, arguments, and schemas.")
+    from skill_runtime import SkillRuntimeError, validate_json_schema
+    try:
+        validate_json_schema(status_arguments, status_tool["input_schema"])
+    except SkillRuntimeError as exc:
+        raise SkillRepositoryError("Skill device_ui status arguments do not match its tool schema.") from exc
+
+    def result_path(path, types):
+        if not isinstance(path, str) or len(path) > 160 or not 1 <= len(path.split(".")) <= 8 or any(not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*", part) for part in path.split(".")):
+            raise SkillRepositoryError("Skill device_ui contains an invalid result path.")
+        schema = status_tool["result_schema"]
+        for part in path.split("."):
+            if not isinstance(schema, dict) or schema.get("type") != "object":
+                raise SkillRepositoryError("Skill device_ui result path is not declared by the status tool.")
+            schema = schema.get("properties", {}).get(part)
+        if not isinstance(schema, dict) or schema.get("type") not in types:
+            raise SkillRepositoryError("Skill device_ui result path has an incompatible declared type.")
+        return path, schema
+
+    def rgb_schema(schema):
+        return schema.get("minItems") == 3 and schema.get("maxItems") == 3 and schema.get("items", {}).get("type") == "integer" and schema["items"].get("minimum") == 0 and schema["items"].get("maximum") == 255
+
+    visualization = device_ui.get("visualization", {"type": "status"})
+    if not isinstance(visualization, dict):
+        raise SkillRepositoryError("Skill device_ui visualization must be an object.")
+    kind = visualization.get("type", "status")
+    keys = {"status": {"type"}, "ring": {"type", "color_path", "active_path", "label_path"}, "dial": {"type", "value_path", "label_path", "unit", "minimum", "maximum"}}
+    if not isinstance(kind, str) or kind not in keys or set(visualization) - keys[kind]:
+        raise SkillRepositoryError("Skill device_ui declares an unsupported visualization.")
+    visualization = {**visualization, "type": kind}
+    if kind == "ring":
+        color_path, color_schema = result_path(visualization.get("color_path"), {"array"})
+        if not rgb_schema(color_schema):
+            raise SkillRepositoryError("Skill ring visualization must use a declared three-channel RGB value.")
+        visualization["color_path"] = color_path
+        visualization["active_path"] = result_path(visualization.get("active_path"), {"boolean"})[0]
+        if visualization.get("label_path") is not None:
+            visualization["label_path"] = result_path(visualization["label_path"], {"string"})[0]
+    elif kind == "dial":
+        visualization["value_path"] = result_path(visualization.get("value_path"), {"integer", "number"})[0]
+        if visualization.get("label_path") is not None:
+            visualization["label_path"] = result_path(visualization["label_path"], {"string"})[0]
+        low, high = visualization.get("minimum"), visualization.get("maximum")
+        unit = visualization.get("unit", "")
+        if type(low) not in {int, float} or type(high) not in {int, float} or not math.isfinite(float(low)) or not math.isfinite(float(high)) or low >= high or not isinstance(unit, str) or len(unit) > 16 or any(ord(char) < 32 for char in unit):
+            raise SkillRepositoryError("Skill dial visualization needs valid finite bounds and unit.")
+
+    fields = device_ui.get("fields", [])
+    if not isinstance(fields, list) or len(fields) > 16:
+        raise SkillRepositoryError("Skill device_ui fields must be a bounded list.")
+    clean_fields = []
+    for field in fields:
+        if not isinstance(field, dict) or set(field) != {"label", "path", "format"}:
+            raise SkillRepositoryError("Skill device_ui field declaration is invalid.")
+        label, fmt = field["label"], field["format"]
+        if not isinstance(label, str) or not 1 <= len(label) <= 48 or any(ord(c) < 32 for c in label):
+            raise SkillRepositoryError("Skill device_ui field label is invalid.")
+        types = ({"text": {"string"}, "boolean": {"boolean"}, "percent": {"integer", "number"}, "number": {"integer", "number"}, "color": {"array"}}.get(fmt) if isinstance(fmt, str) else None)
+        if types is None:
+            raise SkillRepositoryError("Skill device_ui field format is unsupported.")
+        path, field_schema = result_path(field["path"], types)
+        if fmt == "color" and not rgb_schema(field_schema):
+            raise SkillRepositoryError("Skill device_ui color fields must use three RGB channels.")
+        clean_fields.append({"label": label, "path": path, "format": fmt})
+
+    controls = device_ui.get("controls", [])
+    if not isinstance(controls, list) or len(controls) > 24:
+        raise SkillRepositoryError("Skill device_ui controls must be a bounded list.")
+    clean_controls = []
+    for control in controls:
+        if not isinstance(control, dict) or set(control) != {"label", "tool", "arguments", "fields"}:
+            raise SkillRepositoryError("Skill device_ui control declaration is invalid.")
+        label, tool_name, base, inputs = control["label"], control["tool"], control["arguments"], control["fields"]
+        tool = tool_map.get(tool_name) if isinstance(tool_name, str) else None
+        if tool is None or not isinstance(base, dict) or not isinstance(inputs, list) or len(inputs) > 12:
+            raise SkillRepositoryError("Skill device_ui control must reference a declared tool and bounded arguments.")
+        if not isinstance(label, str) or not 1 <= len(label) <= 48 or any(ord(c) < 32 for c in label):
+            raise SkillRepositoryError("Skill device_ui control label is invalid.")
+        schema = tool["input_schema"]
+        variants = schema.get("oneOf", [schema])
+        if not isinstance(variants, list):
+            raise SkillRepositoryError("Skill tool oneOf schema is invalid.")
+        input_names, prepared, candidates = set(), [], []
+        for field in inputs:
+            if not isinstance(field, dict) or set(field) != {"name", "label", "widget"}:
+                raise SkillRepositoryError("Skill device_ui control input declaration is invalid.")
+            name, field_label, widget = field["name"], field["label"], field["widget"]
+            if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,47}", name) or name in base or name in input_names:
+                raise SkillRepositoryError("Skill device_ui control input name is invalid or duplicated.")
+            if not isinstance(field_label, str) or not 1 <= len(field_label) <= 48 or any(ord(c) < 32 for c in field_label):
+                raise SkillRepositoryError("Skill device_ui control input label is invalid.")
+            input_names.add(name)
+            prepared.append({"name": name, "label": field_label, "widget": widget})
+        for variant in variants:
+            props = variant.get("properties", {}) if isinstance(variant, dict) else {}
+            if not isinstance(props, dict) or not (set(base) | input_names) <= set(props):
+                continue
+            try:
+                for key, value in base.items():
+                    validate_json_schema(value, props[key], f"control.{key}")
+            except SkillRuntimeError:
+                continue
+            valid = True
+            for field in prepared:
+                prop = props[field["name"]]
+                typ, widget = prop.get("type"), field["widget"]
+                if widget == "text":
+                    ok = typ == "string"
+                elif widget == "select":
+                    ok = typ == "string" and isinstance(prop.get("enum"), list)
+                elif widget == "boolean":
+                    ok = typ == "boolean"
+                elif widget == "integer":
+                    ok = typ == "integer" and type(prop.get("minimum")) is int and type(prop.get("maximum")) is int
+                elif widget == "number":
+                    ok = typ in {"integer", "number"} and type(prop.get("minimum")) in {int, float} and type(prop.get("maximum")) in {int, float}
+                elif widget == "color":
+                    ok = typ == "array" and rgb_schema(prop)
+                else:
+                    ok = False
+                valid = valid and ok
+            if valid and set(variant.get("required", [])) <= (set(base) | input_names):
+                candidates.append((variant, props))
+        if len(candidates) != 1:
+            raise SkillRepositoryError("Skill device_ui control inputs do not uniquely satisfy one tool schema variant.")
+        variant, props = candidates[0]
+        for field in prepared:
+            prop = props[field["name"]]
+            if field["widget"] in {"integer", "number"}:
+                field.update(minimum=prop["minimum"], maximum=prop["maximum"])
+                if field["widget"] == "number":
+                    field["step"] = "any"
+            elif field["widget"] == "select":
+                field["options"] = prop["enum"]
+            elif field["widget"] == "text":
+                field["max_length"] = prop.get("maxLength", 256)
+                field["min_length"] = prop.get("minLength", 0)
+        clean_controls.append({"label": label, "tool": tool_name, "arguments": base, "fields": prepared})
+    return {"status_tool": status_tool_name, "status_arguments": status_arguments, "visualization": visualization, "fields": clean_fields, "controls": clean_controls}
+
+
 def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publisher: str) -> dict:
-    if manifest.get("kind") != "nix-skill" or type(manifest.get("schema_version")) is not int or manifest["schema_version"] != 1:
+    if not isinstance(manifest, dict) or manifest.get("kind") != "nix-skill" or type(manifest.get("schema_version")) is not int or manifest["schema_version"] != 1:
         raise SkillRepositoryError("Skill manifest must use kind 'nix-skill' and schema_version 1.")
     path_match = re.fullmatch(r"skills/([a-z0-9]+(?:-[a-z0-9]+){0,7})/skill\.json", manifest_path)
     if not path_match:
@@ -1360,6 +1585,72 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
         or re.search(r"https?://|data:|[/\\]", icon, flags=re.IGNORECASE)
     ):
         raise SkillRepositoryError("Skill icon must be a short printable text glyph, not a remote image URL.")
+    fields = {"schema_version", "kind", "id", "name", "version", "description", "category", "publisher", "license", "icon", "logo", "tags", "permissions", "files", "entrypoint", "runtime", "setup_fields", "tools", "triggers", "assistant_summary", "device_ui"}
+    if set(manifest) - fields:
+        raise SkillRepositoryError("Skill manifest contains unsupported fields.")
+    logo = _manifest_text(manifest.get("logo", ""), "logo", required=False, limit=180)
+    if logo and (logo not in files or os.path.splitext(logo)[1].lower() not in SKILL_LOGO_EXTENSIONS):
+        raise SkillRepositoryError("A skill logo must be a supported image path listed in files.")
+    runtime = manifest.get("runtime")
+    setup_fields, tools = manifest.get("setup_fields", []), manifest.get("tools", [])
+    triggers = _manifest_string_list(manifest.get("triggers", []), "triggers", max_items=24, max_length=48)
+    if not isinstance(setup_fields, list) or (runtime is None and setup_fields):
+        raise SkillRepositoryError("Skill setup_fields must be a list and require an executable runtime.")
+    if not isinstance(tools, list) or (runtime is None and tools):
+        raise SkillRepositoryError("Skill tools must be a list and require an executable runtime.")
+    if runtime is not None:
+        if (
+            not isinstance(runtime, dict)
+            or set(runtime) - {"protocol", "entrypoint", "requirements", "autostart"}
+            or runtime.get("protocol") != "nix-skill-jsonl-v1"
+            or type(runtime.get("autostart", False)) is not bool
+            or runtime.get("autostart", False) is not False
+        ):
+            raise SkillRepositoryError("Executable skill runtime must use nix-skill-jsonl-v1 and cannot autostart.")
+        runtime_entry = _validate_skill_file_path(runtime.get("entrypoint", ""))
+        requirements = runtime.get("requirements", "")
+        if not isinstance(requirements, str) or (requirements and (_validate_skill_file_path(requirements) not in files or not requirements.endswith("requirements.txt"))):
+            raise SkillRepositoryError("Runtime entrypoint/requirements must be declared safe files.")
+        if runtime_entry not in files or len(setup_fields) > 12 or not 1 <= len(tools) <= 32:
+            raise SkillRepositoryError("Runnable skills need bounded setup fields and one or more tools.")
+        setup_ids = set()
+        for field in setup_fields:
+            if (
+                not isinstance(field, dict)
+                or set(field) - {"id", "label", "type", "required", "help"}
+                or not isinstance(field.get("type"), str)
+                or field["type"] not in {"string", "secret", "ipv4"}
+                or not isinstance(field.get("id"), str)
+                or not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", field["id"])
+                or field["id"] in setup_ids
+                or not isinstance(field.get("label"), str)
+                or not 1 <= len(field["label"]) <= 80
+                or type(field.get("required", False)) is not bool
+                or not isinstance(field.get("help", ""), str)
+                or len(field.get("help", "")) > 240
+                or any(ord(char) < 32 for char in field.get("label", "") + field.get("help", ""))
+            ):
+                raise SkillRepositoryError("Skill setup field schema is invalid.")
+            setup_ids.add(field["id"])
+        tool_names = set()
+        for tool in tools:
+            if (
+                not isinstance(tool, dict)
+                or set(tool) - {"name", "description", "input_schema", "result_schema"}
+                or not isinstance(tool.get("name"), str)
+                or not re.fullmatch(r"[a-z][a-z0-9_]{0,47}", tool["name"])
+                or tool["name"] in tool_names
+                or not isinstance(tool.get("description"), str)
+                or len(tool["description"]) > 500
+            ):
+                raise SkillRepositoryError("Skill tool schema is invalid.")
+            tool_names.add(tool["name"])
+            _validate_skill_json_schema(tool.get("input_schema"))
+            _validate_skill_json_schema(tool.get("result_schema"))
+        device_ui = _validate_skill_device_ui(manifest.get("device_ui"), tools)
+        runtime = {"protocol": "nix-skill-jsonl-v1", "entrypoint": runtime_entry, "requirements": requirements, "autostart": False}
+    elif triggers or manifest.get("device_ui") is not None:
+        raise SkillRepositoryError("Runtime, setup fields, tools, device UI, and triggers require an executable runtime.")
     return {
         "slug": skill_slug,
         "name": _manifest_text(manifest.get("name"), "name", limit=80),
@@ -1371,12 +1662,19 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
         ),
         "license": _manifest_text(manifest.get("license"), "license", limit=40),
         "icon": icon,
+        "logo": logo,
         "tags": _manifest_string_list(manifest.get("tags", []), "tags", max_items=8, max_length=24),
         "permissions": _manifest_string_list(
             manifest.get("permissions", []), "permissions", max_items=12, max_length=200
         ),
         "files": files,
         "entrypoint": entrypoint,
+        "runtime": runtime,
+        "setup_fields": setup_fields if runtime else [],
+        "tools": tools if runtime else [],
+        "triggers": triggers,
+        "assistant_summary": _manifest_text(manifest.get("assistant_summary", ""), "assistant_summary", required=False, limit=1200),
+        "device_ui": device_ui if runtime else None,
         "manifest_path": manifest_path,
     }
 
@@ -1499,9 +1797,45 @@ def _find_remote_skill(saved: dict, skill_id: str):
     return None
 
 
-def _public_remote_skill(repository: dict, skill: dict, installed: set[str]) -> dict:
+def _marketplace_skill_runtime():
+    from skill_runtime import get_skill_runtime
+    return get_skill_runtime(
+        state_path=SKILLS_STATE_PATH,
+        install_dir=SKILLS_INSTALL_DIR,
+        data_dir=DATA_DIR,
+    )
+
+
+def _download_remote_skill_files(repository: dict, skill: dict) -> list[tuple[str, bytes]]:
+    owner, repo_name = repository.get("owner"), repository.get("repository")
+    branch = _validate_github_ref(repository.get("default_branch"))
+    files = skill.get("files", [])
+    if not isinstance(files, list) or len(files) > SKILLS_MAX_PACKAGE_FILES:
+        raise SkillRepositoryError("Installed skill has an invalid files list.")
+    contents, total_bytes, seen = [], 0, set()
+    for path in files:
+        safe_path = _validate_skill_file_path(path)
+        if safe_path in seen or any(
+            existing.startswith(safe_path + "/") or safe_path.startswith(existing + "/")
+            for existing in seen
+        ):
+            raise SkillRepositoryError("Installed skill contains conflicting file paths.")
+        seen.add(safe_path)
+        source_path = f"skills/{skill.get('slug')}/{safe_path}"
+        url = _github_raw_url(owner, repo_name, branch, source_path)
+        body = _fetch_github_bytes(url, SKILLS_MAX_FILE_BYTES, "raw.githubusercontent.com")
+        total_bytes += len(body)
+        if total_bytes > SKILLS_MAX_PACKAGE_BYTES:
+            raise SkillRepositoryError("Installed skill package exceeds the 1 MiB total size limit.")
+        contents.append((safe_path, body))
+    return contents
+
+
+def _skill_package_manifest(skill: dict, files: list[str]) -> dict:
     return {
-        "id": skill.get("id"),
+        "schema_version": 1,
+        "kind": "nix-skill",
+        "id": skill.get("slug") or str(skill.get("id", "")).split(":")[-1],
         "name": skill.get("name"),
         "version": skill.get("version"),
         "description": skill.get("description"),
@@ -1509,16 +1843,352 @@ def _public_remote_skill(repository: dict, skill: dict, installed: set[str]) -> 
         "publisher": skill.get("publisher"),
         "license": skill.get("license"),
         "icon": skill.get("icon", "✦"),
+        "logo": skill.get("logo", ""),
+        "tags": skill.get("tags", []),
+        "permissions": skill.get("permissions", []),
+        "files": files,
+        "entrypoint": skill.get("entrypoint", ""),
+        "runtime": skill.get("runtime"),
+        "setup_fields": skill.get("setup_fields", []),
+        "tools": skill.get("tools", []),
+        "triggers": skill.get("triggers", []),
+        "assistant_summary": skill.get("assistant_summary", ""),
+        "device_ui": skill.get("device_ui"),
+    }
+
+
+def _write_skill_package(skill: dict, contents: list[tuple[str, bytes]]) -> None:
+    """Atomically replace one package using only its validated declared files."""
+    skill_id = skill.get("id")
+    if not isinstance(skill_id, str) or not skill_id or len(contents) > SKILLS_MAX_PACKAGE_FILES:
+        raise SkillRepositoryError("Invalid skill package metadata.")
+    checked, total_bytes = [], 0
+    for relative, body in contents:
+        relative = _validate_skill_file_path(relative)
+        if relative in checked or not isinstance(body, bytes):
+            raise SkillRepositoryError("Skill package contains duplicate or invalid files.")
+        if len(body) > SKILLS_MAX_FILE_BYTES:
+            raise SkillRepositoryError("A skill file exceeds the 256 KiB size limit.")
+        total_bytes += len(body)
+        if total_bytes > SKILLS_MAX_PACKAGE_BYTES:
+            raise SkillRepositoryError("Skill package exceeds the 1 MiB total size limit.")
+        checked.append(relative)
+    declared = skill.get("files", [])
+    if set(checked) != set(declared):
+        raise SkillRepositoryError("Skill package files do not match its manifest.")
+    root = os.path.realpath(os.path.abspath(SKILLS_INSTALL_DIR))
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    package_path = _skill_package_path(skill_id)
+    temp_path = tempfile.mkdtemp(prefix=".nix-skill-", dir=root)
+    backup_path = None
+    try:
+        manifest = _skill_package_manifest(skill, checked)
+        with open(os.path.join(temp_path, "skill.json"), "xb") as handle:
+            handle.write(json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"))
+        for relative, body in contents:
+            target = os.path.join(temp_path, *relative.split("/"))
+            parent = os.path.dirname(target)
+            os.makedirs(parent, mode=0o700, exist_ok=True)
+            if os.path.commonpath((temp_path, os.path.realpath(parent))) != temp_path:
+                raise SkillRepositoryError("Skill package file escaped its temporary install directory.")
+            with open(target, "xb") as handle:
+                handle.write(body)
+        if os.path.lexists(package_path):
+            backup_path = tempfile.mkdtemp(prefix=".nix-skill-backup-", dir=root)
+            os.rmdir(backup_path)
+            os.replace(package_path, backup_path)
+        try:
+            os.replace(temp_path, package_path)
+        except OSError:
+            if backup_path and os.path.lexists(backup_path):
+                os.replace(backup_path, package_path)
+                backup_path = None
+            raise
+        if backup_path:
+            if os.path.islink(backup_path) or not os.path.isdir(backup_path):
+                os.unlink(backup_path)
+            else:
+                shutil.rmtree(backup_path)
+            backup_path = None
+    finally:
+        if os.path.lexists(temp_path):
+            shutil.rmtree(temp_path) if os.path.isdir(temp_path) and not os.path.islink(temp_path) else os.unlink(temp_path)
+        if backup_path and os.path.lexists(backup_path):
+            if not os.path.lexists(package_path):
+                os.replace(backup_path, package_path)
+            elif os.path.isdir(backup_path) and not os.path.islink(backup_path):
+                shutil.rmtree(backup_path)
+            else:
+                os.unlink(backup_path)
+
+
+def _read_skill_zip(archive_bytes: bytes) -> tuple[dict, list[tuple[str, bytes]]]:
+    if not isinstance(archive_bytes, bytes) or len(archive_bytes) > SKILLS_MAX_UPLOAD_BYTES:
+        raise SkillRepositoryError("Skill ZIP must be at most 2 MiB.")
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(archive_bytes))
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise SkillRepositoryError("Upload a valid skill ZIP archive.") from exc
+    with archive:
+        entries = archive.infolist()
+        if not 1 <= len(entries) <= SKILLS_MAX_PACKAGE_FILES + 2:
+            raise SkillRepositoryError("Skill ZIP contains too many files.")
+        names, manifest_bytes, raw_files, total = set(), None, {}, 0
+        for entry in entries:
+            name = entry.filename
+            if entry.is_dir() or "\\" in name or name.startswith("/"):
+                raise SkillRepositoryError("Skill ZIP paths must be safe relative file paths.")
+            mode = entry.external_attr >> 16
+            file_type = stat.S_IFMT(mode)
+            if stat.S_ISLNK(mode) or (file_type and file_type != stat.S_IFREG):
+                raise SkillRepositoryError("Skill ZIP cannot contain symlinks or special files.")
+            if name != "skill.json":
+                _validate_skill_file_path(name)
+            if name in names:
+                raise SkillRepositoryError("Skill ZIP contains duplicate file paths.")
+            names.add(name)
+            if entry.file_size > (SKILLS_MAX_MANIFEST_BYTES if name == "skill.json" else SKILLS_MAX_FILE_BYTES):
+                raise SkillRepositoryError("A skill ZIP file exceeds its size limit.")
+            total += entry.file_size
+            if total > SKILLS_MAX_PACKAGE_BYTES + SKILLS_MAX_MANIFEST_BYTES:
+                raise SkillRepositoryError("Skill ZIP expands beyond the allowed size limit.")
+            try:
+                body = archive.read(entry)
+            except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
+                raise SkillRepositoryError("Could not read a skill ZIP file.") from exc
+            if len(body) != entry.file_size:
+                raise SkillRepositoryError("Skill ZIP contains a truncated file.")
+            if name == "skill.json":
+                manifest_bytes = body
+            else:
+                raw_files[name] = body
+    if manifest_bytes is None:
+        raise SkillRepositoryError("Skill ZIP is missing skill.json.")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SkillRepositoryError("Skill ZIP manifest must be valid UTF-8 JSON.") from exc
+    parsed = _parse_skill_manifest(manifest, f"skills/{manifest.get('id', '')}/skill.json" if isinstance(manifest, dict) else "", "ZIP upload")
+    if set(raw_files) != set(parsed["files"]):
+        missing = set(parsed["files"]) - set(raw_files)
+        if missing:
+            raise SkillRepositoryError("Skill ZIP is missing declared package files.")
+        raise SkillRepositoryError("Skill ZIP contains files not declared by its manifest.")
+    contents = [(path, raw_files[path]) for path in parsed["files"]]
+    parsed["id"] = parsed["slug"]
+    parsed["source_type"] = "upload"
+    return parsed, contents
+
+
+def _validate_skill_logo(path: str, content: bytes) -> tuple[bytes, str]:
+    extension = os.path.splitext(path)[1].lower()
+    if extension not in SKILL_LOGO_EXTENSIONS or not isinstance(content, bytes) or len(content) > SKILLS_MAX_FILE_BYTES:
+        raise SkillRepositoryError("Skill logo has an unsupported format or size.")
+    if extension == ".svg":
+        lowered = content.lower()
+        if any(token in lowered for token in (b"<!doctype", b"<!entity", b"<script", b"foreignobject", b"javascript:", b"xlink:href", b"href=", b"url(", b"<style")):
+            raise SkillRepositoryError("SVG logos must be passive and cannot contain scripts or external content.")
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError as exc:
+            raise SkillRepositoryError("SVG logo is malformed.") from exc
+        allowed_tags = {"svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon", "title", "desc"}
+        allowed_attrs = {"xmlns", "viewBox", "width", "height", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity", "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "points", "transform", "fill-rule", "clip-rule"}
+        for element in root.iter():
+            tag = element.tag.rsplit("}", 1)[-1]
+            if tag not in allowed_tags or any(key.rsplit("}", 1)[-1] not in allowed_attrs for key in element.attrib):
+                raise SkillRepositoryError("SVG logo contains unsupported active content.")
+            for value in element.attrib.values():
+                if any(ord(char) < 32 and char not in "\t\r\n" for char in value):
+                    raise SkillRepositoryError("SVG logo contains invalid control characters.")
+        ET.register_namespace("", "http://www.w3.org/2000/svg")
+        return ET.tostring(root, encoding="utf-8", xml_declaration=False), "image/svg+xml"
+    signatures = {".png": (b"\x89PNG\r\n\x1a\n", "image/png"), ".jpg": (b"\xff\xd8\xff", "image/jpeg"), ".jpeg": (b"\xff\xd8\xff", "image/jpeg"), ".webp": (b"RIFF", "image/webp")}
+    signature, mime = signatures[extension]
+    if not content.startswith(signature) or (extension == ".webp" and content[8:12] != b"WEBP"):
+        raise SkillRepositoryError("Skill logo does not match its declared image type.")
+    return content, mime
+
+
+def _skill_logo_response(skill_id: str) -> tuple[bytes, str]:
+    with _skills_state_lock:
+        found = _find_remote_skill(_read_skills_state(), skill_id)
+    if found is None:
+        raise KeyError(skill_id)
+    _repository, skill = found
+    if skill_id not in _read_skills_state()["installed"] or not skill.get("logo"):
+        raise KeyError(skill_id)
+    package = _skill_package_path(skill_id)
+    logo_path = _validate_skill_file_path(skill["logo"])
+    target = os.path.join(package, *logo_path.split("/"))
+    if os.path.islink(target) or not os.path.isfile(target):
+        raise KeyError(skill_id)
+    with open(target, "rb") as handle:
+        return _validate_skill_logo(logo_path, handle.read())
+
+
+def _refresh_remote_skill(skill_id: str) -> bool:
+    return _refresh_remote_repository(skill_id)
+
+
+def _set_skill_auto_update(skill_id: str, enabled: bool) -> bool:
+    if type(enabled) is not bool:
+        raise SkillRepositoryError("Auto-update setting must be true or false.")
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        found = _find_remote_skill(saved, skill_id)
+        if found is None or found[0].get("source_type") == "upload" or skill_id not in saved["installed"]:
+            raise KeyError(skill_id)
+        saved["auto_updates"][skill_id] = enabled
+        saved["last_auto_update_check"] = 0
+        _write_skills_state(saved)
+    return enabled
+
+
+def _check_skill_auto_updates(*, force: bool = False) -> dict:
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        enabled = [skill_id for skill_id, value in saved["auto_updates"].items() if value and skill_id in saved["installed"]]
+        last_check = saved["last_auto_update_check"]
+        if not enabled or (not force and time.time() - last_check < SKILLS_AUTO_UPDATE_INTERVAL):
+            return {"checked": False, "updated": []}
+        saved["last_auto_update_check"] = time.time()
+        _write_skills_state(saved)
+    updated_ids = []
+    for skill_id in enabled:
+        try:
+            if _refresh_remote_skill(skill_id):
+                updated_ids.append(skill_id)
+        except (SkillRepositoryError, requests.RequestException, OSError, KeyError):
+            continue
+    return {"checked": True, "updated": updated_ids}
+
+
+def _set_skill_device_name(skill_id: str, device_name: str) -> str:
+    if not isinstance(device_name, str):
+        raise SkillRepositoryError("Device name must be text.")
+    if any(ord(char) < 32 or ord(char) == 127 for char in device_name):
+        raise SkillRepositoryError("Device name cannot contain control characters.")
+    clean = " ".join(device_name.split())
+    if len(clean) > 64:
+        raise SkillRepositoryError("Device name must be 64 characters or fewer.")
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        if _find_remote_skill(saved, skill_id) is None or skill_id not in saved["installed"]:
+            raise KeyError(skill_id)
+        if clean:
+            saved["device_names"][skill_id] = clean
+        else:
+            saved["device_names"].pop(skill_id, None)
+        _write_skills_state(saved)
+    return clean
+
+
+def _devices_payload() -> dict:
+    with _skills_state_lock:
+        saved = _read_skills_state()
+    installed = set(saved["installed"])
+    runtime = _marketplace_skill_runtime()
+    devices = []
+    for repository, skill in _remote_skill_refs(saved):
+        skill_id = skill.get("id")
+        if skill_id not in installed or not isinstance(skill.get("device_ui"), dict):
+            continue
+        state = runtime.status(skill_id)
+        package_path = _skill_package_path(skill_id)
+        manifest_path = os.path.join(package_path, "skill.json")
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as handle:
+                package_manifest = json.load(handle)
+            ui = package_manifest.get("device_ui") if isinstance(package_manifest, dict) else None
+            if not isinstance(ui, dict):
+                ui = skill["device_ui"]
+        except (OSError, json.JSONDecodeError):
+            ui = skill["device_ui"]
+        alias = saved["device_names"].get(skill_id, "")
+        skill_slug = str(skill.get("slug") or skill_id.split(":")[-1])
+        default_device_name = " ".join(part.capitalize() for part in skill_slug.split("-"))
+        item = {
+            "id": skill_id,
+            "name": skill.get("name", skill_id),
+            "device_alias": alias,
+            "device_label": alias or default_device_name or skill.get("name", "Device"),
+            "icon": skill.get("icon", "✦"),
+            "device_ui": ui,
+            "device_status": None,
+            "installed": True,
+            "runtime_declared": bool(skill.get("runtime")),
+            **state,
+        }
+        if state.get("worker_running") and state.get("runnable"):
+            try:
+                item["device_status"] = runtime.device_status(skill_id)
+            except Exception as exc:
+                item["runtime_error"] = str(exc)[:200]
+        devices.append(item)
+    return {"ok": True, "devices": devices}
+
+
+def _public_remote_skill(repository: dict, skill: dict, installed: set[str]) -> dict:
+    skill_id = skill.get("id")
+    is_installed = skill_id in installed
+    runtime_declared = isinstance(skill.get("runtime"), dict)
+    status = {"fingerprint": None, "trusted": False, "configured": False, "worker_running": False, "runnable": False, "runtime_error": None}
+    configuration = {}
+    if is_installed and runtime_declared:
+        runtime = _marketplace_skill_runtime()
+        status = runtime.status(skill_id)
+        configuration = runtime.public_configuration(skill_id)
+        if skill.get("setup_fields") == []:
+            try:
+                with open(os.path.join(_skill_package_path(skill_id), "skill.json"), "r", encoding="utf-8") as handle:
+                    package_manifest = json.load(handle)
+                if isinstance(package_manifest, dict) and isinstance(package_manifest.get("runtime"), dict):
+                    skill = {**skill, **{key: package_manifest.get(key) for key in ("setup_fields", "tools", "device_ui") if package_manifest.get(key) is not None}}
+            except (OSError, json.JSONDecodeError):
+                pass
+    upload = repository.get("source_type") == "upload"
+    source = {
+        "id": skill_id,
+        "name": skill.get("name"),
+        "version": skill.get("version"),
+        "description": skill.get("description"),
+        "category": skill.get("category"),
+        "publisher": skill.get("publisher"),
+        "license": skill.get("license"),
+        "icon": skill.get("icon", "✦"),
+        "logo": skill.get("logo", ""),
         "tags": skill.get("tags", []),
         "permissions": skill.get("permissions", []),
         "files": skill.get("files", []),
+        "entrypoint": skill.get("entrypoint", ""),
+        "runtime": skill.get("runtime"),
+        "setup_fields": skill.get("setup_fields", []),
+        "tools": skill.get("tools", []),
+        "triggers": skill.get("triggers", []),
+        "assistant_summary": skill.get("assistant_summary", ""),
+        "device_ui": skill.get("device_ui"),
         "community": True,
         "repository_name": repository.get("name", "GitHub community"),
         "repository_url": repository.get("url", ""),
+        "source_type": "upload" if upload else "github",
+        "zip_upload": upload,
+        "metadata_refresh_supported": bool(not upload and is_installed),
+        "auto_update_supported": bool(not upload),
+        "auto_update": bool(_read_skills_state()["auto_updates"].get(skill_id, False)) if not upload else False,
+        "logo_url": f"/api/skills/{quote(str(skill_id), safe='')}/logo" if is_installed and skill.get("logo") else None,
         "implementation_status": "execution_disabled",
-        "runnable": False,
-        "installed": skill.get("id") in installed,
+        "runtime_declared": runtime_declared,
+        "runnable": bool(status.get("runnable")) if runtime_declared else False,
+        "installed": is_installed,
+        "fingerprint": status.get("fingerprint"),
+        "trusted": bool(status.get("trusted")),
+        "configured": bool(status.get("configured")),
+        "worker_running": bool(status.get("worker_running")),
+        "runtime_error": status.get("runtime_error"),
+        "configuration": configuration,
     }
+    return source
 
 
 def _skills_payload() -> dict:
@@ -1554,84 +2224,8 @@ def _skill_package_path(skill_id: str) -> str:
 
 
 def _install_remote_skill_package(repository: dict, skill: dict) -> None:
-    owner = repository.get("owner")
-    repo_name = repository.get("repository")
-    branch = _validate_github_ref(repository.get("default_branch"))
-    files = skill.get("files", [])
-    if not isinstance(files, list) or len(files) > SKILLS_MAX_PACKAGE_FILES:
-        raise SkillRepositoryError("Installed skill has an invalid files list.")
-    contents = []
-    total_bytes = 0
-    checked_paths = []
-    for path in files:
-        safe_path = _validate_skill_file_path(path)
-        if safe_path in checked_paths or any(
-            existing.startswith(safe_path + "/") or safe_path.startswith(existing + "/")
-            for existing in checked_paths
-        ):
-            raise SkillRepositoryError("Installed skill contains conflicting file paths.")
-        checked_paths.append(safe_path)
-        source_path = f"skills/{skill.get('slug')}/{safe_path}"
-        url = _github_raw_url(owner, repo_name, branch, source_path)
-        body = _fetch_github_bytes(url, SKILLS_MAX_FILE_BYTES, "raw.githubusercontent.com")
-        total_bytes += len(body)
-        if total_bytes > SKILLS_MAX_PACKAGE_BYTES:
-            raise SkillRepositoryError("Installed skill package exceeds the 1 MiB total size limit.")
-        contents.append((safe_path, body))
-    root = os.path.realpath(os.path.abspath(SKILLS_INSTALL_DIR))
-    os.makedirs(root, mode=0o700, exist_ok=True)
-    package_path = _skill_package_path(str(skill.get("id", "")))
-    temp_path = tempfile.mkdtemp(prefix=".nix-skill-", dir=root)
-    try:
-        manifest = {
-            "schema_version": 1,
-            "kind": "nix-skill",
-            "id": skill.get("slug"),
-            "name": skill.get("name"),
-            "version": skill.get("version"),
-            "description": skill.get("description"),
-            "category": skill.get("category"),
-            "publisher": skill.get("publisher"),
-            "license": skill.get("license"),
-            "icon": skill.get("icon", "✦"),
-            "tags": skill.get("tags", []),
-            "permissions": skill.get("permissions", []),
-            "files": checked_paths,
-            "entrypoint": skill.get("entrypoint", ""),
-        }
-        with open(os.path.join(temp_path, "skill.json"), "xb", buffering=0) as handle:
-            handle.write(json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"))
-        for relative_path, body in contents:
-            target = os.path.join(temp_path, *relative_path.split("/"))
-            parent = os.path.dirname(target)
-            os.makedirs(parent, exist_ok=True)
-            if os.path.commonpath((temp_path, os.path.realpath(parent))) != temp_path:
-                raise SkillRepositoryError("Skill package file escaped its temporary install directory.")
-            with open(target, "xb", buffering=0) as handle:
-                handle.write(body)
-        backup_path = None
-        if os.path.lexists(package_path):
-            backup_path = tempfile.mkdtemp(prefix=".nix-skill-backup-", dir=root)
-            os.rmdir(backup_path)
-            os.replace(package_path, backup_path)
-        try:
-            os.replace(temp_path, package_path)
-        except OSError:
-            if backup_path and os.path.lexists(backup_path):
-                os.replace(backup_path, package_path)
-                backup_path = None
-            raise
-        if backup_path:
-            if os.path.islink(backup_path) or not os.path.isdir(backup_path):
-                os.unlink(backup_path)
-            else:
-                shutil.rmtree(backup_path)
-    finally:
-        if os.path.lexists(temp_path):
-            if os.path.islink(temp_path) or not os.path.isdir(temp_path):
-                os.unlink(temp_path)
-            else:
-                shutil.rmtree(temp_path)
+    """Fetch and atomically install a GitHub package with runtime metadata."""
+    _write_skill_package(skill, _download_remote_skill_files(repository, skill))
 
 
 def _remove_skill_package(skill_id: str) -> None:
@@ -1656,12 +2250,22 @@ def _set_skill_installed(skill_id: str, installed: bool) -> dict:
             installed_ids = set(saved["installed"])
             installed_ids.discard(skill_id)
             if remote_ref is not None:
+                runtime = _marketplace_skill_runtime()
                 _remove_skill_package(skill_id)
+                runtime.forget(skill_id)
+                saved["trusted"].pop(skill_id, None)
+                saved["auto_updates"].pop(skill_id, None)
+                saved["device_names"].pop(skill_id, None)
+                saved["installed_versions"].pop(skill_id, None)
             saved["installed"] = sorted(installed_ids)
             _write_skills_state(saved)
-            remote_ref = None
     if installed and remote_ref is not None:
         repository, skill = remote_ref
+        already_installed = skill_id in saved["installed"]
+        package_path = _skill_package_path(skill_id)
+        if already_installed and os.path.isdir(package_path) and not os.path.islink(package_path):
+            return _skills_payload()
+        _marketplace_skill_runtime().stop(skill_id)
         _install_remote_skill_package(repository, skill)
     if installed:
         with _skills_state_lock:
@@ -1672,7 +2276,139 @@ def _set_skill_installed(skill_id: str, installed: bool) -> dict:
             installed_ids.add(skill_id)
             saved["installed"] = sorted(installed_ids)
             _write_skills_state(saved)
+        if skill_id not in SKILL_CATALOG:
+            try:
+                _marketplace_skill_runtime().provision_installed(skill_id)
+            except Exception:
+                with _skills_state_lock:
+                    saved = _read_skills_state()
+                    saved["installed"] = [item for item in saved["installed"] if item != skill_id]
+                    _write_skills_state(saved)
+                _remove_skill_package(skill_id)
+                raise
     return _skills_payload()
+
+
+def _install_uploaded_skill(skill: dict, contents: list[tuple[str, bytes]]) -> dict:
+    skill_id = skill["id"]
+    package_key = f"upload/{skill_id}"
+    repository = {
+        "key": package_key,
+        "name": "Uploaded ZIP package",
+        "url": "",
+        "source_type": "upload",
+        "skills": [{**skill, "id": skill_id}],
+    }
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        previous = _find_remote_skill(saved, skill_id)
+        if previous is not None:
+            source = "GitHub" if previous[0].get("source_type") != "upload" else "ZIP"
+            raise SkillRepositoryError(f"A {source} skill with this id already exists; uninstall it or use a unique skill id.")
+        _write_skill_package(skill, contents)
+        saved["repositories"].append(repository)
+        saved["installed"] = sorted(set(saved["installed"]) | {skill_id})
+        _write_skills_state(saved)
+    try:
+        _marketplace_skill_runtime().provision_installed(skill_id)
+    except Exception:
+        with _skills_state_lock:
+            saved = _read_skills_state()
+            saved["repositories"] = [item for item in saved["repositories"] if item.get("key") != package_key]
+            saved["installed"] = [item for item in saved["installed"] if item != skill_id]
+            _write_skills_state(saved)
+        _remove_skill_package(skill_id)
+        raise
+    return _skills_payload()
+
+
+def _installed_package_digest(skill_id: str) -> str | None:
+    from skill_runtime import SkillRuntime, SkillRuntimeError
+    package = _skill_package_path(skill_id)
+    try:
+        with open(os.path.join(package, "skill.json"), "r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        if not isinstance(manifest, dict):
+            return None
+        return SkillRuntime.fingerprint(__import__("pathlib").Path(package), manifest)
+    except (OSError, json.JSONDecodeError, SkillRuntimeError):
+        return None
+
+
+def _refresh_remote_repository(skill_id: str) -> bool:
+    """Refresh catalog metadata and package data from a GitHub skill source."""
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        found = _find_remote_skill(saved, skill_id)
+    if found is None:
+        raise KeyError(skill_id)
+    repository, old_skill = found
+    if repository.get("source_type") == "upload":
+        raise KeyError(skill_id)
+    path = old_skill.get("manifest_path") or f"skills/{old_skill.get('slug')}/skill.json"
+    url = _github_raw_url(repository["owner"], repository["repository"], repository["default_branch"], path)
+    manifest = _fetch_github_json(url, SKILLS_MAX_MANIFEST_BYTES, "raw.githubusercontent.com")
+    updated = _parse_skill_manifest(manifest, path, repository.get("publisher", "Community"))
+    updated["id"] = skill_id
+    runtime = _marketplace_skill_runtime()
+    is_installed = skill_id in saved["installed"]
+    before = _installed_package_digest(skill_id) if is_installed else None
+    contents = _download_remote_skill_files(repository, updated)
+    if is_installed:
+        runtime.stop(skill_id)
+        _write_skill_package(updated, contents)
+    after = _installed_package_digest(skill_id) if is_installed else None
+    changed = before is not None and after != before
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        current = _find_remote_skill(saved, skill_id)
+        if current is None:
+            raise SkillRepositoryError("Skill repository changed before refresh completed.")
+        current[1].clear()
+        current[1].update(updated)
+        if changed:
+            saved["trusted"].pop(skill_id, None)
+            saved["installed_versions"].pop(skill_id, None)
+        _write_skills_state(saved)
+    if changed:
+        runtime.forget(skill_id)
+    return changed
+
+
+def _set_skill_runtime_action(skill_id: str, action: str, payload: dict) -> dict:
+    if not isinstance(skill_id, str) or not skill_id:
+        raise KeyError(skill_id)
+    runtime = _marketplace_skill_runtime()
+    with _skills_state_lock:
+        saved = _read_skills_state()
+        found = _find_remote_skill(saved, skill_id)
+        if found is None or skill_id not in saved["installed"]:
+            raise KeyError(skill_id)
+    if action == "configure":
+        status = runtime.save_configuration(skill_id, payload.get("configuration", {}))
+    elif action in {"trust", "untrust"}:
+        current = runtime.status(skill_id)
+        if action == "trust" and payload.get("confirm_digest") != current.get("fingerprint"):
+            raise SkillRepositoryError("Review and confirm the current package digest before trusting it.")
+        status = runtime.trust(skill_id, action == "trust")
+    elif action == "connect":
+        status = runtime.start_skill(skill_id)
+    elif action == "disconnect":
+        runtime.stop(skill_id)
+        status = runtime.status(skill_id)
+    elif action in {"device_connect", "device_status", "device_control"}:
+        if action == "device_connect":
+            runtime.start_skill(skill_id)
+            result = runtime.device_status(skill_id)
+            return {"ok": True, "device": result}
+        if action == "device_status":
+            result = runtime.device_status(skill_id)
+            return {"ok": True, "device": result}
+        result = runtime.control_device(skill_id, payload.get("arguments", {}), payload.get("tool"))
+        return {"ok": True, "device": result}
+    else:
+        raise SkillRepositoryError("Unsupported skill runtime action.")
+    return {"ok": True, "status": status, "skills": _skills_payload().get("skills", [])}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1698,7 +2434,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            return {}
+        if length < 0 or length > SKILLS_MAX_UPLOAD_BYTES * 2 + 128 * 1024:
+            raise SkillRepositoryError("Request body exceeds the 2 MiB upload limit.")
         if length <= 0:
             return {}
         try:
@@ -1868,8 +2609,33 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": "error" not in status, **status})
             return
 
+        logo_match = re.fullmatch(r"/api/skills/([^/]+)/logo", path)
+        if logo_match:
+            try:
+                body, mime = _skill_logo_response(unquote(logo_match.group(1)))
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Cache-Control", "private, max-age=300")
+                self.end_headers()
+                self.wfile.write(body)
+            except (KeyError, SkillRepositoryError):
+                self._json({"ok": False, "error": "skill logo was not found"}, 404)
+            return
+
         if path == "/api/skills":
-            self._json(_skills_payload())
+            update_check = {"checked": False, "updated": []}
+            if parse_qs(urlparse(self.path).query).get("refresh") == ["1"]:
+                update_check = _check_skill_auto_updates()
+            self._json({**_skills_payload(), "auto_update_check": update_check})
+            return
+
+        if path == "/api/devices":
+            try:
+                self._json(_devices_payload())
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}", "devices": []}, 500)
             return
 
         if path == "/api/profile":
@@ -2018,7 +2784,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = _application_route_path(urlparse(self.path).path.rstrip("/") or "/")
-        payload = self._read_json()
+        try:
+            payload = self._read_json()
+        except SkillRepositoryError as exc:
+            self._json({"ok": False, "error": str(exc)}, 413)
+            return
 
         if path == "/api/luna/model":
             self._json({
@@ -2050,6 +2820,23 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError as exc:
                     self._json({"ok": False, "error": f"Could not save skill repository: {exc}"}, 500)
                 return
+            if action == "upload_zip":
+                try:
+                    encoded = payload.get("zip_base64")
+                    if not isinstance(encoded, str) or len(encoded) > ((SKILLS_MAX_UPLOAD_BYTES + 2) // 3) * 4 + 8:
+                        raise SkillRepositoryError("Skill ZIP must be at most 2 MiB.")
+                    try:
+                        archive_bytes = base64.b64decode(encoded, validate=True)
+                    except (ValueError, base64.binascii.Error) as exc:
+                        raise SkillRepositoryError("Skill ZIP upload must be valid base64.") from exc
+                    skill, contents = _read_skill_zip(archive_bytes)
+                    result = _install_uploaded_skill(skill, contents)
+                    self._json(result)
+                except SkillRepositoryError as exc:
+                    self._json({"ok": False, "error": str(exc)}, 400)
+                except Exception as exc:
+                    self._json({"ok": False, "error": f"Could not install skill ZIP: {type(exc).__name__}: {exc}"}, 500)
+                return
             if action in {"install", "uninstall"}:
                 skill_id = payload.get("skill_id")
                 try:
@@ -2067,8 +2854,34 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": False, "error": f"GitHub package download failed: {exc}"}, 502)
                 except OSError as exc:
                     self._json({"ok": False, "error": f"Could not install skill package: {exc}"}, 500)
+                except Exception as exc:
+                    self._json({"ok": False, "error": f"Could not update skill package: {type(exc).__name__}: {exc}"}, 500)
                 return
-            self._json({"ok": False, "error": "action must be add_repository, install, or uninstall"}, 400)
+            skill_id = payload.get("skill_id")
+            try:
+                if action == "device_name":
+                    name = _set_skill_device_name(skill_id, payload.get("device_name", ""))
+                    self._json({"ok": True, "device_name": name})
+                    return
+                if action == "auto_update":
+                    enabled = _set_skill_auto_update(skill_id, payload.get("enabled"))
+                    self._json({"ok": True, "enabled": enabled, **_skills_payload()})
+                    return
+                if action == "repair":
+                    _refresh_remote_repository(skill_id)
+                    self._json(_skills_payload())
+                    return
+                if action in {"configure", "trust", "untrust", "connect", "disconnect", "device_connect", "device_status", "device_control"}:
+                    result = _set_skill_runtime_action(skill_id, action, payload)
+                    self._json(result)
+                    return
+            except KeyError:
+                self._json({"ok": False, "error": "installed skill was not found"}, 404)
+            except SkillRepositoryError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 400)
+            return
             return
 
         if path == "/api/profile":
@@ -4149,6 +4962,7 @@ function personCard(p) {
       ${p.role ? `<span class="meta">${esc(p.role)}</span>` : ""}
     </div>
     <div class="kbline"><span class="k">current state</span><span class="v">${esc(p.state || "?")} (${esc(p.valence || "neutral")})</span></div>
+    <div class="kbline"><span class="k">follow-up</span><span class="v">${p.follow_up_eligible === true ? "Eligible: active problem and concern unanswered" : "Not due"}</span></div>
     <div class="kbline"><span class="k">learned</span><span class="v">${esc(String(p.value || ""))}</span></div>
     <div class="kbid" style="margin-top:6px">updated ${esc(String(p.updated_at || "").replace("T", " ").slice(0, 16))}</div>
   </div>`;
@@ -4577,9 +5391,9 @@ def _lan_ip() -> str:
 
 def main() -> int:
     host = os.environ.get("NIX_CONSOLE_HOST", "0.0.0.0")
-    port_env = os.environ.get("NIX_CONSOLE_PORT")
-    port = int(port_env) if port_env else None
-
+    # Keep the browser endpoint stable across restarts and align with the
+    # documented single-port dashboard contract. Only the bind host is configurable.
+    port = 49117
     server, port = build_app(host=host, port=port)
 
     lan = host if host not in ("0.0.0.0", "::") else _lan_ip()

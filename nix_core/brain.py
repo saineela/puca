@@ -59,6 +59,312 @@ from tone_policy import conversation_policy
 from tabby_client import TabbyClient
 from puca_v4_contract import infer_envelope, verify_reply
 from text_cleanup import clean_response_text
+from skill_runtime import SkillRuntimeError
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate keys in model-proposed JSON instead of taking the last."""
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON field: {key}")
+        value[key] = item
+    return value
+
+
+def _single_assistant_rgb(text: str) -> list[int] | None:
+    """Read one valid RGB triplet from a single assistant message."""
+    matches = list(re.finditer(
+        r"\bRGB\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)",
+        str(text or ""),
+        re.IGNORECASE,
+    ))
+    if len(matches) != 1:
+        return None
+    rgb = [int(channel) for channel in matches[0].groups()]
+    return rgb if all(channel <= 255 for channel in rgb) else None
+
+
+def _recent_assistant_rgb(history: list[dict[str, Any]]) -> list[int] | None:
+    """Read an RGB triplet only if the immediately previous turn is assistant."""
+    if not history or not isinstance(history[-1], dict) or history[-1].get("role") != "assistant":
+        return None
+    return _single_assistant_rgb(str(history[-1].get("content") or ""))
+
+
+def _assistant_offered_rgb(text: str, request_text: str = "") -> list[int] | None:
+    """Return the offered RGB only when it matches the offer and current request."""
+    rgb = _single_assistant_rgb(text)
+    if rgb is None:
+        return None
+    color_pattern = r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b"
+    colors = set(re.findall(color_pattern, str(text or "").casefold()))
+    named_hues = colors - {"warm", "cool"}
+    if named_hues and len(named_hues) == 1:
+        colors = named_hues
+    if len(colors) != 1:
+        return None
+    color_name = next(iter(colors))
+    if not _rgb_matches_named_color(rgb, color_name):
+        return None
+
+    requested_colors = set(re.findall(color_pattern, str(request_text or "").casefold()))
+    requested_hues = requested_colors - {"warm", "cool"}
+    if requested_hues and len(requested_hues) == 1:
+        requested_colors = requested_hues
+    if requested_colors and (
+        len(requested_colors) != 1
+        or next(iter(requested_colors)) != color_name
+    ):
+        return None
+    return rgb
+
+
+def _mentioned_device_skill(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
+    normalized = " ".join((text or "").casefold().split())
+    targets = []
+    for spec in skill_specs:
+        if not isinstance(spec, dict) or not spec.get("runnable") or not isinstance(spec.get("skill_id"), str):
+            continue
+        names = [spec.get("device_name"), spec.get("name"), *(spec.get("triggers") or [])]
+        if any(
+            isinstance(name, str) and name.strip() and re.search(
+                rf"(?<![a-z0-9]){re.escape(name.casefold())}(?![a-z0-9])",
+                normalized,
+            )
+            for name in names
+        ):
+            targets.append(spec["skill_id"])
+    unique_targets = list(dict.fromkeys(targets))
+    return unique_targets[0] if len(unique_targets) == 1 else None
+
+
+def _unique_device_alias_in_text(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
+    """Resolve one explicitly named installed-device alias to a runnable skill."""
+    normalized = " ".join((text or "").casefold().split())
+    targets = [
+        str(spec["skill_id"])
+        for spec in skill_specs
+        if isinstance(spec, dict)
+        and spec.get("runnable")
+        and isinstance(spec.get("skill_id"), str)
+        and any(
+            isinstance(alias, str)
+            and alias.strip()
+            and re.search(
+                rf"(?<![a-z0-9]){re.escape(alias.casefold())}(?![a-z0-9])",
+                normalized,
+            )
+            for alias in (spec.get("device_name"), spec.get("name"), *(spec.get("triggers") or []))
+        )
+    ]
+    return targets[0] if len(targets) == 1 else None
+
+
+def _explicit_named_color_intent(
+    text: str, skill_specs: list[dict[str, Any]]
+) -> tuple[str, str] | None:
+    """Recognize one named color requested for one explicitly addressed device."""
+    normalized = " ".join((text or "").casefold().split())
+    skill_id = _mentioned_device_skill(normalized, skill_specs)
+    if skill_id is None or re.search(r"\b(?:off|down|stop)\b", normalized):
+        return None
+    if not re.search(r"\b(?:set|change|switch|make|turn|apply)\b", normalized):
+        return None
+    color_terms = set(re.findall(
+        r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b",
+        normalized,
+    ))
+    return (skill_id, next(iter(color_terms))) if len(color_terms) == 1 else None
+
+
+def _polite_device_color_request(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
+    """Recognize the specific polite 'do you mind ... light to a color' phrasing."""
+    normalized = " ".join((text or "").casefold().split()).replace("soemthing", "something")
+    if not re.match(r"^(?:do|would) you mind\b", normalized):
+        return None
+    if not re.search(r"\b(?:to something|to a|to an)\b", normalized):
+        return None
+
+    if not re.search(r"\b(?:cool|warm|blue|green|red|purple|pink|amber|white)\b", normalized):
+        return None
+    return _unique_device_alias_in_text(normalized, skill_specs)
+
+
+def _confirmed_rgb_offer(
+    text: str, history: list[dict[str, Any]], skill_specs: list[dict[str, Any]]
+) -> tuple[str, list[int], str] | None:
+    """Resolve a bare affirmative only against a matching immediately prior offer."""
+    confirmation = " ".join((text or "").casefold().split())
+    if confirmation not in {"yes", "yes please", "please do", "go ahead", "do it", "sounds good"}:
+        return None
+    if len(history) < 2 or not all(isinstance(turn, dict) for turn in history[-2:]):
+        return None
+    if history[-2].get("role") != "user" or history[-1].get("role") != "assistant":
+        return None
+    request = str(history[-2].get("content") or "")
+    offer = str(history[-1].get("content") or "")
+    skill_id = _unique_device_alias_in_text(request, skill_specs)
+    rgb = _single_assistant_rgb(offer)
+    request_lower = request.casefold()
+    requested_colors = set(re.findall(
+        r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b",
+        request_lower,
+    ))
+    offered_change = re.search(
+        r"\b(?:i(?:'ll| will)|i can|let me|shall i)\b.{0,100}\b(?:change|set|turn|switch|make)\b",
+        offer,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if skill_id is None or rgb is None or not offered_change or len(requested_colors) != 1:
+        return None
+    if re.search(r"\b(?:didn't|did not|can't|cannot|won't|wouldn't|couldn't)\b", offer, re.IGNORECASE):
+        return None
+    color_name = next(iter(requested_colors))
+    if not re.search(rf"\b{re.escape(color_name)}\b", offer, re.IGNORECASE):
+        return None
+    if not _rgb_matches_named_color(rgb, color_name):
+        return None
+    return skill_id, rgb, color_name
+
+
+def _explicit_combined_color_intent(
+    text: str, skill_specs: list[dict[str, Any]]
+) -> tuple[str, str] | None:
+    """Identify a direct on-and-color request for one explicitly named device."""
+    normalized = " ".join((text or "").casefold().split())
+    skill_id = _mentioned_device_skill(normalized, skill_specs)
+    if skill_id is None or re.search(r"\b(?:off|down|stop)\b", normalized):
+        return None
+    turns_on = bool(re.search(r"\b(?:turn|switch|power)\b.{0,50}\b(?:on|up)\b", normalized))
+    changes_color = bool(re.search(
+        r"\b(?:color|colour)\b.{0,35}\b(?:to|as)\b|\b(?:set|change|switch|make)\b.{0,45}\b(?:color|colour)\b",
+        normalized,
+    ))
+    if not turns_on or not changes_color:
+        return None
+    color_terms = set(re.findall(
+        r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b",
+        normalized,
+    ))
+    return (skill_id, next(iter(color_terms))) if len(color_terms) == 1 else None
+
+
+def _rgb_matches_named_color(rgb: Any, color_name: str) -> bool:
+    """Reject obvious channel mismatches for directly named basic colors."""
+    if not isinstance(rgb, list) or len(rgb) != 3 or any(type(channel) is not int or not 0 <= channel <= 255 for channel in rgb):
+        return False
+    red, green, blue = rgb
+    color = color_name.casefold()
+    if color == "green":
+        return green >= 64 and green > red and green > blue
+    if color == "red":
+        return red >= 64 and red > green and red > blue
+    if color in {"blue", "cool"}:
+        return blue >= 64 and blue > red and blue > green
+    if color in {"purple", "violet"}:
+        return red >= 64 and blue >= 64 and green < min(red, blue)
+    if color in {"yellow", "amber", "orange"}:
+        return red >= 64 and green >= 48 and blue < min(red, green)
+    if color in {"cyan", "teal"}:
+        return green >= 64 and blue >= 64 and red < min(green, blue)
+    if color == "pink":
+        return red >= 96 and blue >= 48 and green < red
+    if color == "white":
+        return min(rgb) >= 128 and max(rgb) - min(rgb) <= 80
+    if color == "warm":
+        return red >= 64 and red >= green and red > blue
+    if color == "cool":
+        return blue >= 64 and blue >= red and green >= 32
+    if color == "blue":
+        return blue >= 64 and blue >= red and green >= 32
+    return True
+
+
+def _explicit_polite_color_choice(
+    text: str, assistant_reply: str, skill_specs: list[dict[str, Any]]
+) -> tuple[str, list[int]] | None:
+    """Resolve one model-selected RGB for a direct, polite color request."""
+    intent = _explicit_named_color_intent(text, skill_specs)
+    if intent is None:
+        intent = _explicit_combined_color_intent(text, skill_specs)
+    if intent is None:
+        skill_id = _polite_device_color_request(text, skill_specs)
+        requested_tone = re.search(r"\b(?:cool|warm|blue|green|red|purple|pink|amber|white)\b", text, re.IGNORECASE)
+        if skill_id is None or requested_tone is None:
+            return None
+        intent = (skill_id, requested_tone.group(0).casefold())
+    skill_id, color_name = intent
+    requested_tone = re.search(rf"\b{re.escape(color_name)}\b", text, re.IGNORECASE)
+    if requested_tone is None:
+        requested_tone = re.search(r"\b(?:cool|warm)\b", text, re.IGNORECASE)
+    if requested_tone is None:
+        return None
+    if not re.search(rf"\b{re.escape(requested_tone.group(0))}\b", assistant_reply, re.IGNORECASE):
+        return None
+    rgb = _single_assistant_rgb(assistant_reply)
+    if rgb is None:
+        return None
+    return (skill_id, rgb) if _rgb_matches_named_color(rgb, color_name) else None
+
+
+def _retry_failed_device_request(
+    text: str, history: list[dict[str, Any]], skill_specs: list[dict[str, Any]]
+) -> str | None:
+    """Resolve an explicit retry only after Core said it sent no confirmed command."""
+    retry = " ".join((text or "").casefold().split())
+    if retry not in {"try again", "please try again", "retry", "try that again", "do it again"}:
+        return None
+    if len(history) < 2 or not all(isinstance(turn, dict) for turn in history[-2:]):
+        return None
+    if history[-2].get("role") != "user" or history[-1].get("role") != "assistant":
+        return None
+    previous_request = str(history[-2].get("content") or "")
+    previous_reply = str(history[-1].get("content") or "").casefold()
+    if not re.search(r"\b(?:didn't send|did not send|no command was sent|couldn't confirm|could not confirm|didn't safely validate)\b", previous_reply):
+        return None
+    if _unique_device_alias_in_text(previous_request, skill_specs) is None:
+        return None
+    if not re.search(r"\b(?:turn|switch|power|set|make|change|apply)\b", previous_request, re.IGNORECASE):
+        return None
+    return previous_request
+
+
+def _unapplied_device_request(
+    text: str, history: list[dict[str, Any]], skill_specs: list[dict[str, Any]]
+) -> str | None:
+    """Retry the latest direct user request after they say the change did not apply."""
+    feedback = " ".join((text or "").casefold().split())
+    if feedback not in {"didnt apply", "didn't apply", "did not apply", "not applied", "it didnt apply", "it didn't apply", "it did not apply", "that didnt apply", "that didn't apply", "that did not apply"}:
+        return None
+    if len(history) < 2 or not all(isinstance(turn, dict) for turn in history[-2:]) or history[-1].get("role") != "assistant":
+        return None
+    retry_phrases = {"try again", "please try again", "retry", "try that again", "do it again"}
+    for turn in reversed(history[:-1]):
+        if not isinstance(turn, dict) or turn.get("role") != "user":
+            continue
+        candidate = str(turn.get("content") or "")
+        normalized = " ".join(candidate.casefold().split())
+        if normalized in retry_phrases:
+            continue
+        if _explicit_combined_color_intent(candidate, skill_specs) is not None:
+            return candidate
+        if _unique_device_alias_in_text(candidate, skill_specs) is not None:
+            return None
+        return None
+    return None
+
+
+def _explicit_color_followup_skill(
+    text: str, skill_specs: list[dict[str, Any]]
+) -> str | None:
+    """Require an explicit pronoun follow-up and one fully named device alias."""
+    normalized = " ".join((text or "").casefold().split())
+    if not re.search(r"\b(?:set|apply|make|change|turn|switch)\b", normalized):
+        return None
+    if not re.search(r"\b(?:that|it|same)\b", normalized):
+        return None
+    return _mentioned_device_skill(normalized, skill_specs)
 
 
 def _active_assistant_identity() -> tuple[str, str, str]:
@@ -885,12 +1191,23 @@ def should_delegate_to_knowledge(text: str) -> bool:
     # Ask the same deterministic parser used by Knowledge before Casper gets
     # a chance to answer with an empty "Okay.".
     try:
-        from nix_knowledge.states import parse_state_statement
-    except ImportError:
+        from nix_knowledge.nix_knowledge.states import parse_state_statement
+    except (ImportError, ModuleNotFoundError):
         try:
-            from states import parse_state_statement
-        except ImportError:
-            parse_state_statement = None
+            import importlib.util
+            from pathlib import Path
+            parser_path = Path(__file__).resolve().parents[1] / "nix_knowledge" / "nix_knowledge" / "states.py"
+            spec = importlib.util.spec_from_file_location("nix_state_parser", parser_path)
+            if spec is None or spec.loader is None:
+                raise ImportError
+            state_parser = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(state_parser)
+            parse_state_statement = state_parser.parse_state_statement
+        except (ImportError, ModuleNotFoundError, OSError, AttributeError):
+            try:
+                from states import parse_state_statement
+            except ImportError:
+                parse_state_statement = None
     return bool(parse_state_statement and parse_state_statement(normalized))
 
 
@@ -1004,7 +1321,9 @@ def _identity_context_for_model(assistant_name: str, assistant_role: str) -> str
         )
     else:
         profile = ""
-    return "\n\n".join(part for part in (persona, system_identity, profile) if part)
+    device_instruction = 'DEVICE/SKILL COMMANDS: When matching installed skill data is supplied, the selected companion chooses three RGB channels for a color description; honor explicit user-supplied RGB/hex exactly and do not use or invent named-color presets. For an animation, choose only an exact case-sensitive effect name in the supplied live_device.available_effects; never invent an animation name. Propose only one declared tool call using exactly NIX_SKILL_CALL:{"type":"skill_tool_call","skill_id":"<supplied-id>","tool":"<declared-tool>","arguments":{}}; Core validates it before execution. Report success only when the returned device state matches the requested action.'
+
+    return "\n\n".join(part for part in (persona, system_identity, profile, device_instruction) if part)
 
 
 _ASSISTANT_IDENTITY_RE = re.compile(
@@ -1201,6 +1520,8 @@ class Brain:
     ):
         self.knowledge = knowledge or KnowledgeClient()
         self.actions = actions or ActionsClient()
+        from skill_runtime import get_skill_runtime
+        self.skill_runtime = get_skill_runtime()
         if ollama is not None:
             self.ollama = ollama
         elif CASPER_BACKEND == "transformers":
@@ -1477,6 +1798,80 @@ class Brain:
                 }
             )
 
+        # Resolve narrowly scoped follow-ups against the immediately preceding
+        # device request, without letting an old mention target a new turn.
+        history = session_context or []
+        targeting_text = clean
+        followup_text = " ".join(clean.casefold().split())
+        installed_specs_method = getattr(self.skill_runtime, "installed_skill_specs", None)
+        installed_specs = installed_specs_method() if callable(installed_specs_method) else []
+        polite_target = _polite_device_color_request(clean, installed_specs)
+        if polite_target is not None:
+            spec = next(item for item in installed_specs if item.get("skill_id") == polite_target)
+            targeting_text = f"set {spec.get('device_name') or spec.get('name')}"
+        elif followup_text in {"yes", "yes please", "please do", "go ahead", "do it", "sounds good"} and len(history) >= 2 and all(isinstance(turn, dict) for turn in history[-2:]):
+            prior_target = _polite_device_color_request(str(history[-2].get("content") or ""), installed_specs) if history[-2].get("role") == "user" else None
+            if prior_target is not None:
+                spec = next(item for item in installed_specs if item.get("skill_id") == prior_target)
+                targeting_text = f"set {spec.get('device_name') or spec.get('name')}"
+        if (
+            followup_text in {"yes", "yes please", "please do", "go ahead", "do it", "sounds good", "try again", "please try again", "retry", "try that again", "do it again"}
+            and len(history) >= 2
+            and all(isinstance(turn, dict) for turn in history[-2:])
+            and history[-2].get("role") == "user"
+            and history[-1].get("role") == "assistant"
+        ):
+            targeting_text = str(history[-2].get("content") or "")
+        elif followup_text in {"didnt apply", "didn't apply", "did not apply", "not applied", "it didnt apply", "it didn't apply", "it did not apply", "that didnt apply", "that didn't apply", "that did not apply"}:
+            targeting_text = _unapplied_device_request(clean, history, installed_specs) or clean
+
+        # The selected assistant proposes a tool call from only the relevant
+        # installed skill schema data; the runtime independently validates it.
+        skill_specs = self.skill_runtime.targeted_skill_specs(targeting_text, session_context)
+        runnable_skill_ids = {
+            spec["skill_id"] for spec in skill_specs if spec.get("runnable")
+        }
+        if skill_specs and not runnable_skill_ids:
+            unavailable = skill_specs[0]
+            device_name = str(unavailable.get("device_name") or unavailable.get("name") or "This device")[:80]
+            if not unavailable.get("configured"):
+                reply = f"{device_name} isn't ready yet. Complete its setup in Skills, then review and explicitly trust the installed package."
+            else:
+                reply = f"{device_name} is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "skill_id": unavailable["skill_id"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=reply, refs={"route": CHAT, "skill_id": unavailable["skill_id"]})
+            return _finish({"route": CHAT, "rule": "trusted_skill_unavailable", "reply": reply, "details": {"deterministic": True, "model_called": False, "skill_id": unavailable["skill_id"]}})
+
+        if runnable_skill_ids:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "skill_ids": sorted(runnable_skill_ids)})
+            response = self._handle_chat(
+                clean,
+                session_context=session_context,
+                conversation_id=conversation_id,
+                skill_specs=skill_specs,
+            )
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=response.get("reply", ""), refs={"route": response.get("route", CHAT), "skill_tool": response.get("rule", "").startswith("nix_model_skill_tool")})
+            return _finish(response)
+
+        # An installed but unready direct-address skill gets a Core-owned setup
+        # response. Runnable skills never fall through to deterministic parsing.
+        candidate = self.skill_runtime.trigger_candidate(clean)
+        if candidate is not None and candidate[0] not in {spec["skill_id"] for spec in skill_specs}:
+            candidate_id = candidate[0]
+            try:
+                state = self.skill_runtime.status(candidate_id)
+            except Exception:
+                state = {"runnable": False, "configured": False, "trusted": False}
+            if not state.get("runnable"):
+                device_name = str(self.skill_runtime._state().get("device_names", {}).get(candidate_id) or candidate[1].get("name") or "This device")[:80]
+                if not state.get("configured"):
+                    reply = f"{device_name} isn't ready yet. Complete its setup in Skills, then review and explicitly trust the installed package."
+                else:
+                    reply = f"{device_name} is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+                self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "skill_id": candidate_id})
+                self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=reply, refs={"route": CHAT, "skill_id": candidate_id})
+                return _finish({"route": CHAT, "rule": "trusted_skill_unavailable", "reply": reply, "details": {"deterministic": True, "model_called": False, "skill_id": candidate_id}})
+
         # A clarification answer belongs to the unresolved prior request.
         # Resolve it before ordinary routing, so a bare "Maanvi" cannot become
         # a new fact or a world-chat query.
@@ -1748,6 +2143,17 @@ class Brain:
             route = KNOWLEDGE
             features.update(route=KNOWLEDGE, rule="core_personal_memory_contract")
         rule = features.get("rule")
+        if route == KNOWLEDGE and should_delegate_to_knowledge(clean) and len(split_clauses(clean)) == 1:
+            response = self._handle_knowledge(
+                clean,
+                session_context=session_context,
+                raw_user_request=clean,
+                conversation_id=conversation_id,
+            )
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": KNOWLEDGE, "rule": rule})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=response["reply"], refs={"route": KNOWLEDGE})
+            response["rule"] = response.get("rule") or rule
+            return _finish(response)
 
         if route == UNKNOWN:
             custom_prediction = None
@@ -2430,7 +2836,12 @@ class Brain:
         # rendering and are intentionally never rephrased by Casper. This
         # avoids a needless 4B generation (and any leakage risk) for simple
         # memory writes such as “remember that I like tea”.
-        if is_fact_write:
+        active_assistant_name, _active_assistant_role, _active_model_id = _active_assistant_identity()
+        deterministic_state_write = (
+            result.get("operation") in {"STORE_STATE", "SUPERSEDE_STATE", "STATE_NOOP"}
+            and active_assistant_name != "Luna"
+        )
+        if is_fact_write or deterministic_state_write:
             reply = deterministic
             formatter_ms = 0.0
         else:
@@ -2481,7 +2892,7 @@ class Brain:
         details = dict(payload)
         assistant_name, _assistant_role, active_model_id = _active_assistant_identity()
         details["core_formatter"] = {
-            "attempted": not is_fact_write,
+            "attempted": not (is_fact_write or deterministic_state_write),
             "assistant_name": assistant_name,
             "official_model": active_model_id,
             "model": self.ollama.model,
@@ -2632,12 +3043,137 @@ class Brain:
 
         return prompt
 
+    def _request_and_execute_color(
+        self,
+        *,
+        skill_id: str,
+        color_name: str,
+        user_text: str,
+        allowed_skill_ids: set[str],
+    ) -> dict[str, Any]:
+        """Ask for a color tool proposal, then validate it and confirm readback.
+
+        The Ring Light's color action also turns the ring on, so it fulfills a
+        compound power-on-and-color request in one worker-confirmed command.
+        """
+        try:
+            recovery_reply = self.ollama.chat(
+                system_prompt=(
+                    "You are selecting arguments for one explicitly requested device color change. "
+                    "Return exactly one NIX_SKILL_CALL marker followed by JSON and nothing else. "
+                    "Use only a supplied skill_id and declared control_ring tool. For the requested "
+                    "named color, choose three integer RGB channels from 0 to 255 that visually "
+                    "fit that color. Do not return an explanation, catalog query, or success claim."
+                ),
+                history=[],
+                user_text=user_text,
+                think=False,
+            )
+            if len(recovery_reply) > 32768 or not recovery_reply.lstrip().startswith("NIX_SKILL_CALL:"):
+                raise ValueError("recovery response was not one structured skill call")
+            proposal_text = recovery_reply.lstrip()[len("NIX_SKILL_CALL:"):].strip()
+            proposal, end = json.JSONDecoder(object_pairs_hook=_unique_json_object).raw_decode(proposal_text)
+            if proposal_text[end:].strip() or not isinstance(proposal, dict) or proposal.get("type") != "skill_tool_call":
+                raise ValueError("recovery response was not one complete skill call")
+            if proposal.get("skill_id") != skill_id or proposal.get("skill_id") not in allowed_skill_ids:
+                raise SkillRuntimeError("The recovery proposal selected a different device.")
+            matched = self.skill_runtime.validate_proposal(proposal)
+            if matched is None or matched.get("skill_id") != skill_id:
+                raise SkillRuntimeError("The recovery proposal did not validate for the selected device.")
+            arguments = matched.get("arguments") or {}
+            if arguments.get("action") != "color" or not _rgb_matches_named_color(arguments.get("rgb"), color_name):
+                raise SkillRuntimeError("The recovery proposal did not match the requested color.")
+            return self._execute_confirmed_rgb_action(
+                matched["skill_id"], arguments["rgb"], model_called=True,
+                color_source="validated_recovery_skill_proposal",
+            )
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_model_skill_tool_missing",
+                "reply": "I didn't send a device command because I couldn't get a valid, matching color request from the model.",
+                "details": {"model_called": True, "skill_proposal_validated": False, "skill_execution_confirmed": False, "skill_error": str(exc)[:200]},
+            }
+
+    def _execute_confirmed_rgb_action(
+        self,
+        skill_id: str,
+        rgb: list[int],
+        *,
+        model_called: bool,
+        color_source: str,
+    ) -> dict[str, Any]:
+        """Validate one RGB proposal and speak only after worker state agrees."""
+        proposal = {
+            "type": "skill_tool_call",
+            "skill_id": skill_id,
+            "tool": "control_ring",
+            "arguments": {"action": "color", "rgb": rgb},
+        }
+        try:
+            matched = self.skill_runtime.validate_proposal(proposal)
+            if matched is None or matched.get("skill_id") != skill_id:
+                raise SkillRuntimeError("The RGB proposal did not validate for the selected device.")
+            outcome = self.skill_runtime.execute(matched)
+            result = outcome.get("result") or {}
+            state = result.get("state") if isinstance(result, dict) else None
+            reported_rgb = state.get("rgb") if isinstance(state, dict) else None
+            effect = str(state.get("effect") or "None") if isinstance(state, dict) else ""
+            confirmed = (
+                state.get("on") is True
+                and isinstance(reported_rgb, list)
+                and len(reported_rgb) == 3
+                and all(type(channel) is int for channel in reported_rgb)
+                and all(abs(actual - expected) <= 1 for actual, expected in zip(reported_rgb, rgb))
+                and effect.casefold() in {"", "none"}
+            )
+            if not confirmed:
+                return {
+                    "route": CHAT,
+                    "rule": "nix_model_skill_tool_unconfirmed",
+                    "reply": "The skill returned a result, but the reported device state did not match the requested color, so I can't say it changed.",
+                    "details": {
+                        "model_called": model_called,
+                        "skill_proposal_validated": True,
+                        "skill_execution": outcome,
+                        "skill_execution_confirmed": False,
+                        "color_source": color_source,
+                    },
+                }
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_color_followup" if color_source == "immediately_preceding_assistant_turn" else "nix_worker_skill_color_confirmed",
+                "reply": str(result.get("message") or f"The device reports the requested RGB color {reported_rgb} is on."),
+                "details": {
+                    "model_called": model_called,
+                    "deterministic": True,
+                    "skill_proposal_validated": True,
+                    "skill_execution": outcome,
+                    "skill_execution_confirmed": True,
+                    "color_source": color_source,
+                },
+            }
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_model_skill_tool_unconfirmed",
+                "reply": f"I couldn't confirm the device result, so I can't report the request as successful ({type(exc).__name__}: {str(exc)[:160]}).",
+                "details": {
+                    "model_called": model_called,
+                    "skill_proposal_validated": False,
+                    "skill_execution_confirmed": False,
+                    "skill_error": str(exc)[:200],
+                    "color_source": color_source,
+                },
+            }
+
     def _handle_chat(
         self,
         text: str,
         *,
         session_context: list[dict[str, Any]] | None = None,
         conversation_id: str | None = None,
+        skill_specs: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         # A bare "who is <name>" question about someone the KB knows
         # is personal recall, not world trivia. Probe once and route
@@ -2666,13 +3202,316 @@ class Brain:
         think = False
         assistant_name, assistant_role, active_model_id = _active_assistant_identity()
         thinking_source = f"{assistant_name.lower()}_thinking_disabled"
+        retry_request = _retry_failed_device_request(text, history, skill_specs)
+        retry_request = retry_request or _unapplied_device_request(text, history, skill_specs)
+        action_text = retry_request or text
+        color_intent = (
+            _explicit_combined_color_intent(action_text, skill_specs or [])
+            or _explicit_named_color_intent(action_text, skill_specs or [])
+        )
+        if retry_request is None and re.search(r"\b(?:that|it|same)\b", text, re.IGNORECASE):
+            previous_request = ""
+            if history and isinstance(history[-1], dict) and history[-1].get("role") == "user":
+                previous_request = str(history[-1].get("content") or "")
+            elif (
+                len(history) >= 2
+                and isinstance(history[-2], dict)
+                and isinstance(history[-1], dict)
+                and history[-2].get("role") == "user"
+                and history[-1].get("role") == "assistant"
+            ):
+                previous_request = str(history[-2].get("content") or "")
+            prior_skill = _unique_device_alias_in_text(previous_request, skill_specs)
+            if prior_skill:
+                current_colors = set(re.findall(
+                    r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b",
+                    text.casefold(),
+                ))
+                if len(current_colors) == 1:
+                    color_name = next(iter(current_colors))
+                    device_name = next(
+                        (
+                            str(spec.get("device_name") or spec.get("name"))
+                            for spec in skill_specs or []
+                            if spec.get("skill_id") == prior_skill
+                        ),
+                        "the selected device",
+                    )
+                    # The previous user turn supplies the target only. It
+                    # must not carry its old color into the new request.
+                    action_text = f"change it to {color_name} for the {device_name}"
+                    color_intent = (prior_skill, color_name)
+        allowed_skill_ids: set[str] = set()
+
         try:
+
+            user_text = text
+            if skill_specs:
+                runnable_specs = [spec for spec in skill_specs if spec.get("runnable")]
+                allowed_skill_ids = {spec["skill_id"] for spec in runnable_specs}
+                capability_data = json.loads(
+                    self.skill_runtime.proposal_context(sorted(allowed_skill_ids))
+                )
+                if not isinstance(capability_data, list) or len(capability_data) > 8 or any(not isinstance(item, dict) for item in capability_data):
+                    raise SkillRuntimeError("Skill capability data exceeded its bounds.")
+                supplied_ids = {item.get("skill_id") for item in capability_data}
+                if supplied_ids != allowed_skill_ids:
+                    raise SkillRuntimeError("Current runnable skill data did not match the selected capabilities.")
+                for spec in runnable_specs:
+                    live_device = spec.get("live_device")
+                    if live_device is None:
+                        continue
+                    matching = next((item for item in capability_data if item.get("skill_id") == spec["skill_id"]), None)
+                    if matching is not None:
+                        matching["live_device"] = live_device
+                        if spec.get("live_device_error"):
+                            matching["live_device_error"] = spec["live_device_error"]
+                user_text = json.dumps({
+                    "nix_skill_capabilities_untrusted_data": capability_data,
+                    "user_request": action_text,
+                }, ensure_ascii=False, separators=(",", ":"))
+
+            if color_intent is None and any(word in text.casefold().split() for word in ("that", "it", "same")):
+                target_skill_id = _mentioned_device_skill(action_text, skill_specs or [])
+                color_terms = set(re.findall(r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b", text.casefold()))
+                if target_skill_id in allowed_skill_ids and len(color_terms) == 1:
+                    color_intent = (target_skill_id, next(iter(color_terms)))
+
+            confirmation = _confirmed_rgb_offer(text, history, skill_specs or [])
+            if confirmation is not None and confirmation[0] in allowed_skill_ids:
+                return self._execute_confirmed_rgb_action(
+                    confirmation[0], confirmation[1], model_called=False,
+                    color_source="immediately_preceding_assistant_offer",
+                )
+
+            followup_skill_id = _explicit_color_followup_skill(text, skill_specs or [])
+            followup_rgb = _assistant_offered_rgb(
+                str(history[-1].get("content") or ""), text
+            ) if history and isinstance(history[-1], dict) and history[-1].get("role") == "assistant" else None
+            if followup_skill_id in allowed_skill_ids and followup_rgb is not None:
+                return self._execute_confirmed_rgb_action(
+                    followup_skill_id, followup_rgb, model_called=True,
+                    color_source="immediately_preceding_assistant_turn",
+                )
+
+            if color_intent is not None and _explicit_color_followup_skill(action_text, skill_specs or []) is not None:
+                return self._request_and_execute_color(
+                    skill_id=color_intent[0], color_name=color_intent[1],
+                    user_text=user_text, allowed_skill_ids=allowed_skill_ids,
+                )
+
             reply = self.ollama.chat(
                 system_prompt=self._chat_system_prompt(current_text=text),
                 history=history,
-                user_text=text,
+                user_text=user_text,
                 think=think,
             )
+            if len(reply) > 32768:
+                raise SkillRuntimeError("The model response exceeded the skill proposal size limit.")
+            has_proposal_marker = "NIX_SKILL_CALL:" in reply
+            if skill_specs and has_proposal_marker:
+                try:
+                    if not reply.lstrip().startswith("NIX_SKILL_CALL:"):
+                        raise ValueError("skill proposal must not contain surrounding prose")
+                    proposal_text = reply.lstrip()[len("NIX_SKILL_CALL:"):].strip()
+                    proposal, end = json.JSONDecoder(object_pairs_hook=_unique_json_object).raw_decode(proposal_text)
+                    if proposal_text[end:].strip():
+                        raise ValueError("unexpected text after skill proposal")
+                    if not isinstance(proposal, dict) or proposal.get("type") != "skill_tool_call":
+                        raise ValueError("proposal has the wrong type")
+                    if proposal.get("skill_id") not in allowed_skill_ids:
+                        raise SkillRuntimeError("The proposed skill was not supplied for this request.")
+                    matched = self.skill_runtime.validate_proposal(proposal)
+                    if matched is None:
+                        raise SkillRuntimeError("The model did not provide a valid skill tool call.")
+                    if matched["skill_id"] not in allowed_skill_ids:
+                        raise SkillRuntimeError("The proposed skill was not supplied for this request.")
+                except Exception as exc:
+                    if color_intent is not None and color_intent[0] in allowed_skill_ids:
+                        return self._request_and_execute_color(
+                            skill_id=color_intent[0], color_name=color_intent[1],
+                            user_text=user_text, allowed_skill_ids=allowed_skill_ids,
+                        )
+                    rejected_color = (
+                        _explicit_combined_color_intent(action_text, skill_specs)
+                        or _explicit_named_color_intent(action_text, skill_specs)
+                    )
+                    if rejected_color is not None and rejected_color[0] in allowed_skill_ids:
+                        return self._request_and_execute_color(
+                            skill_id=rejected_color[0], color_name=rejected_color[1],
+                            user_text=user_text, allowed_skill_ids=allowed_skill_ids,
+                        )
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_tool_rejected",
+                        "reply": f"I couldn't safely validate that skill request, so no command was sent ({type(exc).__name__}: {str(exc)[:160]}).",
+                        "details": {
+                            "model_called": True,
+                            "skill_proposal_validated": False,
+                            "skill_error": str(exc)[:200],
+                        },
+                    }
+                if color_intent is not None:
+                    if matched.get("skill_id") != color_intent[0]:
+                        return {
+                            "route": CHAT,
+                            "rule": "nix_model_skill_tool_rejected",
+                            "reply": "I didn't send a device command because the proposed device didn't match your request.",
+                            "details": {"model_called": True, "skill_proposal_validated": False},
+                        }
+                    arguments = matched.get("arguments") or {}
+                    if arguments.get("action") == "color" and _rgb_matches_named_color(arguments.get("rgb"), color_intent[1]):
+                        return self._execute_confirmed_rgb_action(
+                            matched["skill_id"], arguments["rgb"],
+                            model_called=True, color_source="validated_model_skill_proposal",
+                        )
+                    return self._request_and_execute_color(
+                        skill_id=color_intent[0], color_name=color_intent[1],
+                        user_text=user_text, allowed_skill_ids=allowed_skill_ids,
+                    )
+                try:
+                    outcome = self.skill_runtime.execute(matched)
+                    result = outcome.get("result") or {}
+                    reply_text = str(result.get("message") or "The skill returned a confirmed result.")
+                    arguments = matched.get("arguments") or {}
+                    if arguments.get("action") == "color_catalog":
+                        reply_text = str(result.get("message") or "The Dot does not publish a named-color list; Luna selects RGB channels for each requested color.")
+                    elif arguments.get("action") == "catalog":
+                        effects = result.get("available_effects") or []
+                        reply_text = (
+                            "Firmware-reported effects: "
+                            + (", ".join(str(value) for value in effects) if effects else "none reported")
+                            + "."
+                        )
+                    elif arguments.get("action") == "state" and isinstance(result.get("state"), dict):
+                        state = result["state"]
+                        reply_text = (
+                            f"The device reports the ring {'on' if state.get('on') else 'off'}, "
+                            f"RGB {state.get('rgb')}, brightness {state.get('brightness')}, "
+                            f"effect {state.get('effect') or 'None'}."
+                        )
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_tool",
+                        "reply": reply_text,
+                        "details": {
+                            "model_called": True,
+                            "deterministic": False,
+                            "skill_execution": outcome,
+                            "skill_proposal_validated": True,
+                        },
+                    }
+                except Exception as exc:
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_tool_unconfirmed",
+                        "reply": f"I couldn't confirm the device result, so I can't report the request as successful ({type(exc).__name__}: {str(exc)[:160]}).",
+                        "details": {
+                            "model_called": True,
+                            "skill_proposal_validated": True,
+                            "skill_execution_confirmed": False,
+                            "skill_error": str(exc)[:200],
+                        },
+                    }
+            if allowed_skill_ids and not has_proposal_marker:
+                if color_intent is not None:
+                    return self._request_and_execute_color(
+                        skill_id=color_intent[0], color_name=color_intent[1],
+                        user_text=user_text, allowed_skill_ids=allowed_skill_ids,
+                    )
+                polite_color = _explicit_polite_color_choice(action_text, reply, skill_specs)
+                if polite_color is not None:
+                    return self._execute_confirmed_rgb_action(
+                        polite_color[0], polite_color[1], model_called=True,
+                        color_source="single_matching_rgb_in_model_reply",
+                    )
+
+            if allowed_skill_ids and not has_proposal_marker and not re.search(
+                r"\b(?:available|options|catalog|what are|which are|what effects|what animations|how does|how do)\b",
+                action_text,
+                re.IGNORECASE,
+            ) and (
+                re.search(
+                    r"^\s*(?:(?:please|can you|could you|would you|will you)\s+)?"
+                    r"(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|"
+                    r"brighten|dim|paint|animate|apply)\b",
+                    action_text,
+                    re.IGNORECASE,
+                )
+                or _explicit_combined_color_intent(action_text, skill_specs) is not None
+                or _explicit_named_color_intent(action_text, skill_specs) is not None
+                or _polite_device_color_request(action_text, skill_specs) is not None
+            ):
+                # Follow-up color suggestions are resolved only from one
+                # explicit RGB triplet in the immediately preceding assistant
+                # turn and only for a uniquely named, runnable device.
+                followup_skill_id = _explicit_color_followup_skill(action_text, skill_specs)
+                followup_rgb = (
+                    _assistant_offered_rgb(str(history[-1].get("content") or ""), action_text)
+                    if action_text == text and history and isinstance(history[-1], dict)
+                    and history[-1].get("role") == "assistant"
+                    else None
+                )
+                if followup_skill_id in allowed_skill_ids and followup_rgb is not None:
+                    return self._execute_confirmed_rgb_action(
+                        followup_skill_id, followup_rgb, model_called=True,
+                        color_source="immediately_preceding_assistant_turn",
+                    )
+
+                unresolved_color_intent = (
+                    _explicit_combined_color_intent(action_text, skill_specs)
+                    or _explicit_named_color_intent(action_text, skill_specs)
+                    or _polite_device_color_request(action_text, skill_specs)
+                )
+                if unresolved_color_intent is not None:
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_tool_missing",
+                        "reply": "I didn't send a device command because I couldn't confirm one clear color choice for that request.",
+                        "details": {"model_called": True, "skill_proposal_validated": False},
+                    }
+                # A trusted worker may recognize a narrow, deterministic direct
+                # command when the model omits its structured proposal. The
+                # runtime still binds it to a declared tool and validates its
+                # arguments before execute() can send anything to the device.
+                try:
+                    matched = self.skill_runtime.match(action_text)
+                except Exception:
+                    matched = None
+                if isinstance(matched, dict) and matched.get("skill_id") in allowed_skill_ids:
+                    try:
+                        outcome = self.skill_runtime.execute(matched)
+                        result = outcome.get("result") or {}
+                        return {
+                            "route": CHAT,
+                            "rule": "nix_worker_skill_match",
+                            "reply": str(result.get("message") or "The skill returned a confirmed result."),
+                            "details": {
+                                "model_called": True,
+                                "deterministic": True,
+                                "skill_match_validated": True,
+                                "skill_execution": outcome,
+                                "skill_execution_confirmed": True,
+                            },
+                        }
+                    except Exception as exc:
+                        return {
+                            "route": CHAT,
+                            "rule": "nix_model_skill_tool_unconfirmed",
+                            "reply": f"I couldn't confirm the device result, so I can't report the request as successful ({type(exc).__name__}: {str(exc)[:160]}).",
+                            "details": {
+                                "model_called": True,
+                                "skill_match_validated": True,
+                                "skill_execution_confirmed": False,
+                                "skill_error": str(exc)[:200],
+                            },
+                        }
+                return {
+                    "route": CHAT,
+                    "rule": "nix_model_skill_tool_missing",
+                    "reply": "I didn't send a device command because the model didn't return a valid skill call.",
+                    "details": {"model_called": True, "skill_proposal_validated": False},
+                }
             reply = strip_model_control_traces(reply)
             if assistant_name != "Luna":
                 reply = suppress_nonessential_questions(

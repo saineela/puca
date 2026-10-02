@@ -1,4 +1,6 @@
-# NIX PUCA
+<p align="center">
+  <img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1790917615/93d18a47-5f3a-46e1-ad71-705b2680442f_anp8f1.png" alt="NIX PUCA" width="360">
+</p>
 
 <p align="center">
   <strong>A local-first Personal User Companion Agent foundation.</strong><br>
@@ -16,6 +18,7 @@
 
 <p align="center">
   <a href="https://github.com/saineela/puca">Repository</a> ·
+  <a href="https://github.com/saineela/puca/stargazers">☆ Star NIX PUCA</a> ·
   <a href="nix_core/README.md">Core docs</a> ·
   <a href="nix_knowledge/README.md">Knowledge docs</a> ·
   <a href="nix_actions/README.md">Actions docs</a> ·
@@ -57,7 +60,7 @@ NIX makes these responsibilities visible in code:
 - **Temporal interpretation:** converts supported relative dates and times to timezone-aware timestamps before storage or presentation.
 - **Deterministic scheduling:** Actions tracks pending, fired, failed, cancelled, and rescheduled operations and can link them to source Knowledge records.
 - **Conversation continuity:** bounded session history and clarification continuation scoped to a conversation.
-- **Core console:** browser dashboard, traces, conversations, event and memory views, model settings, and local administration.
+- **Core console:** browser dashboard, traces, conversations, event and memory views, model settings, and local administration. The dashboard follows NIX PUCA's official light-only black-and-white theme and logo.
 - **OpenAI-compatible API:** `GET /v1/models` and `POST /v1/chat/completions` for compatible clients. API Token Guard rejects known Open WebUI follow-up/title/tag metadata jobs before Core/model invocation so they do not pollute conversations.
 - **WebSocket text gateway:** token-authenticated text transport for client/voice-gateway integrations. This is not, by itself, a complete speech-recognition or text-to-speech system.
 - **Optional semantic retrieval:** local Sentence Transformers/BGE embeddings when dependencies and model files are supplied.
@@ -66,7 +69,7 @@ NIX makes these responsibilities visible in code:
 
 ### Planned, not yet implemented
 
-The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-time voice, open-source Web Search, ESP32/OPNsense presence, opt-in location/timeline integrations, and Echo Dot research. These are future plans, not currently available features. In particular, the existing Skills marketplace saves bounded static files and does **not** execute skills; the catalog's Web Search entry is not a working search connector.
+The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-time voice, open-source Web Search, ESP32/OPNsense presence, opt-in location/timeline integrations, and Echo Dot research. The planned NIX Home mobile client has an [API and screen-flow blueprint](nix_core/MOBILE_APP_API.md); no mobile app or authenticated mobile API suite is implemented. These are future plans, not currently available features. In particular, the existing Skills marketplace saves bounded static files and does **not** execute skills; the catalog's Web Search entry is not a working search connector.
 
 ## Architecture
 
@@ -182,12 +185,12 @@ At minimum, set a unique `NIX_AUTH_TOKEN` before running the WebSocket gateway. 
 For a local-only console, run:
 
 ```bash
-NIX_CONSOLE_HOST=127.0.0.1 python nix_core/console.py
+NIX_CONSOLE_HOST=127.0.0.1 python nix_core/console_extend.py
 ```
 
 Open the local URL printed on startup. The console serves the dashboard, `/api/*`, and the OpenAI-compatible `/v1/*` endpoint from one port. It reuses reachable Knowledge/Actions APIs; otherwise, it can host their handlers in-process through an internal bridge.
 
-The default console bind host is `0.0.0.0`, and the default port is selected dynamically. Prefer loopback for initial evaluation; use `NIX_CONSOLE_PORT` to set a fixed port. The console exposes private records and administrative operations and is not an internet-facing security boundary by itself.
+The console binds `0.0.0.0:49117` by default; the port is fixed across restarts and dashboard reloads. Set `NIX_CONSOLE_HOST=127.0.0.1` to restrict access to this machine; there is no port override. The console exposes private records and administrative operations and is not an internet-facing security boundary by itself. Binding to all interfaces permits LAN access when host firewall/network policy allows, but does not configure internet access or router port forwarding.
 
 ### Run Knowledge and Actions separately
 
@@ -217,7 +220,7 @@ The gateway listens on port `9000` by default. It accepts authenticated text pro
 | Knowledge API | `127.0.0.1:8100` | Knowledge HTTP endpoints. |
 | Actions API | `127.0.0.1:8200` | Scheduler/session HTTP endpoints. |
 | Core WebSocket | `0.0.0.0:9000` | Authenticated text transport; restrict its interface as appropriate. |
-| Core console | Dynamic port | Dashboard, `/api/*`, and `/v1/*`; set `NIX_CONSOLE_HOST` and `NIX_CONSOLE_PORT`. |
+| Core console | `0.0.0.0:49117` | Dashboard, `/api/*`, and `/v1/*`; set `NIX_CONSOLE_HOST` to restrict its interface. |
 
 ## Configuration, privacy, and security
 
@@ -232,7 +235,7 @@ Common settings are documented in [`.env.example`](.env.example):
 | `NIX_KNOWLEDGE_API_HOST` / `NIX_KNOWLEDGE_API_PORT` | Knowledge service bind host and port. |
 | `NIX_ACTIONS_API_HOST` / `NIX_ACTIONS_API_PORT` | Actions service bind host and port. |
 | `NIX_WS_HOST` / `NIX_WS_PORT` | WebSocket bind host and port. |
-| `NIX_CONSOLE_HOST` / `NIX_CONSOLE_PORT` | Dashboard/API bind host and port. |
+| `NIX_CONSOLE_HOST` | Dashboard/API bind host; port is fixed at `49117`. |
 | `NIX_CASPER_BACKEND` | `transformers`, `ollama`, or `tabby` transport selection; verify actual runtime configuration. |
 | `NIX_REQUEST_LOG` / `NIX_REQUEST_LOG_DIR` | Core request logging (enabled by default) and its output directory. Logs do not rotate automatically. |
 
@@ -344,6 +347,7 @@ data/                           Local SQLite/runtime state (Git-ignored)
 
 - [**Roadmap**](ROADMAP.md) — planned features, status, dependencies, and privacy gates.
 - [`nix_core/README.md`](nix_core/README.md) — routing, console, APIs, WebSocket text gateway, and model boundaries.
+- [`nix_core/MOBILE_APP_API.md`](nix_core/MOBILE_APP_API.md) — NIX Home mobile API blueprint; clearly separates the copy prototype from proposed routes.
 - [`nix_knowledge/README.md`](nix_knowledge/README.md) — memory, temporal processing, API, and tests.
 - [`nix_actions/README.md`](nix_actions/README.md) — action lifecycle, scheduler, sessions, and API.
 - [`nix_decision/README.md`](nix_decision/README.md) — explicit trigger contract and safety gates.
@@ -363,7 +367,7 @@ Suggested concise repository description:
 
 > Local-first Personal User Companion Agent foundation in Python: modular conversation routing, durable personal memory, temporal grounding, and deterministic reminders.
 
-Target repository URL: [`github.com/saineela/puca`](https://github.com/saineela/puca). Confirm the repository exists, is public, and this link resolves before announcing the launch. Add repository topics and description in GitHub settings; README text alone does not set GitHub's metadata or guarantee search ranking.
+Target repository URL: [`github.com/saineela/puca`](https://github.com/saineela/puca). [Star NIX PUCA](https://github.com/saineela/puca/stargazers) if you find the project useful. Confirm the repository exists, is public, and this link resolves before announcing the launch. Add repository topics and description in GitHub settings; README text alone does not set GitHub's metadata or guarantee search ranking.
 
 ## License and contributions
 

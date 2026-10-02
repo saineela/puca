@@ -13,6 +13,7 @@ from nix_knowledge.states import (
     find_states,
     follow_up_eligible,
     parse_state_statement,
+    state_person_label,
     store_state,
 )
 
@@ -79,7 +80,7 @@ def test_memory_policy_fields_distinguish_eligible_from_ordinary(engine):
     store_state(engine, parse_state_statement("my sister is sick"), "my sister is sick")
     block = render_memory_block(engine, current_text="my sister is sick")
     assert "eligible=true" in block
-    assert "close" in block
+    assert "Your sister" in block
 
     store_state(engine, parse_state_statement("my sister is better now"), "my sister is better now")
     block = render_memory_block(engine, current_text="my sister is better now")
@@ -106,6 +107,9 @@ def test_recovery_marks_prior_follow_up_answered(engine):
         "remind me to stretch tomorrow at 9am",
         "my sister works at NASA",
         "my name is Sai",
+        "alright is good",
+        "fine is doing well",
+        "okay is alright",
     ],
 )
 def test_parse_negative(text):
@@ -145,12 +149,33 @@ def test_non_close_person_is_never_follow_up_eligible(engine):
     assert data["follow_up_reason"] == "already_answered_or_not_close"
 
 
-def test_alright_is_a_temporal_well_state_not_a_fact():
+def test_alright_is_a_temporal_well_state_not_a_person():
     parsed = parse_state_statement("my sister is doing alright now")
     assert parsed is not None
     assert parsed["state"] == "alright"
     assert parsed["group"] == "well"
     assert parsed["valence"] == "good"
+    assert parsed["name"] is None
+
+    assert parse_state_statement("alright is good") is None
+    assert parse_state_statement("fine is doing well") is None
+    assert state_person_label({"name": "alright", "state": "alright"}) is None
+    assert state_person_label({"subject": "someone close", "state": "alright"}) is None
+    assert state_person_label({"subject": "your alright", "state": "alright"}) is None
+    assert state_person_label({"role": "sister", "subject": "someone close"}) == "Your sister"
+
+
+def test_follow_up_requires_real_close_relationship_and_unanswered_problem():
+    eligible = {
+        "role": "sister", "follow_up_policy": "only_if_close_and_unwell_or_problem",
+        "follow_up_needed": True, "follow_up_answered": False, "valence": "bad",
+    }
+    assert follow_up_eligible(eligible)
+    assert not follow_up_eligible({**eligible, "role": "cousin"})
+    assert not follow_up_eligible({**eligible, "relationship_closeness": "ordinary"})
+    assert not follow_up_eligible({**eligible, "follow_up_answered": True})
+    assert not follow_up_eligible({**eligible, "valence": "good"})
+    assert not follow_up_eligible({**eligible, "follow_up_needed": 1})
 
 
 def test_valence_sides():
@@ -273,6 +298,30 @@ def test_ambiguous_role_state_write_is_not_assigned_randomly(engine):
     assert result["operation"] == "NEEDS_CLARIFICATION"
     assert result["candidates"] == ["jane", "maanvi"]
     assert engine.search("person") == []
+
+
+def test_find_states_hides_corrupt_state_word_person_records(engine):
+    engine.create("person", {
+        "statement_type": "current_state", "name": "alright",
+        "subject": "alright", "state": "alright", "valence": "good",
+        "value": "alright is good",
+    })
+    engine.create("person", {
+        "statement_type": "current_state", "subject": "someone close",
+        "state": "alright", "valence": "good", "value": "my sister is alright",
+    })
+    states = find_states(engine)["states"]
+    assert len(states) == 1
+    assert states[0]["subject"] == "Your sister"
+
+    engine.create("person", {
+        "statement_type": "current_state", "role": "sister",
+        "subject": "user's sister", "state": "alright", "valence": "good",
+        "value": "my sister is alright",
+    })
+    states = find_states(engine)["states"]
+    assert len(states) == 2
+    assert all(state["subject"] == "Your sister" for state in states)
 
 
 def test_find_states_filters_by_query(engine):
