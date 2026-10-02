@@ -1,4 +1,6 @@
-# NIX PUCA
+<p align="center">
+    <img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1790917615/93d18a47-5f3a-46e1-ad71-705b2680442f_anp8f1.png" width="500" title="Puca logo">
+</p>
 
 <p align="center">
   <strong>A local-first Personal User Companion Agent foundation.</strong><br>
