@@ -176,3 +176,4 @@ Thumbs.db
 
 # Local hardware/vendor installers
 *.run
+nix_core/ring_light_package/
