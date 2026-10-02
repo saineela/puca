@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from http.server import ThreadingHTTPServer
 from threading import Thread
 from urllib.request import Request, urlopen
@@ -72,7 +73,7 @@ def test_retired_pro_id_is_rejected_from_official_model_apis(monkeypatch, luna_c
     "path",
     [
         "/", "/home", "/models", "/conversations", "/memories", "/people",
-        "/events", "/api", "/docs", "/settings", "/skills",
+        "/events", "/devices", "/api", "/docs", "/settings", "/skills",
         "/release-notes", "/release-notes/", "/workspace/skills/", "/nix/conversations",
     ],
 )
@@ -80,11 +81,19 @@ def test_dashboard_pages_are_directly_routeable(luna_console, path):
     with urlopen(f"{luna_console}{path}", timeout=3) as response:
         markup = response.read().decode()
         assert response.status == 200
-        assert "<title>Nix PUCA V5</title>" in markup
+        assert "<title>NIX PUCA</title>" in markup
+        assert "https://res.cloudinary.com/dh5uxc6ql/image/upload/v1790917615/93d18a47-5f3a-46e1-ad71-705b2680442f_anp8f1.png" in markup
         assert 'id="skillsRepositoryForm"' in markup
         assert "appBasePath" in markup
         if path.rstrip("/") == "/release-notes":
             assert 'id="release-notes"' in markup
+        if path.rstrip("/") == "/devices":
+            assert markup.count('id="devices"') == 1
+            assert 'id="devicesList"' in markup
+            assert "function renderDevices(devices)" in markup
+            assert "function loadDevices()" in markup
+            assert "not visual confirmation of the physical LEDs" in markup or "cannot confirm what the physical LEDs look like" in markup
+            assert ".device-ring" in markup
 
 
 @pytest.mark.parametrize("path", ["/api/not-a-dashboard-page", "/v1/not-a-dashboard-page"])
@@ -230,18 +239,58 @@ def test_instance_profile_is_validated_and_persisted(monkeypatch, luna_console):
     assert cleared["user_name"] == ""
 
 
+def test_people_view_never_uses_state_words_as_person_names(monkeypatch, tmp_path):
+    database = tmp_path / "people.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE knowledge (id INTEGER, data TEXT, created_at TEXT, updated_at TEXT, knowledge_type TEXT, status TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO knowledge VALUES (?, ?, ?, ?, 'person', 'active')",
+            [
+                (1, json.dumps({"statement_type": "current_state", "name": "alright", "subject": "alright", "state": "alright", "valence": "good", "value": "alright is good"}), "now", "now"),
+                (2, json.dumps({"statement_type": "current_state", "name": None, "subject": "someone close", "state": "alright", "valence": "good", "value": "my sister is doing alright"}), "now", "now"),
+            ],
+        )
+    monkeypatch.setattr(console, "KNOWLEDGE_DB", str(database))
+
+    people = console._people_view()
+
+    assert len(people) == 1
+    assert people[0]["subject"] == "Your sister"
+    assert people[0]["state"] == "alright"
+    assert people[0]["follow_up_eligible"] is False
+
+
 def test_dashboard_announces_official_luna_and_documents_model_history():
     with open(console.DASHBOARD_PATH, encoding="utf-8") as handle:
         dashboard = handle.read()
 
     assert console._dashboard_markup() == dashboard
-    assert "<title>Nix PUCA V5</title>" in dashboard
+    assert "<title>NIX PUCA</title>" in dashboard
+    assert 'class="brand-logo"' in dashboard
+    assert "Personal User Companion Agent</div>" not in dashboard
+    assert 'id="homeHeadline"' in dashboard
+    assert 'id="homeSubtitle"' in dashboard
+    assert 'id="homeSuggestionsTitle"' in dashboard
+    assert "async function loadHomeCopy()" in dashboard
+    assert "apiUrl('/api/mobile/v1/home-copy')" in dashboard
+    assert 'class="theme-mode-chip"' in dashboard
+    assert "function applyOfficialTheme()" in dashboard
+    assert "color-scheme:light" in dashboard
+    assert 'https://github.com/saineela/puca' in dashboard
+    assert 'Star NIX PUCA' in dashboard
+    assert 'input.name=fieldId' in dashboard
+    assert "device-visual:not(.is-active) .device-ring" in dashboard
     assert "document.querySelectorAll('[data-page]').forEach(button=>button.onclick=()=>navigate(button.dataset.page))" in dashboard
     assert "document.querySelectorAll('[data-page-link]').forEach(button=>button.onclick=()=>navigate(button.dataset.pageLink))" in dashboard
     assert "$('send').onclick=send;" in dashboard
     assert "$('skillsRepositoryForm').addEventListener('submit',async event=>" in dashboard
-    assert "$('theme').onclick=()=>applyTheme(!document.body.classList.contains('dark'))" in dashboard
-    assert '<div class="brand-name">Nix</div>' in dashboard
+    assert "$('theme').onclick=()=>applyTheme(!document.body.classList.contains('dark'))" not in dashboard
+    assert "$('colorTheme').addEventListener" not in dashboard
+    assert 'id="colorTheme"' not in dashboard
+    assert 'id="selectedColorTheme"' not in dashboard
+    assert '<div class="brand-name">Nix</div>' not in dashboard
     assert '<div class="brand-name">nix</div>' not in dashboard
     assert "Launching our new <span>Luna model lineup</span>" in dashboard
     assert "A new chapter for Nix" not in dashboard
@@ -255,10 +304,15 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert "checkpoint-60" not in dashboard.lower()
     assert "step 60" not in dashboard.lower()
     assert "60-step contextual run" not in dashboard.lower()
-    assert 'data:image/svg+xml' in dashboard
-    assert "fill='%23435441'" in dashboard
+    assert 'data:image/svg+xml' not in dashboard
+    assert "fill='%23435441'" not in dashboard
     assert ".brand-mark{width:42px;height:42px" in dashboard
+    assert ".brand-logo{display:block;width:100%;max-width:205px;height:58px" in dashboard
     assert ".agent-face{width:42px;height:42px" in dashboard
+    assert "input.id=fieldId;input.name=fieldId" in dashboard
+    assert "aliasInput.name=aliasInput.id" in dashboard
+    assert "name=\"${inputId}\"" in dashboard
+    assert "id=\"skill-auto-update-${settingsId}\" name=\"skill-auto-update-${settingsId}\"" in dashboard
     assert "/* Editorial refresh: quieter colors, clearer hierarchy, and readable marks. */" in dashboard
     assert 'id="themeColor"' in dashboard
     assert 'id="conversationSearch"' in dashboard
@@ -271,7 +325,40 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert 'id="skillsSearch"' in dashboard
     assert "skill-store-card" in dashboard
     assert "function renderSkills()" in dashboard
-    assert "function showSkillDetails(skillId)" in dashboard
+    assert "function showSkillDetails(skillId,openSettings=false)" in dashboard
+    assert "data-skill-settings" in dashboard
+    assert "data-save-settings" in dashboard
+    assert 'id="skill-settings"' in dashboard
+    assert "function openSkillSettings(skillId)" in dashboard
+    assert "function renderSkillSettings()" in dashboard
+    assert "private per-skill .venv; only binary wheels are accepted" in dashboard
+    assert "private per-skill `.venv`" not in dashboard
+    assert "The saved GitHub catalog does not currently provide setup requirements." in dashboard
+    assert "metadata_refresh_supported" in dashboard
+    assert "data-settings-repair" in dashboard
+    assert "cache:'no-store'" in dashboard
+    assert 'data-settings-skill="${safeId}"' in dashboard
+    assert 'data-settings-trust' in dashboard
+    assert 'data-settings-auto-update' in dashboard
+    assert "'skill-settings'" in dashboard
+    assert "else if(page==='skill-settings')loadSkills()" in dashboard
+    assert "if(page==='skills')loadSkills(true)" in dashboard
+    assert "if(page==='devices')loadDevices()" in dashboard
+    assert "function renderDevices(devices)" in dashboard
+    assert ".device-ring{border:13px solid var(--device-glow)!important;background:transparent!important" in dashboard
+    assert "@supports ((mask:radial-gradient(farthest-side,transparent 70%,#000 72%)) or (-webkit-mask:radial-gradient(farthest-side,transparent 70%,#000 72%)))" in dashboard
+    assert "device-ring{border:0!important;background:repeating-conic-gradient" in dashboard
+    assert "device-ring.is-animated{background:conic-gradient(from -90deg,#ff3b30" in dashboard
+    assert "animation:device-ring-spectrum 3s linear infinite" in dashboard
+    assert "@media(prefers-reduced-motion:reduce){.device-ring.is-animated{animation:none}}" in dashboard
+    assert "art.classList.toggle('has-ring-effect',hasEffect)" in dashboard
+    assert "Echo Dot ring on${color?`" in dashboard
+    assert "aliasInput.id=`device-name-${deviceKey}`" in dashboard
+    assert "fieldId=`device-control-" in dashboard
+    assert "data.device_status||{}" in dashboard
+    assert "control.tool,arguments:args" in dashboard
+    assert "data.device_name" in dashboard
+    assert "device_connected?'ESPHome API connected'" not in dashboard
     assert "Community content is unreviewed." in dashboard
     assert "const submittedUrl=new URL(url),submittedParts=submittedUrl.pathname.split('/').filter(Boolean).slice(0,2)" in dashboard
     assert "appUrl(path)" in dashboard
@@ -294,7 +381,10 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert 'id="release-notes"' in dashboard
     assert "button.setAttribute('aria-expanded',String(active))" in dashboard
     assert "panel.hidden=!active" in dashboard
-    assert "1,800 broad public-dialogue rows, 461 sampled project controls, 18 authored single-turn examples, 360 authored multi-turn trajectories, and 14 role controls" in dashboard
+    assert "Casper V5’s recorded training used 2,941 examples" in dashboard
+    assert "1,003 training and 250 evaluation examples" in dashboard
+    assert "These are separate snapshots, not amounts to add together" in dashboard
+    assert "Casper V6 is a beta and is not the default" in dashboard
     assert "casper-puca-qlora-v6-final" in dashboard
     assert "DailyDialog: Li et al. (2017)" in dashboard
     assert "https://huggingface.co/datasets/HuggingFaceH4/no_robots" in dashboard
@@ -306,21 +396,21 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert "Warm, sweet, and playful" in dashboard
     assert "luna-v6-contextual-v1" in dashboard
     assert "Official · current source registry" in dashboard
-    assert "mixed Casper V6 contract, not Luna-identity-only scores" in dashboard
+    assert "7/8 on a small test that included policy guidance" in dashboard
     assert "Luna QLoRA pilot · V2 · V3 · V4" in dashboard
     assert "Luna Instruct V1 · conversation baseline" in dashboard
-    assert "Luna Pro v1 · research candidate, not a release" in dashboard
-    assert "unresolved dataset provenance and rights" in dashboard
+    assert "Luna Pro v1 · an early research candidate" in dashboard
+    assert "license/provenance is unresolved in archived notes" in dashboard
     assert "casper-puca-qlora-v5" in dashboard
     assert "casper-puca-qlora-v6" in dashboard
-    assert "How Official Luna is structured inside Nix" in dashboard
-    assert "4-bit NF4, double quantization, and bfloat16" in dashboard
+    assert "Historical Luna adapter design" in dashboard
+    assert "4-bit quantization" in dashboard
     assert "Assistant-only supervision" in dashboard
-    assert "do not reuse its data or training approach for any model" in dashboard.lower()
-    assert "former endpoints return HTTP 410" in dashboard
-    assert "unresolved dataset provenance and rights" in dashboard
+    assert "project data" in dashboard
+    assert "local artifact status" in dashboard
+    assert "license/provenance is unresolved in archived notes" in dashboard
     assert "Model status unavailable" in dashboard
-    assert "Transformers source default; runtime status unavailable" in dashboard
+    assert "runtime status unavailable" in dashboard
     assert "active status unavailable" not in dashboard
     assert "NIX_ASSISTANT_MODEL" not in dashboard
     assert "not proof of hosted serving state" in dashboard

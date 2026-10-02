@@ -44,16 +44,23 @@ def follow_up_eligible(data: dict[str, Any]) -> bool:
 
     A follow-up is permitted only for a close/loved person whose current
     state is an active problem and whose prior concern has not been answered.
-    The helper also derives the value for records written by older versions.
+    Older records may derive closeness from a recognized close-family role,
+    but a policy label alone can never make an ordinary relationship close.
     """
-    closeness = str(data.get("relationship_closeness") or "").lower()
-    policy = str(data.get("follow_up_policy") or "").lower()
-    close = closeness in {"close", "loved"} or policy == "only_if_close_and_unwell_or_problem"
-    active_problem = bool(data.get("follow_up_needed")) and str(
+    closeness = str(data.get("relationship_closeness") or "").strip().lower()
+    policy = str(data.get("follow_up_policy") or "").strip().lower()
+    role = str(data.get("role") or "").strip().lower()
+    close = closeness in {"close", "loved"} or (
+        not closeness
+        and policy == "only_if_close_and_unwell_or_problem"
+        and role in CLOSE_PEOPLE_ROLES
+    )
+    active_problem = data.get("follow_up_needed") is True and str(
         data.get("valence") or ""
     ).lower() == "bad"
-    answered = bool(data.get("follow_up_answered"))
+    answered = data.get("follow_up_answered") is True
     return close and active_problem and not answered
+
 
 PEOPLE_ROLES = (
     "sister", "brother", "mom", "mum", "mother", "dad", "father",
@@ -62,7 +69,9 @@ PEOPLE_ROLES = (
     "nephew", "girlfriend", "boyfriend", "partner", "friend",
     "best friend", "roommate",
 )
-_ROLES_RE = "|".join(re.escape(r) for r in PEOPLE_ROLES)
+_PEOPLE_ROLES_NORMALIZED = frozenset(PEOPLE_ROLES)
+_PEOPLE_ROLES_RE = "|".join(re.escape(role) for role in PEOPLE_ROLES)
+_ROLES_RE = _PEOPLE_ROLES_RE
 
 # canonical state -> (valence, group)
 STATE_VOCAB: dict[str, tuple[str, str]] = {
@@ -195,7 +204,8 @@ _NAME_STOPWORDS = {
     # every later state supersede anchors to the wrong person.
     "bro", "dude", "man", "sis", "haha", "lol", "omg", "ugh",
     "okay", "ok", "sorry", "hmm", "huh", "wow", "yeah", "yes",
-    "no", "wait", "look", "listen", "guys",
+    "no", "wait", "look", "listen", "guys", "someone", "somebody",
+    "anyone", "anybody", "everyone", "everybody", "people", "person",
 }
 
 
@@ -204,6 +214,60 @@ def _clean_name(candidate: str | None) -> str | None:
     if not candidate:
         return None
     return re.sub(r"'s$", "", candidate).strip() or None
+
+
+def state_person_name(candidate: Any) -> str | None:
+    """Reject state words and conversational fillers captured as names."""
+    if not isinstance(candidate, str):
+        return None
+    name = _clean_name(candidate)
+    if not name:
+        return None
+    normalized = name.casefold()
+    if normalized in _NAME_STOPWORDS or normalized in STATE_VOCAB:
+        return None
+    return name
+
+
+def state_person_label(data: dict[str, Any]) -> str | None:
+    """Return a real person's name/relationship, not a state or empty subject."""
+    name = state_person_name(data.get("name"))
+    if name:
+        return name[:1].upper() + name[1:]
+
+    # Older records sometimes kept only a generic subject but retained the
+    # original utterance. Recover a relationship/name only from that explicit
+    # person-state wording; never use the state itself as an entity label.
+    value = data.get("value")
+    if isinstance(value, str):
+        parsed = parse_state_statement(value)
+        if parsed:
+            inferred_name = state_person_name(parsed.get("name"))
+            if inferred_name:
+                return inferred_name[:1].upper() + inferred_name[1:]
+            inferred_role = parsed.get("role")
+            if isinstance(inferred_role, str) and inferred_role.casefold() in _PEOPLE_ROLES_NORMALIZED:
+                return f"Your {inferred_role}"
+
+    role = data.get("role")
+    if isinstance(role, str) and role.strip().casefold() in _PEOPLE_ROLES_NORMALIZED:
+        return f"Your {role.strip()}"
+
+    subject = data.get("subject")
+    if not isinstance(subject, str) or not subject.strip():
+        return None
+    subject = subject.strip()
+    normalized = " ".join(subject.casefold().split())
+    role_match = re.fullmatch(r"(?:user's|your)\s+(.+)", subject, re.IGNORECASE)
+    if role_match and role_match.group(1).casefold() in _PEOPLE_ROLES_NORMALIZED:
+        return f"Your {role_match.group(1)}"
+    if role_match and state_person_name(role_match.group(1)) is None:
+        return None
+    if normalized in STATE_VOCAB or normalized in {
+        "someone close", "someone", "person", "unknown", "none"
+    } or state_person_name(subject) is None:
+        return None
+    return subject[:1].upper() + subject[1:]
 
 
 def valence_of(text: str) -> str | None:
@@ -265,14 +329,12 @@ def parse_state_statement(text: str) -> dict[str, Any] | None:
     match = _P_NAME_ROLE_STATE.match(lowered)
     if match:
         candidate, role, rest = match.groups()
-        if candidate not in _NAME_STOPWORDS:
-            name = _clean_name(candidate)
+        name = state_person_name(candidate)
     if rest is None:
         match = _P_ROLE_STATE.match(lowered)
         if match:
             role, maybe_name, rest = match.groups()
-            if maybe_name and maybe_name not in _NAME_STOPWORDS:
-                name = _clean_name(maybe_name)
+            name = state_person_name(maybe_name)
     if rest is None:
         # name-only possessive ("maanvi's cured now"): the real gate
         # is the state vocabulary in `rest`, not capitalization -
@@ -281,10 +343,9 @@ def parse_state_statement(text: str) -> dict[str, Any] | None:
         match = _P_NAME_STATE.match(lowered)
         if match:
             candidate, rest = match.groups()
-            if candidate not in _NAME_STOPWORDS:
-                name = _clean_name(candidate)
+            name = state_person_name(candidate)
 
-    if rest is None:
+    if rest is None or (role is None and name is None):
         return None
 
     # explicit state word first; negation/recovery cues in the full
@@ -619,12 +680,15 @@ def find_states(engine, query: str | None = None) -> dict[str, Any]:
                     if len(token) > 2
                 ):
                     continue
+            person_label = state_person_label(data)
+            if person_label is None:
+                continue
             states.append(
                 {
                     "record_id": int(row_id),
                     "value": data.get("value", ""),
-                    "subject": data.get("subject", ""),
-                    "name": data.get("name"),
+                    "subject": person_label,
+                    "name": state_person_name(data.get("name")),
                     "role": data.get("role"),
                     "state": data.get("state", ""),
                     "valence": data.get("valence", "neutral"),

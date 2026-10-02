@@ -605,7 +605,7 @@ If this appears in a browser, determine whether it is a diagnostic trace/API fie
 Knowledge API: 127.0.0.1:8100
 Actions API:   127.0.0.1:8200
 Websocket:     127.0.0.1:9000 by default
-Console:       random free port by default; override with NIX_CONSOLE_PORT
+Console:       0.0.0.0:49117 by default; fixed port (restrict host with NIX_CONSOLE_HOST)
 Timezone:      America/Chicago
 ```
 
@@ -635,7 +635,7 @@ Use the Knowledge virtual environment because it contains Torch/Transformers:
 ```bash
 /root/nix_knowledge/.venv/bin/python /root/nix_knowledge/scripts/knowledge_api.py
 /root/nix_knowledge/.venv/bin/python /root/nix_actions/scripts/actions_api.py
-/root/nix_knowledge/.venv/bin/python /root/nix_core/console.py
+/root/nix_knowledge/.venv/bin/python /root/nix_core/console_extend.py
 /root/nix_knowledge/.venv/bin/python /root/nix_core/ws_server.py
 ```
 
