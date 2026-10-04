@@ -780,10 +780,18 @@ class SkillRuntime:
         actionable = not bool(re.search(
             r"\b(?:story|explain|explanation|how does|how do|how can|what if|wonder|whether)\b",
             current,
-        )) and bool(re.search(
-            r"\b(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
-            current,
-        ))
+        )) and (
+            bool(re.search(
+                r"\b(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
+                current,
+            ))
+            # Direct state questions about a device ("is the light on?")
+            # are skill intents: they need a verified read, not a chat guess.
+            or bool(re.search(
+                r"\b(?:is|are|was|were)\b.{0,60}\b(?:on|off)\b",
+                current,
+            ))
+        )
         refers_back = len(current) <= 160 and bool(re.search(
             r"\b(?:it|its|it's|that|this|they|them|their|those|there|one|ones)\b", current
         ))
@@ -830,6 +838,16 @@ class SkillRuntime:
                 if nearest:
                     targeted = nearest
                     break
+            # A generic device noun in the recent turns ("turn it off" after
+            # "is the light on") resolves to the only runnable skill rather
+            # than falling back to chat, which cannot act on the device.
+            if not targeted and any(re.search(
+                r"\b(?:device|light|lamp|ring|speaker|plug|thermostat|lock|camera)\b",
+                turn_text,
+            ) for turn_text in recent_turns):
+                runnable = [spec for spec in specs if spec["runnable"]]
+                if len(runnable) == 1:
+                    targeted = runnable
 
         # A single installed runnable skill may be selected for a plainly
         # device-directed request even when the user uses a generic noun.

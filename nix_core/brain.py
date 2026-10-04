@@ -42,6 +42,7 @@ from config import (
     OLLAMA_NUM_BATCH,
     OLLAMA_THINK,
     OLLAMA_NUM_CTX,
+    SKILL_CLEANSE_MODEL,
     TIMEZONE,
     ASSISTANT_NAME,
     ASSISTANT_ROLE,
@@ -61,7 +62,9 @@ from puca_v4_contract import infer_envelope, verify_reply
 from text_cleanup import clean_response_text
 from skill_runtime import SkillRuntimeError
 from skill_manager import SkillManager
+from skill_cleanser import SkillPromptCleanser
 from skill_planner import SkillPlanner, SkillPlannerError
+from skill_profiles import SkillProfileDecider, SkillProfileError, profile_for_spec
 
 
 def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -122,6 +125,41 @@ def _assistant_offered_rgb(text: str, request_text: str = "") -> list[int] | Non
     return rgb
 
 
+# Generic light words ("the light", "the lamp") resolve to the single
+# installed light-like skill even when its declared aliases omit them —
+# the router accepts these phrasings, so Core's grounding must too.
+_GENERIC_LIGHT_WORD_RE = re.compile(r"(?<![a-z0-9])(?:lights?|lamps?)(?![a-z0-9])")
+# "light blue" is a color phrase, not a device mention.
+_LIGHT_COLOR_PHRASE_RE = re.compile(
+    r"\b(?:lights?|lamps?)\s+(?:blue|green|red|pink|purple|yellow|orange|white|brown|gray|grey|teal|cyan|amber|violet|magenta)\b"
+)
+_LIGHT_DEVICE_HINT_RE = re.compile(r"\b(?:light|lamp|bulb|led)\b", re.IGNORECASE)
+
+
+def _generic_light_word_mentioned(text: str) -> bool:
+    normalized = " ".join((text or "").casefold().split())
+    return bool(
+        _GENERIC_LIGHT_WORD_RE.search(normalized)
+        and not _LIGHT_COLOR_PHRASE_RE.search(normalized)
+    )
+
+
+def _single_light_like_skill(skill_specs: list[dict[str, Any]]) -> str | None:
+    """The one runnable light-like skill, or None when ambiguous."""
+    light_like = [
+        str(spec["skill_id"])
+        for spec in skill_specs
+        if isinstance(spec, dict)
+        and spec.get("runnable")
+        and isinstance(spec.get("skill_id"), str)
+        and any(
+            isinstance(name, str) and _LIGHT_DEVICE_HINT_RE.search(name)
+            for name in (spec.get("device_name"), spec.get("name"), *(spec.get("triggers") or []))
+        )
+    ]
+    return light_like[0] if len(light_like) == 1 else None
+
+
 def _mentioned_device_skill(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
     normalized = " ".join((text or "").casefold().split())
     targets = []
@@ -138,7 +176,11 @@ def _mentioned_device_skill(text: str, skill_specs: list[dict[str, Any]]) -> str
         ):
             targets.append(spec["skill_id"])
     unique_targets = list(dict.fromkeys(targets))
-    return unique_targets[0] if len(unique_targets) == 1 else None
+    if unique_targets:
+        return unique_targets[0] if len(unique_targets) == 1 else None
+    if _generic_light_word_mentioned(normalized):
+        return _single_light_like_skill(skill_specs)
+    return None
 
 
 def _unique_device_alias_in_text(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
@@ -160,11 +202,69 @@ def _unique_device_alias_in_text(text: str, skill_specs: list[dict[str, Any]]) -
             for alias in (spec.get("device_name"), spec.get("name"), *(spec.get("triggers") or []))
         )
     ]
-    return targets[0] if len(targets) == 1 else None
+    if targets:
+        return targets[0] if len(targets) == 1 else None
+    if _generic_light_word_mentioned(normalized):
+        return _single_light_like_skill(skill_specs)
+    return None
 
 
 _NAMED_COLOR_PATTERN = r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b"
-_DESCRIPTIVE_COLOR_PATTERN = r"\b(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sky|fire|candlelight|lavender|mint|rose|coral|peach|gold|golden|silver|ice|iceberg|forest|grass|leaves|sand|sandstone|strawberry|grape|plum|turquoise|indigo|magenta)\b"
+
+# Extended color vocabulary (xkcd color survey, round-3 T2): common non-basic
+# color words beyond the 12 canonical basics. Longer phrases precede their
+# prefixes so "sea green" is captured as one token.
+_COLOR_VOCAB_PATTERN = (
+    r"\b(?:"
+    r"sea\s+green|forest\s+green|lime\s+green|neon\s+green|bottle\s+green|spring\s+green|"
+    r"hot\s+pink|deep\s+pink|rose\s+red|violet\s+red|light\s+blue|dark\s+blue|light\s+green|dark\s+green|"
+    r"warm\s+white|cool\s+white|sun\s+yellow|blood\s+red|ocean\s+blue|royal\s+blue|steel\s+blue|"
+    r"denim\s+blue|cerulean\s+blue|burnt\s+orange|mountain\s+meadow|cotton\s+candy|"
+    r"chartreuse|lime|mint|lavender|rose|coral|peach|magenta|indigo|turquoise|maroon|navy|olive|"
+    r"salmon|apricot|mustard|plum|aubergine|burgundy|scarlet|crimson|ruby|sapphire|azure|aqua|"
+    r"gold|bronze|copper|silver|grey|gray|black|cream|ivory|beige|tan|khaki|moss|sage|jade|"
+    r"emerald|fuchsia|mauve|orchid|periwinkle|cerulean|lemon|banana|tangerine|raspberry|cherry|"
+    r"tomato|seafoam|puce|ochre|mahogany|blush|bubblegum|amethyst|lilac|wisteria|grape|viridian|"
+    r"shamrock|denim|brick|terracotta|rust|charcoal|stone|slate|sandy|pearl|eggshell|strawberry"
+    r")\b"
+)
+
+# Core-owned resolution of descriptive color words to canonical color names,
+# so requests like "the color of the sun" work without depending on a model
+# rewrite. RGB still comes from Core's canonical table and device readback.
+_DESCRIPTIVE_COLOR_CANONICAL: dict[str, str] = {
+    "sun": "orange",
+    "sunlight": "orange",
+    "sunshine": "orange",
+    "sunrise": "orange",
+    "sunset": "orange",
+    "sky": "blue",
+    "ocean": "blue",
+    "sea": "blue",
+    "water": "blue",
+    "fire": "red",
+    "flame": "red",
+    "heart": "red",
+    "hearts": "red",
+    "blood": "red",
+    "forest": "green",
+    "grass": "green",
+    "leaves": "green",
+    "leaf": "green",
+    "ice": "white",
+    "snow": "white",
+    "gold": "yellow",
+    "golden": "yellow",
+}
+
+
+def _descriptive_color_name(text: str) -> str | None:
+    """Resolve the first descriptive color term to its canonical color name."""
+    match = re.search(_DESCRIPTIVE_COLOR_PATTERN, text or "", re.IGNORECASE)
+    if match is None:
+        return None
+    return _DESCRIPTIVE_COLOR_CANONICAL.get(match.group(0).casefold())
+_DESCRIPTIVE_COLOR_PATTERN = r"\b(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sea|water|sky|fire|flame|candlelight|lavender|mint|rose|coral|peach|gold|golden|silver|ice|iceberg|snow|forest|grass|leaves|leaf|hearts?|blood|sand|sandstone|strawberry|grape|plum|turquoise|indigo|magenta)\b"
 _COLOR_REQUEST_PATTERN = r"\b(?:color|colour|hue|shade|tone)\b"
 
 
@@ -177,13 +277,15 @@ def _explicit_color_request_skill(
     if skill_id is None or re.search(r"\b(?:off|down|stop)\b", normalized):
         return None
     action = r"\b(?:set|change|switch|make|turn|apply|paint)\b"
-    named = bool(re.search(_NAMED_COLOR_PATTERN, normalized))
+    named = bool(re.search(_NAMED_COLOR_PATTERN, normalized) or re.search(_COLOR_VOCAB_PATTERN, normalized))
     descriptive = bool(re.search(_DESCRIPTIVE_COLOR_PATTERN, normalized))
     has_color_noun = bool(re.search(_COLOR_REQUEST_PATTERN, normalized))
     exact_color = bool(re.search(r"#(?:[0-9a-f]{6})\b|\bRGB\s*\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)", normalized, re.IGNORECASE))
+    survey_color = bool(re.search(_COLOR_VOCAB_PATTERN, normalized))
     natural_color = bool(exact_color or
         (named and (has_color_noun or bool(re.search(r"\b(?:make|set|change|switch|turn|apply|paint)\b", normalized))))
         or (descriptive and has_color_noun)
+        or survey_color
         or re.search(r"\b(?:to|as|into)\s+(?:the\s+)?(?:color|colour|hue|shade|tone)\s+of\b", normalized)
         or re.search(r"\b(?:glow|shine|look|appear)\b.{0,24}\b(?:like|as)\s+(?:the\s+)?(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sky|fire|candlelight)\b", normalized)
         or re.search(r"\b(?:to|as|into|like)\s+(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sky|fire|candlelight|lavender|mint|rose|coral|peach|gold|golden|silver|ice|forest|grass|leaves|sand|turquoise|indigo|magenta)\b", normalized)
@@ -200,8 +302,40 @@ def _explicit_named_color_intent(
     skill_id = _explicit_color_request_skill(text, skill_specs)
     normalized = " ".join((text or "").casefold().split())
     colors = set(re.findall(_NAMED_COLOR_PATTERN, normalized))
+    survey = sorted(set(re.findall(_COLOR_VOCAB_PATTERN, normalized)))
+    if skill_id is not None and len(survey) == 1:
+        survey_words = set(survey[0].split())
+        descriptive_terms = set(re.findall(_DESCRIPTIVE_COLOR_PATTERN, normalized))
+        # A concrete shade phrase ("light blue", "royal blue") is a specific
+        # request, not a metaphor: ground it exactly through the survey table.
+        # Phrases built on descriptive terms ("ocean blue") keep the model's
+        # shade freedom.
+        if not (survey_words & descriptive_terms):
+            resolved = _resolve_color_grounding(survey[0])
+            if resolved is not None:
+                return skill_id, resolved["color_name"]
     if skill_id is None or len(colors) != 1:
+        # An XKCD-survey word (chartreuse, lavender, magenta) resolves like a
+        # named color when it is the only color word in the request. Survey
+        # words that double as scene descriptions (lavender, mint) count only
+        # as color words here, not as descriptive context.
+        if skill_id is not None:
+            survey = re.findall(_COLOR_VOCAB_PATTERN, normalized)
+            descriptive_terms = {
+                term for term in re.findall(_DESCRIPTIVE_COLOR_PATTERN, normalized)
+                if term.casefold() not in _XKCD_COLOR_RGB
+            }
+            if len(survey) == 1 and not descriptive_terms:
+                resolved = _resolve_color_grounding(next(iter(survey)))
+                if resolved is not None:
+                    return skill_id, resolved["color_name"]
         return None
+    # Descriptions like "ocean blue" name a hue in context, but do not
+    # impose a hard-coded value: RGB still comes from the model proposal.
+    descriptive_terms = set(re.findall(_DESCRIPTIVE_COLOR_PATTERN, normalized))
+    if descriptive_terms and re.search(r"\b(?:color|colour|hue|shade|tone)\b", normalized):
+        return None
+    return skill_id, next(iter(colors))
     # Descriptions like "ocean blue" name a hue in context, but do not
     # impose a hard-coded value: RGB still comes from the model proposal.
     descriptive_terms = set(re.findall(_DESCRIPTIVE_COLOR_PATTERN, normalized))
@@ -276,7 +410,14 @@ def _explicit_combined_color_intent(
     colors = set(re.findall(_NAMED_COLOR_PATTERN, normalized))
     if not turns_on or color_request != skill_id:
         return None
-    return (skill_id, next(iter(colors))) if len(colors) == 1 else None
+    if len(colors) == 1:
+        return (skill_id, next(iter(colors)))
+    survey = re.findall(_COLOR_VOCAB_PATTERN, normalized)
+    if len(survey) == 1:
+        resolved = _resolve_color_grounding(next(iter(survey)))
+        if resolved is not None:
+            return (skill_id, resolved["color_name"])
+    return None
 
 
 def _ring_light_result_confirms_action(matched: dict[str, Any], outcome: dict[str, Any]) -> bool:
@@ -319,6 +460,229 @@ def _ring_light_result_confirms_action(matched: dict[str, Any], outcome: dict[st
     if action == "effect":
         return state.get("on") is True and state.get("effect") == arguments.get("effect")
     return True
+
+
+# Core-owned canonical RGB values. Named-color requests are grounded by
+# appending these exact numbers to the planner input: Needle3 reliably copies
+# explicit numbers from the text (confidence ~0.74) but collapses (~0.07) when
+# it must invent RGB from a color name, suppressing a correct call.
+_NAMED_COLOR_CANONICAL_RGB: dict[str, tuple[int, int, int]] = {
+    "green": (0, 255, 0),
+    "red": (255, 0, 0),
+    "blue": (0, 0, 255),
+    "purple": (128, 0, 128),
+    "violet": (127, 0, 255),
+    "pink": (255, 105, 180),
+    "orange": (255, 140, 0),
+    "yellow": (255, 255, 0),
+    "amber": (255, 191, 0),
+    "cyan": (0, 255, 255),
+    "teal": (0, 128, 128),
+    "white": (255, 255, 255),
+}
+
+# XKCD color-survey vocabulary (~950 weighted-RGB names) extended to common
+# missing hues. Unknown color words resolve to their nearest survey anchor
+# with a similarity-completeness gate: anything too far from every known
+# color stays ungrounded so the device never receives a low-similarity
+# guess (xkcd colors + fabrication gate, round-3 research T2).
+_XKCD_COLOR_RGB: dict[str, tuple[int, int, int]] = {
+    "chartreuse": (0, 158, 42),
+    "lime": (134, 154, 8),
+    "mint": (192, 255, 218),
+    "lavender": (215, 181, 245),
+    "rose": (207, 100, 111),
+    "coral": (255, 98, 88),
+    "peach": (255, 177, 138),
+    "magenta": (193, 34, 210),
+    "indigo": (56, 12, 100),
+    "turquoise": (6, 190, 190),
+    "maroon": (94, 12, 22),
+    "navy": (0, 1, 50),
+    "olive": (110, 111, 18),
+    "salmon": (255, 121, 112),
+    "apricot": (255, 170, 119),
+    "mustard": (206, 178, 22),
+    "plum": (142, 69, 133),
+    "aubergine": (62, 16, 56),
+    "burgundy": (97, 11, 26),
+    "scarlet": (245, 21, 36),
+    "crimson": (190, 18, 60),
+    "ruby": (117, 8, 60),
+    "sapphire": (15, 58, 191),
+    "azure": (6, 154, 217),
+    "sky": (130, 202, 255),
+    "aqua": (18, 244, 238),
+    "gold": (219, 175, 0),
+    "bronze": (186, 121, 5),
+    "copper": (184, 115, 51),
+    "silver": (196, 205, 209),
+    "grey": (150, 150, 150),
+    "gray": (150, 150, 150),
+    "black": (0, 0, 0),
+    "cream": (255, 247, 204),
+    "ivory": (255, 255, 209),
+    "beige": (230, 218, 178),
+    "tan": (237, 198, 111),
+    "khaki": (182, 181, 89),
+    "moss": (118, 129, 46),
+    "sage": (136, 156, 110),
+    "jade": (30, 160, 131),
+    "emerald": (3, 156, 97),
+    "fuchsia": (237, 15, 224),
+    "mauve": (175, 122, 140),
+    "orchid": (224, 121, 222),
+    "periwinkle": (142, 130, 224),
+    "cerulean": (4, 106, 158),
+    "tan orange": (252, 152, 63),
+    "lemon": (255, 247, 0),
+    "banana": (255, 225, 81),
+    "tangerine": (255, 125, 11),
+    "raspberry": (176, 24, 70),
+    "cherry": (207, 2, 44),
+    "tomato": (242, 44, 53),
+    "blood red": (152, 0, 35),
+    "forest green": (12, 91, 27),
+    "sea green": (13, 145, 107),
+    "lime green": (137, 254, 5),
+    "neon green": (12, 255, 12),
+    "hot pink": (240, 0, 135),
+    "deep pink": (203, 8, 153),
+    "light blue": (189, 226, 254),
+    "dark blue": (0, 3, 91),
+    "light green": (150, 247, 118),
+    "dark green": (5, 73, 13),
+    "warm white": (255, 245, 213),
+    "cool white": (245, 255, 255),
+    "sun yellow": (255, 253, 85),
+    "strawberry": (191, 79, 68),
+    "eggshell": (255, 240, 216),
+    "pearl": (255, 244, 218),
+    "sandy": (246, 215, 133),
+    "stone": (140, 141, 139),
+    "slate": (83, 96, 108),
+    "charcoal": (51, 51, 51),
+    "denim": (59, 112, 143),
+    "denim blue": (59, 112, 143),
+    "steel blue": (90, 125, 154),
+    "royal blue": (67, 66, 187),
+    "cerulean blue": (3, 87, 158),
+    "burnt orange": (191, 74, 8),
+    "rust": (179, 62, 13),
+    "brick": (154, 47, 19),
+    "terracotta": (202, 106, 68),
+    "rose red": (191, 5, 71),
+    "bottle green": (4, 74, 26),
+    "seafoam": (120, 231, 190),
+    "puce": (165, 113, 78),
+    "ochre": (191, 139, 8),
+    "mahogany": (74, 18, 20),
+    "violet red": (244, 63, 132),
+    "blush": (240, 148, 146),
+    "bubblegum": (255, 182, 200),
+    "cotton candy": (255, 181, 208),
+    "amethyst": (162, 103, 222),
+    "lilac": (206, 155, 224),
+    "wisteria": (168, 125, 234),
+    "grape": (102, 2, 60),
+    "ocean blue": (3, 113, 168),
+    "mountain meadow": (22, 170, 134),
+    "viridian": (6, 146, 105),
+    "shamrock": (1, 184, 102),
+    "spring green": (138, 255, 132),
+}
+
+# Perceptual-ish channel weights (Sarma et al. weighted-RGB distance) guard
+# against preferring an implausible far neighbor (e.g. a light rose chosen
+# over deep pink for "hot pink").
+_COLOR_DISTANCE_WEIGHTS = (3.0, 4.0, 2.0)
+_MIN_COLOR_SIMILARITY = 0.3
+
+
+def _resolve_color_grounding(color_word: str) -> dict[str, Any] | None:
+    """Resolve a color word to Core-owned RGB: exact canonical or exact survey.
+
+    Basic colors come from the canonical table; XKCD color-survey words
+    (round-3 research T2) resolve through the survey table with their
+    measured RGB. Words absent from both stay ungrounded so the planner's
+    first attempt stands and Core neither invents nor guesses values.
+    """
+    normalized = " ".join((color_word or "").casefold().split())
+    canonical = _NAMED_COLOR_CANONICAL_RGB.get(normalized)
+    if canonical is not None:
+        return {"color_name": normalized, "rgb": list(canonical)}
+    survey = _XKCD_COLOR_RGB.get(normalized)
+    if survey is not None:
+        return {"color_name": normalized, "rgb": list(survey), "similarity": 1.0, "resolved_from": normalized}
+    return None
+
+
+def _weighted_rgb_similarity(rgb: tuple[int, int, int], other: tuple[int, int, int]) -> float:
+    """Bounded similarity in [0, 1] from weighted per-channel RGB distance."""
+    channels = (
+        abs(rgb[0] - other[0]),
+        abs(rgb[1] - other[1]),
+        abs(rgb[2] - other[2]),
+    )
+    weighted = tuple(
+        weight * channel for weight, channel in zip(_COLOR_DISTANCE_WEIGHTS, channels, strict=True)
+    )
+    return 1.0 - (sum(weighted) / 1020.0)
+
+
+def _rgb_distance(rgb: tuple[int, int, int], other: tuple[int, int, int]) -> float:
+    """Squared weighted-RGB distance used for nearest-neighbor resolution."""
+    channels = (
+        rgb[0] - other[0],
+        rgb[1] - other[1],
+        rgb[2] - other[2],
+    )
+    return float(sum((weight * channel) ** 2 for weight, channel in zip(_COLOR_DISTANCE_WEIGHTS, channels, strict=True)))
+
+
+# Graded relative quantities move the property a small, disciplined amount
+# from the observed value (fuzzy-quantifier research T15): the linguistic
+# hedges signal a mild change, not a doubling or halving.
+_BRIGHTNESS_HEDGE_PATTERN = r"\b(?:a\s+bit|slightly|slightly\s+more|a\s+little|a\s+little\s+bit|somewhat|a\s+touch|just\s+a\s+bit|just\s+a\s+little|marginally)\b"
+
+
+def _fuzzy_brightness_language(text: str) -> str | None:
+    """Detect a hedged relative brightness change like 'a bit brighter'."""
+    normalized = " ".join((text or "").casefold().split())
+    if re.search(_BRIGHTNESS_HEDGE_PATTERN, normalized) is None:
+        return None
+    if re.search(r"\b(?:brighten|brighter|more\s+bright|up)\b", normalized):
+        return "brighten_small"
+    if re.search(r"\b(?:dim|dimmer|darker|less\s+bright|down)\b", normalized):
+        return "dim_small"
+    return None
+
+
+def _apply_fuzzy_brightness_quantifier(
+    observed: float, mode: str | None
+) -> float | None:
+    """Map a hedged relative request to a small delta from the observed value."""
+    if not isinstance(observed, (int, float)) or not 0 < float(observed) <= 1.0:
+        return None
+    current = float(observed)
+    target = current * 1.2 if mode == "brighten_small" else current * 0.8
+    return round(max(0.05, min(1.0, target)), 2)
+
+
+def _grounded_brightness_level(text: str) -> dict[str, float] | None:
+    """Extract a Core-owned brightness level from explicit phrasings only."""
+    normalized = " ".join((text or "").casefold().split())
+    percent = re.search(r"\b(\d{1,3})\s*(?:percent|%)", normalized)
+    if percent is not None:
+        value = min(1.0, max(0.05, int(percent.group(1)) / 100.0))
+        return {"brightness": value}
+    if re.search(r"\b(?:full|max(?:imum)?|100(?:\s*percent)?)\b", normalized):
+        return {"brightness": 1.0}
+    if re.search(r"\bhalf\b", normalized):
+        return {"brightness": 0.5}
+    if re.search(r"\bquarter\b", normalized):
+        return {"brightness": 0.25}
+    return None
 
 
 def _rgb_matches_named_color(rgb: Any, color_name: str) -> bool:
@@ -452,6 +816,90 @@ def _is_explicit_device_action(text: str, skill_specs: list[dict[str, Any]]) -> 
             re.IGNORECASE,
         ))
     )
+
+
+# Word-level typos that change device action verbs or topics. Applied before
+# Luna normalization so the intent gate and the planner both see corrected text.
+_DEVICE_WORD_TYPO_FIXES = {
+    "turd": "turn",
+    "trun": "turn",
+    "tirn": "turn",
+    "swich": "switch",
+    "swtch": "switch",
+    "collor": "color",
+    "clolor": "color",
+    "brighness": "brightness",
+    "brighntess": "brightness",
+    "brigtness": "brightness",
+    "lgith": "light",
+    "lihgt": "light",
+    "ligth": "light",
+    "lgiht": "light",
+    "devcie": "device",
+    "deivce": "device",
+    "chaneg": "change",
+    "chnage": "change",
+}
+
+
+# ASR fusions like "skyand" merge a color word with the next conjunction;
+# split the common color-word + and/then fusions before typo mapping.
+_FUSED_COLOR_CONJUNCTION_RE = re.compile(
+    r"\b(sky|sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sea|water|fire|flame|leaf|leaves|grass|rose|mint|snow|sand|blood|hearts?|candlelight|ice|gold|golden|silver|peach|coral|lavender|forest|strawberry|grape|plum|turquoise|indigo|magenta)(and|then)\b",
+    re.IGNORECASE,
+)
+
+
+def _apply_device_word_typo_fixes(text: str) -> str:
+    """Correct common device-action typos without touching anything else."""
+    if not isinstance(text, str) or not text:
+        return text
+    # "the color of the skyand then turn off" — ASR fusion of a color word
+    # with the next conjunction would otherwise be parsed as an unknown
+    # color ("skyand") and the second step would be lost.
+    text = _FUSED_COLOR_CONJUNCTION_RE.sub(r"\1 \2", text)
+    tokens = text.split()
+    corrected = False
+    fixed = []
+    for token in tokens:
+        replacement = _DEVICE_WORD_TYPO_FIXES.get(token.casefold())
+        if replacement is not None and token != replacement:
+            fixed.append(replacement)
+            corrected = True
+        else:
+            fixed.append(token)
+    return " ".join(fixed) if corrected else text
+
+
+_CASUAL_POWER_PHRASES = (
+    (
+        re.compile(r"\bkill\s+((?:the\s+|a\s+|that\s+|this\s+)?(?:light|lights|ring|lamp|led|device))\b", re.IGNORECASE),
+        r"turn off \1",
+    ),
+    (
+        re.compile(r"\bshut\s+((?:the\s+|a\s+|that\s+|this\s+)?(?:light|lights|ring|lamp|led|device))\b", re.IGNORECASE),
+        r"turn off \1",
+    ),
+    (
+        re.compile(r"\blight\s+(?:it|them)\s+up\b", re.IGNORECASE),
+        "turn it on",
+    ),
+    (
+        re.compile(r"\blight\s+up\b(?!\s+(?:the|a|an|my|your|his|her|their)\b)", re.IGNORECASE),
+        "turn it on",
+    ),
+)
+
+
+def _apply_casual_device_phrases(text: str) -> str:
+    """Rewrite casual power phrasings ('kill the light', 'light it up') into
+    standard on/off requests so they reuse the verified power pipeline."""
+    if not isinstance(text, str) or not text:
+        return text
+    result = text
+    for pattern, replacement in _CASUAL_POWER_PHRASES:
+        result = pattern.sub(replacement, result)
+    return result
 
 
 def _requires_multi_action_plan(text: str, skill_specs: list[dict[str, Any]]) -> bool:
@@ -1689,6 +2137,8 @@ class Brain:
         actions: ActionsClient | None = None,
         ollama: OllamaClient | None = None,
         skill_planner: SkillPlanner | None = None,
+        skill_profile_decider: SkillProfileDecider | None = None,
+        skill_cleanser: SkillPromptCleanser | None = None,
         log_requests: bool = True,
     ):
         self.knowledge = knowledge or KnowledgeClient()
@@ -1700,6 +2150,22 @@ class Brain:
         if injected_planner is ollama:
             injected_planner = None
         self.skill_planner = skill_planner or injected_planner or SkillPlanner()
+        injected_decider = (
+            getattr(ollama, "skill_profile_decider", None) if ollama is not None else None
+        )
+        if injected_decider is ollama:
+            injected_decider = None
+        self.skill_profile_decider = (
+            skill_profile_decider or injected_decider or SkillProfileDecider()
+        )
+        # Skill prompt cleanser (Qwen3-0.6B): turns raw user wording into
+        # explicit step tasks before Needle plans each one. Injected for
+        # tests; defaults to its own small Ollama client so the cleanser
+        # never competes with the conversation model's slot.
+        self.skill_cleanser = skill_cleanser or SkillPromptCleanser(
+            client=OllamaClient(model=SKILL_CLEANSE_MODEL),
+            model=SKILL_CLEANSE_MODEL,
+        )
         if ollama is not None:
             self.ollama = ollama
         elif CASPER_BACKEND == "transformers":
@@ -1979,6 +2445,11 @@ class Brain:
         # Resolve narrowly scoped follow-ups against the immediately preceding
         # device request, without letting an old mention target a new turn.
         history = session_context or []
+        recap = self._session_recap_reply(clean, history)
+        if recap is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": "nix_session_recap"})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=recap["reply"], refs={"route": CHAT, "rule": "nix_session_recap"})
+            return _finish(recap)
         targeting_text = clean
         followup_text = " ".join(clean.casefold().split())
         installed_specs_method = getattr(self.skill_runtime, "installed_skill_specs", None)
@@ -2027,7 +2498,13 @@ class Brain:
 
         # The selected assistant proposes a tool call from only the relevant
         # installed skill schema data; the runtime independently validates it.
-        skill_specs = self.skill_runtime.targeted_skill_specs(targeting_text, session_context)
+        # Device-word typos and casual power phrases are corrected before
+        # targeting so "turn on the lgith" / "kill the light" still reach
+        # the skill path instead of falling to chat.
+        skill_specs = self.skill_runtime.targeted_skill_specs(
+            _apply_casual_device_phrases(_apply_device_word_typo_fixes(targeting_text)),
+            session_context,
+        )
         runnable_skill_ids = {
             spec["skill_id"] for spec in skill_specs if spec.get("runnable")
         }
@@ -3161,6 +3638,27 @@ class Brain:
 
         if assistant_name == "Luna":
             prompt = _identity_context_for_model(assistant_name, assistant_role)
+            prompt += (
+                "\n\nREPLY RULES (always apply):\n"
+                "- Answer in one or two short, complete sentences. Never reply "
+                "with a bare word such as 'Nothing', 'alright', or 'grateful'.\n"
+                "- Never open a conversation with 'Nothing'; greet the user back "
+                "briefly when greeted.\n"
+                "- Honesty about actions: never claim you stored, saved, or "
+                "remembered anything unless the context for THIS turn explicitly "
+                "shows a store result. Questions about earlier requests or this "
+                "session's history are answered only from the conversation "
+                "history you can see, not from device skills.\n"
+                "- Never promise or claim any device action ('I'll change it', "
+                "'done', 'I set it'). Device commands are executed by Core "
+                "through skills, never by you in conversation. If asked to "
+                "change a device you cannot reach from this conversation, say "
+                "so honestly and ask the user to restate it with the device "
+                "name.\n"
+                "- Device results reach you as plain verified facts; report them "
+                "as-is in user language (device state, color name, brightness "
+                "percent) and never recite raw RGB tuples or machine messages."
+            )
             if digest:
                 prompt += (
                     "\n\nRelevant context already shared with NIX (use only if it helps with this message):\n"
@@ -3276,72 +3774,103 @@ class Brain:
 
         return prompt
 
-    def _normalize_skill_request_with_luna(
+    _DEVICE_CONTEXT_PATTERN = re.compile(
+        r"\b(?:light|lamp|ring|speaker|plug|device|color|colour|brightness|"
+        r"effect|animation|turn|switch|on|off)\b",
+        re.IGNORECASE,
+    )
+
+    def _recent_device_context(self, history: list[dict[str, Any]] | None) -> str:
+        """Bound recent device-related turns so Luna can resolve 'previous color'."""
+        if not isinstance(history, list):
+            return ""
+        snippets: list[str] = []
+        for turn in history[-12:]:
+            if not isinstance(turn, dict):
+                continue
+            role = str(turn.get("role") or "")
+            content = " ".join(str(turn.get("content") or "").split())
+            if role not in {"user", "assistant"} or not content:
+                continue
+            if not self._DEVICE_CONTEXT_PATTERN.search(content):
+                continue
+            snippets.append(f"{role}: {content[:200]}")
+            if len(snippets) >= 6:
+                break
+        return " | ".join(snippets)[:900]
+
+    def _decide_skill_profile(
         self,
         *,
-        user_request: str,
-        device_name: str,
-        conversation_id: str | None,
-    ) -> str:
-        """Resolve wording for the small planner without giving Luna tools or authority."""
-        assistant_name, assistant_role, _model_id = _active_assistant_identity()
-        system_prompt = (
-            _identity_context_for_model(assistant_name, assistant_role)
-            + "\n\nYou are the natural-language normalizer for a separate local device-function planner. "
-            "Your only task is to rewrite the current user request as one concise, unambiguous request "
-            "for that planner. Do not create a plan, select a tool, emit arguments, choose RGB numbers, "
-            "claim execution, or answer the user. Do not add, remove, or reverse requested device actions. "
-            "Use the supplied device label only to resolve a pronoun or generic name. Preserve explicit "
-            "RGB/hex values exactly. For every request targeted to a skill, resolve clear descriptive "
-            "references using ordinary knowledge and rewrite them as concise actionable settings: "
-            "‘change the light to match the color of the sky’ -> ‘set the light color to sky blue’; "
-            "‘make it like a sunset’ -> ‘set the light color to warm sunset orange’. Do not invent RGB "
-            "values; the dedicated Needle planner selects function arguments from this normalized request. "
-            "Do not add, remove, or reverse requested actions. If wording is already clear, keep it essentially "
-            "unchanged. Core will validate every Needle proposal and the worker's device readback "
-            "before any success is reported. Return only a JSON object with exactly one key: "
-            '{"normalized_request":"..."}.'
+        normalized_request: str,
+        capability_data: list[dict[str, Any]],
+        allowed_skill_ids: set[str],
+    ) -> tuple[str, Any, bool]:
+        """Stage 1: select one installed profile (proposal-only, fail-closed).
+
+        With a single runnable profile the choice is determined, so the extra
+        Needle inference is bypassed rather than risk a spurious withhold on a
+        121M router. The real decider runs whenever multiple profiles compete.
+        """
+        specs_by_id = {
+            item.get("skill_id"): item
+            for item in capability_data
+            if isinstance(item, dict) and isinstance(item.get("skill_id"), str)
+        }
+        allowed = {sid for sid in allowed_skill_ids if sid in specs_by_id}
+        if len(allowed) == 1:
+            skill_id = next(iter(allowed))
+            return skill_id, profile_for_spec(specs_by_id[skill_id]), True
+        selected_id = self.skill_profile_decider.decide(
+            user_text=normalized_request,
+            capabilities=capability_data,
+            allowed_skill_ids=sorted(allowed_skill_ids),
         )
-        response = self.ollama.chat(
-            system_prompt=system_prompt,
-            history=[],
-            user_text=json.dumps({
-                "current_user_request": user_request,
-                "selected_device_label": device_name[:80],
-            }, ensure_ascii=False, separators=(",", ":")),
-            think=False,
-            max_new_tokens=160,
-        )
-        if not isinstance(response, str) or len(response) > 2000:
-            raise SkillRuntimeError("Luna returned no bounded device-request normalization.")
-        try:
-            normalized_payload = json.loads(response, object_pairs_hook=_unique_json_object)
-        except (ValueError, TypeError) as exc:
-            raise SkillRuntimeError("Luna did not return the required normalized-request JSON.") from exc
-        if (
-            not isinstance(normalized_payload, dict)
-            or set(normalized_payload) != {"normalized_request"}
-            or not isinstance(normalized_payload.get("normalized_request"), str)
+        if selected_id not in allowed_skill_ids:
+            raise SkillProfileError(
+                "The skill decider selected a profile that is not runnable for this request."
+            )
+        spec = specs_by_id.get(selected_id)
+        if spec is None:
+            raise SkillProfileError("The selected skill profile had no capability data.")
+        return selected_id, profile_for_spec(spec), False
+
+    _CONTROL_VERB_PATTERN = re.compile(
+        r"\b(?:turn|switch|power|set|change|adjust|apply|make|paint|enable|"
+        r"disable|activate|run|start|play|stop|brighten|dim)\b"
+    )
+    _QUERY_VERB_PATTERN = re.compile(
+        r"\b(?:list|show|read|tell|check|get|what|which|is|are|was|were|did)\b"
+    )
+    _EFFECT_TOPIC_PATTERN = re.compile(r"\b(?:effect|animation|pattern)\b")
+    _BRIGHTNESS_TOPIC_PATTERN = re.compile(r"\b(?:brightness|bright|dim|dimmer)\b")
+    _COLOR_TOPIC_PATTERN = re.compile(
+        r"#[0-9a-f]{6}\b|\bRGB\s*\(|\b(?:color|colour|hue|shade)\b"
+    )
+
+    @classmethod
+    def _normalization_preserves_request_intent(
+        cls, original: str, normalized: str
+    ) -> bool:
+        """Reject rewrites that introduce actions or topics the user never asked for."""
+        original_lower = original.casefold()
+        normalized_lower = normalized.casefold()
+        if cls._CONTROL_VERB_PATTERN.search(normalized_lower) and not cls._CONTROL_VERB_PATTERN.search(original_lower):
+            return False
+        if cls._QUERY_VERB_PATTERN.search(normalized_lower) and not cls._QUERY_VERB_PATTERN.search(original_lower):
+            return False
+        if cls._COLOR_TOPIC_PATTERN.search(normalized_lower) and not (
+            cls._COLOR_TOPIC_PATTERN.search(original_lower)
+            or re.search(_NAMED_COLOR_PATTERN, original_lower)
+            or re.search(_DESCRIPTIVE_COLOR_PATTERN, original_lower)
+            or re.search(_COLOR_VOCAB_PATTERN, original_lower)
         ):
-            raise SkillRuntimeError("Luna returned an invalid normalized-request envelope.")
-        normalized = " ".join(normalized_payload["normalized_request"].split())
-        if not normalized or len(normalized) > 1000:
-            raise SkillRuntimeError("Luna returned an empty or oversized normalized request.")
-        self._validate_skill_request_normalization(user_request, normalized)
-        exact_rgb = re.search(
-            r"\bRGB\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)",
-            user_request,
-            re.IGNORECASE,
-        )
-        if exact_rgb is not None and not all(value in normalized for value in exact_rgb.groups()):
-            raise SkillRuntimeError("Luna's normalization did not preserve the exact user-supplied RGB.")
-        hex_color = re.search(r"#([0-9a-fA-F]{6})\b", user_request)
-        if hex_color is not None:
-            value = hex_color.group(1)
-            expected_rgb = [str(int(value[index:index + 2], 16)) for index in (0, 2, 4)]
-            if not all(channel in normalized for channel in expected_rgb):
-                normalized += f"; preserve the exact color RGB({', '.join(expected_rgb)})."
-        return normalized
+            return False
+        if cls._BRIGHTNESS_TOPIC_PATTERN.search(normalized_lower) and not cls._BRIGHTNESS_TOPIC_PATTERN.search(original_lower):
+            return False
+        if cls._EFFECT_TOPIC_PATTERN.search(normalized_lower) and not cls._EFFECT_TOPIC_PATTERN.search(original_lower):
+            return False
+        return True
 
     @staticmethod
     def _validate_skill_request_normalization(original: str, normalized: str) -> None:
@@ -3386,6 +3915,21 @@ class Brain:
         if brightness_requested and not re.search(r"\b(?:brightness|bright|dim|dimmer)\b", normalized_lower):
             raise SkillRuntimeError("Luna's normalization dropped the requested brightness setting.")
 
+        # Added-action hallucination guard: a rewrite must never introduce a
+        # power verb (turn/shut/power/…) the user never used. Bare "on" in a
+        # prepositional phrase ("the color on the ring") is fine; only the
+        # verb, which flips device power, is policed here. The cleanser is a
+        # 0.6B model and has been observed adding "turn on" steps uninvited.
+        added_power_verb = re.search(
+            r"\b(?:turn|switch|shut|power|enable|disable|activate)\b",
+            normalized_lower,
+        ) and not re.search(
+            r"\b(?:turn|switch|shut|power|enable|disable|activate)\b",
+            original_lower,
+        )
+        if added_power_verb:
+            raise SkillRuntimeError("The request rewrite added an unrequested power action.")
+
     def _skill_planner_system_prompt(self) -> str:
         """Provide the short, caller-owned task context passed to Needle."""
         return (
@@ -3404,22 +3948,175 @@ class Brain:
         skill_specs: list[dict[str, Any]],
         color_intent: tuple[str, str] | None,
         color_request_skill: str | None,
+        profile_system_prompt: str | None = None,
+        profile_id: str | None = None,
+        profile_decider_bypassed: bool = False,
+        relative_brightness: str | None = None,
+        resolution_debug: dict[str, Any] | None = None,
+        acknowledgment_request: str | None = None,
+        descriptive_color_grounding: str | None = None,
     ) -> dict[str, Any]:
         """Use the dedicated planner, validate the complete plan, and execute it fail-closed."""
         details: dict[str, Any] = {
             "model_called": False,
             "skill_planner_called": True,
             "skill_planner_model": getattr(self.skill_planner, "model", "configured-skill-planner"),
+            "skill_profile_id": profile_id,
+            "skill_profile_decider_bypassed": profile_decider_bypassed,
             "conversation_model_called": False,
             "skill_plan_validated": False,
             "skill_execution_confirmed": False,
         }
+        if resolution_debug:
+            details["skill_pronoun_resolution"] = resolution_debug
         try:
-            calls = self.skill_planner.plan(
-                system_prompt=self._skill_planner_system_prompt(),
+            # Core-owned groundings rescue only the argument classes the model
+            # measured-unreliably fails on (RGB numbers, percent levels, exact
+            # effect names). Needle always gets the first attempt.
+            color_grounding = None
+            resolved_from_descriptive = False
+            if color_intent is not None:
+                color_grounding = _resolve_color_grounding(str(color_intent[1]))
+            elif color_request_skill is not None and not re.search(
+                _NAMED_COLOR_PATTERN, planner_input, re.IGNORECASE
+            ):
+                descriptive_color = _descriptive_color_name(planner_input)
+                if descriptive_color is not None:
+                    color_grounding = _resolve_color_grounding(descriptive_color)
+                    resolved_from_descriptive = color_grounding is not None
+            if color_grounding is not None and color_grounding.get("resolved_from"):
+                details["color_grounding_used"] = {
+                    "requested": color_grounding.get("resolved_from"),
+                    "resolved": color_grounding.get("color_name"),
+                    "rgb": color_grounding.get("rgb"),
+                }
+            elif descriptive_color_grounding:
+                color_grounding = _resolve_color_grounding(descriptive_color_grounding)
+            brightness_grounding = _grounded_brightness_level(planner_input)
+            if brightness_grounding is None and relative_brightness and capabilities:
+                try:
+                    skill_id0 = capabilities[0].get("skill_id")
+                    tool_name0 = next(
+                        (
+                            tool.get("name")
+                            for tool in capabilities[0].get("tools") or []
+                            if isinstance(tool, dict) and tool.get("name")
+                        ),
+                        None,
+                    )
+                    proposal = {
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id0,
+                        "tool": tool_name0,
+                        "arguments": {"action": "state"},
+                    }
+                    matched = self.skill_runtime.validate_proposal(proposal)
+                    outcome = self.skill_runtime.execute(matched)
+                    result = outcome.get("result") or {}
+                    state = (
+                        result.get("state")
+                        if isinstance(result, dict) and isinstance(result.get("state"), dict)
+                        else result
+                    )
+                    current = state.get("brightness") if isinstance(state, dict) else None
+                    fuzzy_mode = None
+                    if relative_brightness is None:
+                        fuzzy_mode = _fuzzy_brightness_language(planner_input)
+                        mode_value = fuzzy_mode
+                    else:
+                        mode_value = relative_brightness
+                    hedge = _BRIGHTNESS_HEDGE_PATTERN
+                    hedged = bool(re.search(hedge, planner_input, re.IGNORECASE))
+                    if isinstance(current, (int, float)) and 0 < float(current) <= 1.0:
+                        factor_current = float(current)
+                        hedged_relative = (
+                            hedged
+                            and mode_value in {"dim", "brighten", "dim_small", "brighten_small"}
+                        )
+                        if hedged_relative:
+                            target = _apply_fuzzy_brightness_quantifier(
+                                factor_current,
+                                "brighten_small" if mode_value in {"brighten", "brighten_small"} else "dim_small",
+                            )
+                            mode_label = (
+                                "brighten_small"
+                                if mode_value in {"brighten", "brighten_small"}
+                                else "dim_small"
+                            )
+                        elif mode_value == "dim":
+                            target = factor_current * 0.5
+                            mode_label = "dim"
+                        else:
+                            target = min(1.0, factor_current * 1.5 + 0.05)
+                            mode_label = "brighten"
+                        if target is not None:
+                            brightness_grounding = {
+                                "brightness": round(max(0.05, min(1.0, target)), 2)
+                            }
+                            details["brightness_read_then_act"] = {
+                                "mode": mode_label,
+                                "observed": round(factor_current, 2),
+                                "target": brightness_grounding["brightness"],
+                            }
+                        if fuzzy_mode is not None:
+                            details["brightness_fuzzy_quantifier"] = {"mode": fuzzy_mode}
+                except Exception:
+                    brightness_grounding = None
+            effect_grounding = None
+            for capability in capabilities:
+                effects = (capability.get("live_device") or {}).get("available_effects") or []
+                if not isinstance(effects, list):
+                    continue
+                match = next(
+                    (
+                        effect for effect in effects
+                        if isinstance(effect, str) and effect.strip() and re.search(
+                            rf"(?<![a-z0-9]){re.escape(effect.casefold())}(?![a-z0-9])",
+                            planner_input.casefold(),
+                        )
+                    ),
+                    None,
+                )
+                if match is not None:
+                    effect_grounding = {"effect": match}
+                    break
+            details["skill_planner_input"] = str(planner_input)[:300]
+            plan_kwargs = dict(
+                system_prompt=profile_system_prompt or self._skill_planner_system_prompt(),
                 user_text=planner_input,
                 capabilities=capabilities,
             )
+            try:
+                calls = self.skill_planner.plan(**plan_kwargs)
+            except SkillPlannerError:
+                if not (color_grounding or brightness_grounding or effect_grounding):
+                    # Reads are side-effect-free: Needle's flaky validation
+                    # block (omitted validation, false-positive negation flags
+                    # on question wording) must not block a verified read. The
+                    # grounded retry below emits it deterministically; the
+                    # confirmation and readback gates still apply.
+                    if not (
+                        isinstance(planner_input, str)
+                        and self._QUERY_VERB_PATTERN.search(planner_input)
+                        and not self._CONTROL_VERB_PATTERN.search(planner_input)
+                    ):
+                        raise
+                    details["skill_planner_read_retry"] = True
+                # Deterministic rescue: retry with Core-resolved arguments for
+                # the measured-unreliable steps. Validation and readback gates
+                # still apply to every rescued call.
+                details["skill_planner_grounded_retry"] = True
+                calls = self.skill_planner.plan(
+                    color_grounding=color_grounding,
+                    brightness_grounding=brightness_grounding,
+                    effect_grounding=effect_grounding,
+                    force_grounded=True,
+                    **plan_kwargs,
+                )
+            details["skill_plan_calls"] = [
+                {"tool": call.get("tool"), "arguments": call.get("arguments")}
+                for call in calls[:8]
+            ]
             validated = self.skill_manager.validate(calls, allowed_skill_ids)
             has_self_sufficient_color_action = (
                 color_request_skill is not None
@@ -3441,10 +4138,46 @@ class Brain:
                 ]
                 if len(color_calls) != 1:
                     raise SkillRuntimeError("A color plan must contain exactly one matching color action.")
-                if color_intent is not None and not _rgb_matches_named_color(
-                    (color_calls[0].get("arguments") or {}).get("rgb"), color_intent[1]
-                ):
-                    raise SkillRuntimeError("The plan's RGB values did not match the requested color.")
+                if color_intent is not None:
+                    requested_name = color_intent[1]
+                    shade_resolution = _resolve_color_grounding(requested_name)
+                    shade_words = set(requested_name.split())
+                    exact_shade_phrase = (
+                        shade_resolution is not None
+                        and " " in requested_name
+                        and shade_resolution.get("resolved_from") == requested_name
+                        and isinstance(shade_resolution.get("rgb"), list)
+                        and not (shade_words & {
+                            term.casefold()
+                            for term in re.findall(_DESCRIPTIVE_COLOR_PATTERN, requested_name, re.IGNORECASE)
+                        })
+                    )
+                    proposed_rgb = (color_calls[0].get("arguments") or {}).get("rgb")
+                    if exact_shade_phrase:
+                        # Core-owned exact shade ("light blue", "royal blue",
+                        # "hot pink"): the survey's measured RGB replaces what
+                        # the model proposed — Needle3's number garbling and
+                        # shade collapse are measured failure classes. The
+                        # device readback gate still confirms the final value.
+                        survey_rgb = [int(value) for value in shade_resolution["rgb"]]
+                        if proposed_rgb != survey_rgb:
+                            for index, item in enumerate(validated):
+                                if item is color_calls[0]:
+                                    validated[index] = {
+                                        **item,
+                                        "arguments": {
+                                            **(item.get("arguments") or {}),
+                                            "rgb": survey_rgb,
+                                        },
+                                    }
+                                    color_calls[0] = validated[index]
+                                    break
+                            details["skill_planner_shade_rescue"] = {
+                                "requested": requested_name,
+                                "rgb": survey_rgb,
+                            }
+                    elif not _rgb_matches_named_color(proposed_rgb, requested_name):
+                        raise SkillRuntimeError("The plan's RGB values did not match the requested color.")
                 exact_rgb = re.search(
                     r"\bRGB\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)",
                     user_request,
@@ -3472,7 +4205,13 @@ class Brain:
                     and (item.get("arguments") or {}).get("action") == "on"
                 ]
                 if ring_color_calls and redundant_power_calls:
-                    raise SkillRuntimeError("A Ring Light color function already powers on; no separate power-on call is needed.")
+                    # The color function powers the ring on by itself, so an
+                    # explicit power-on before the color step is redundant, not
+                    # unsafe: drop it and let the color call's own readback
+                    # confirm the resulting on-state and RGB.
+                    validated = [
+                        item for item in validated if item not in redundant_power_calls
+                    ]
                 if requested_rgb is not None and len(validated) > 1:
                     raise SkillRuntimeError("One explicit RGB/hex request does not authorize additional device actions.")
 
@@ -3490,13 +4229,20 @@ class Brain:
                 )
                 completed = execution["completed_count"]
                 total = len(validated)
-                if total == 1:
-                    reply = "The skill returned a result, but the reported device state did not confirm the requested action, so I can't say it changed."
-                else:
-                    reply = (
+                if total > 1:
+                    partial = (
                         f"Completed and confirmed {completed} of {total} requested device actions before stopping. "
                         if completed else "No requested device action was confirmed. "
-                    ) + f"I stopped because action {execution['failed_index'] + 1} could not be confirmed."
+                    )
+                    reply = partial + (
+                        f"The device didn't confirm action {execution['failed_index'] + 1} (it may be disconnecting), "
+                        "so I stopped there and did not send the later actions."
+                    )
+                else:
+                    reply = (
+                        "The device didn't confirm that action (it may be disconnecting), "
+                        "so I can't say it changed. Try connecting the skill again."
+                    )
                 return {
                     "route": CHAT,
                     "rule": "nix_model_skill_plan_partial" if total > 1 else "nix_model_skill_tool_unconfirmed",
@@ -3512,7 +4258,10 @@ class Brain:
             )
             details["conversation_model_called"] = True
             details["model_called"] = True
-            reply = self._compose_verified_skill_reply(execution)
+            reply = self._compose_verified_skill_reply(
+                execution,
+                user_request=acknowledgment_request if acknowledgment_request else user_request,
+            )
             first_action = (validated[0].get("arguments") or {}).get("action")
             rule = (
                 "nix_worker_skill_color_confirmed" if first_action == "color"
@@ -3522,9 +4271,58 @@ class Brain:
             return {"route": CHAT, "rule": rule, "reply": reply, "details": details}
         except Exception as exc:
             details["skill_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            # Failure taxonomy (production-agent literature): distinguish a
+            # transient model failure from a semantic plan rejection so the
+            # console and logs stop mislabeling recoverable classes.
+            if details.get("skill_plan_validated"):
+                details["skill_failure_class"] = "execution"
+            elif details.get("skill_plan_calls") is not None:
+                details["skill_failure_class"] = "validation"
+            elif details.get("skill_planner_input") is not None:
+                details["skill_failure_class"] = "planning"
+            else:
+                details["skill_failure_class"] = "normalization"
             if not details["skill_plan_validated"]:
                 details["skill_execution_confirmed"] = False
             multi_action = _requires_multi_action_plan(user_request, skill_specs)
+            # A vague color description Core cannot ground ("the color of a
+            # cucumber") is a clarification case, not a safety failure: ask
+            # for a settable color instead of reciting planner internals.
+            vague_color_match = re.search(
+                r"\b(?:color|colour|shade)\s+(?:of|like)\s+(?:a|an|the|some)?\s*([a-z]+)",
+                user_request or "",
+                re.IGNORECASE,
+            )
+            if (
+                not multi_action
+                and details.get("skill_failure_class") == "planning"
+                and vague_color_match is not None
+                and not details.get("color_grounding_used")
+            ):
+                # Only claim a noun is unmappable when it really is: "sun",
+                # "water", and friends live in Core's descriptive table and
+                # must never be reported as unknown.
+                vague_noun = vague_color_match.group(1).casefold()
+                if _descriptive_color_name(vague_noun) is not None or _resolve_color_grounding(vague_noun) is not None:
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_tool_rejected",
+                        "reply": (
+                            "I didn't send a device command because the dedicated skill planner "
+                            "did not produce a valid, safe plan."
+                        ),
+                        "details": details,
+                    }
+                return {
+                    "route": CHAT,
+                    "rule": "nix_color_ungroundable",
+                    "reply": (
+                        f"I couldn't map \"{vague_color_match.group(1)}\" to a color I can set. "
+                        "Try a color name (like teal or pink), or something I know like the sky, "
+                        "the sun, water, or leaves."
+                    ),
+                    "details": details,
+                }
             return {
                 "route": CHAT,
                 "rule": "nix_model_skill_plan_rejected" if multi_action else "nix_model_skill_tool_rejected",
@@ -3536,9 +4334,79 @@ class Brain:
                 "details": details,
             }
 
-    def _compose_verified_skill_reply(self, execution: dict[str, Any]) -> str:
-        """Let the selected companion phrase only Core-verified worker outcomes."""
+    def _compose_verified_skill_reply(
+        self, execution: dict[str, Any], *, user_request: str = ""
+    ) -> str:
+        """Acknowledge a Core-verified execution.
+
+        The confirmed facts are always rendered by Core's deterministic fact
+        template (data-to-text, round-3 T4). Luna then phrases the final
+        acknowledgment from an extremely simple JSON of what was performed;
+        any output failing the fact-preservation gate falls back to the
+        template verbatim, so the reply can never drift from the device.
+        """
         outcomes = execution.get("outcomes", [])
+        fact_line = self._device_state_fact_line(execution)
+        if fact_line is not None:
+            performed = []
+            for outcome in outcomes[:8]:
+                if not isinstance(outcome, dict):
+                    continue
+                fragment = self._ring_action_fact_fragment(outcome)
+                if fragment is None:
+                    return fact_line
+                arguments = (
+                    outcome.get("arguments")
+                    if isinstance(outcome.get("arguments"), dict)
+                    else {}
+                )
+                performed.append({
+                    "action": str(arguments.get("action") or "unknown"),
+                    "result": fragment.rstrip("."),
+                })
+            payload = {
+                "user_request": " ".join(str(user_request or "").split())[:200],
+                "confirmed": True,
+                "performed": performed,
+            }
+            try:
+                assistant_name, assistant_role, _model_id = _active_assistant_identity()
+                response = self.ollama.chat(
+                    system_prompt=(
+                        _identity_context_for_model(assistant_name, assistant_role)
+                        + "\n\nThe user's request below was ALREADY executed and confirmed by the "
+                        "device skill. You receive an extremely simple JSON describing exactly what "
+                        "was performed. Write ONE short, warm sentence telling the user it is done. "
+                        "Use ONLY the facts in the JSON — no RGB numbers, no machine words, no JSON "
+                        "syntax, no room names, no extra device states, and never promise or offer "
+                        "further actions."
+                    ),
+                    history=[],
+                    user_text=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                    think=False,
+                    max_new_tokens=48,
+                )
+                result_text = clean_response_text(str(response or "")).strip()
+                # Models sometimes wrap the sentence in quotation marks;
+                # ship the sentence, never the wrapping punctuation.
+                result_text = result_text.strip("\"'\u201c\u201d\u2018\u2019").strip()[:300]
+                if (
+                    result_text
+                    # "Done."-style one-worders add nothing over the fact
+                    # line; demand a real sentence or fall back.
+                    and len(result_text.split()) >= 3
+                    and "{" not in result_text
+                    and not re.search(
+                        r"\b(?:bedroom|room|cozy|cozier|glow|glowing|atmosphere|fresh air|scent|senses|feels)\b",
+                        result_text,
+                        re.IGNORECASE,
+                    )
+                    and _reply_preserves_state_facts(result_text, fact_line)
+                ):
+                    return result_text
+            except Exception:
+                pass
+            return fact_line
         verified_results = []
         for outcome in outcomes[:8]:
             result = outcome.get("result") if isinstance(outcome, dict) else None
@@ -3580,6 +4448,89 @@ class Brain:
             return result_text
         except Exception:
             return fallback
+
+    def _device_state_fact_line(self, execution: dict[str, Any]) -> str | None:
+        """Render confirmed ring outcomes as deterministic, human-readable text.
+
+        Data-to-text (round-3 T4) finding generalized after user feedback:
+        the companion model rephrases machine-facing worker messages into
+        wording no user understands ("The Dot reports color RGB (255, 105,
+        180)"). Core owns the verified facts, so Core renders them; the
+        companion model is never asked to paraphrase device results.
+        """
+        outcomes = execution.get("outcomes", [])
+        if (
+            not isinstance(outcomes, list)
+            or not outcomes
+            or len(outcomes) > 8
+            or not all(isinstance(outcome, dict) for outcome in outcomes)
+        ):
+            return None
+        fragments = [self._ring_action_fact_fragment(outcome) for outcome in outcomes]
+        if any(fragment is None for fragment in fragments):
+            return None
+        bare = [fragment.rstrip(".") for fragment in fragments]
+        if len(bare) == 1:
+            return bare[0] + "."
+        # Mid-sentence fragments read naturally lowercased ("... and the "
+        # "Ocean Ripple effect is running"); effect names stay capitalized
+        # because only the leading article is touched.
+        bare = [
+            fragment if index == 0 else fragment[:1].lower() + fragment[1:]
+            for index, fragment in enumerate(bare)
+        ]
+        joiner = " and " if len(bare) == 2 else "; "
+        return joiner.join(bare) + "."
+
+    def _ring_action_fact_fragment(self, outcome: dict[str, Any]) -> str | None:
+        """One confirmed ring outcome as one short human phrase."""
+        arguments = outcome.get("arguments") if isinstance(outcome.get("arguments"), dict) else {}
+        action = arguments.get("action")
+        result = outcome.get("result") if isinstance(outcome.get("result"), dict) else {}
+        state = result.get("state") if isinstance(result.get("state"), dict) else {}
+        if action == "state":
+            on = state.get("on")
+            brightness = state.get("brightness")
+            rgb = state.get("rgb")
+            effect = str(state.get("effect") or "None")
+            if on is None or not isinstance(brightness, (int, float)) or not isinstance(rgb, list):
+                return None
+            color_text = _closest_color_label(rgb) or f"RGB({rgb[0]}, {rgb[1]}, {rgb[2]})"
+            percent = int(round(float(brightness) * 100))
+            effect_text = "" if effect.casefold() in {"", "none"} else f" and the {effect} effect is running"
+            return (
+                f"The device is {'on' if on is True else 'off'} at {percent}% brightness "
+                f"showing {color_text}{effect_text}."
+            )
+        if action == "on":
+            return "The device is on"
+        if action == "off":
+            return "The device is off"
+        if action == "color":
+            rgb = state.get("rgb") if isinstance(state.get("rgb"), list) and len(state.get("rgb")) == 3 else arguments.get("rgb")
+            label = _closest_color_label(rgb)
+            if label:
+                return f"The device is now showing {label}"
+            return "The device color is updated"
+        if action == "brightness":
+            level = state.get("brightness")
+            if not isinstance(level, (int, float)) or isinstance(level, bool):
+                level = arguments.get("brightness")
+            if (
+                isinstance(level, (int, float))
+                and not isinstance(level, bool)
+                and 0.0 < float(level) <= 1.0
+            ):
+                return f"The device is now at {int(round(float(level) * 100))}% brightness"
+            return None
+        if action == "effect":
+            effect = state.get("effect") or arguments.get("effect")
+            effect_text = str(effect or "None").strip()
+            if effect_text.casefold() in {"", "none"}:
+                return "The effect is stopped"
+            return f"The {effect_text} effect is running"
+        return None
+
 
     def _request_and_execute_color(
         self,
@@ -3651,10 +4602,17 @@ class Brain:
                         "color_source": color_source,
                     },
                 }
+            color_label = _closest_color_label(reported_rgb) if isinstance(reported_rgb, list) else None
             return {
                 "route": CHAT,
                 "rule": "nix_worker_skill_color_followup" if color_source == "immediately_preceding_assistant_turn" else "nix_worker_skill_color_confirmed",
-                "reply": str(result.get("message") or f"The device reports the requested RGB color {reported_rgb} is on."),
+                # Data-to-text: speak the verified fact in user language,
+                # never the worker's machine-facing message.
+                "reply": (
+                    f"The device is now showing {color_label}."
+                    if color_label
+                    else "The device color is updated."
+                ),
                 "details": {
                     "model_called": model_called,
                     "deterministic": True,
@@ -3677,6 +4635,59 @@ class Brain:
                     "color_source": color_source,
                 },
             }
+
+    _SESSION_RECAP_PATTERN = re.compile(
+        r"\bwhat\s+(?:commands?|requests?|instructions?|prompts?|things|messages?)\b"
+        r"[^.?!]*\b(?:did|have|gave|give)\b"
+        r"|\bwhat\s+did\s+i\s+(?:say|ask|tell|give|send|request|write)\b"
+        r"|\b(?:command|conversation|chat)\s+history\b"
+        r"|\blist\s+(?:all\s+|the\s+)?(?:commands?|requests?|prompts?|messages?)\b",
+        re.IGNORECASE,
+    )
+    # A recap question is about the conversation itself; a device-worded
+    # question ("what commands does the ring light support") is a device
+    # question and must not be hijacked by the recap answer.
+    _DEVICE_TOPIC_PATTERN = re.compile(
+        r"\b(?:ring|light|dot|device|skill|led|bulb|lamp|speaker|plug)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _session_recap_reply(cls, text: str, history: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """Answer 'what commands did I give you' from the session history."""
+        if not cls._SESSION_RECAP_PATTERN.search(text or ""):
+            return None
+        if cls._DEVICE_TOPIC_PATTERN.search(text or ""):
+            return None
+        user_turns = [
+            str(turn.get("content") or "").strip()
+            for turn in (history or [])
+            if isinstance(turn, dict)
+            and turn.get("role") == "user"
+            and str(turn.get("content") or "").strip()
+        ]
+        user_turns = [turn[:80] for turn in user_turns]
+        if not user_turns:
+            return {
+                "route": CHAT,
+                "rule": "nix_session_recap",
+                "reply": "This is the start of our conversation, so you haven't sent me anything to list yet.",
+                "details": {"model_called": False, "session_recap_count": 0},
+            }
+        shown = user_turns[-10:]
+        prefix = "" if len(user_turns) <= 10 else f"(last {len(shown)} of {len(user_turns)})\n"
+        listing = "\n".join(
+            f"{index}. {turn}" for index, turn in enumerate(shown, 1)
+        )
+        return {
+            "route": CHAT,
+            "rule": "nix_session_recap",
+            "reply": f"Here's what you've sent me this session {prefix}\n{listing}",
+            "details": {
+                "model_called": False,
+                "session_recap_count": len(user_turns),
+            },
+        }
 
     def _handle_chat(
         self,
@@ -3707,6 +4718,9 @@ class Brain:
                 )
 
         history = session_context or []
+        recap = self._session_recap_reply(text, history)
+        if recap is not None:
+            return recap
         if skill_specs is None:
             targeting_text = text
             installed_specs_method = getattr(self.skill_runtime, "installed_skill_specs", None)
@@ -3714,7 +4728,10 @@ class Brain:
             retry_target = _retry_failed_device_request(text, history, installed_specs)
             if retry_target is not None:
                 targeting_text = retry_target
-            targeted = self.skill_runtime.targeted_skill_specs(targeting_text, history)
+            targeted = self.skill_runtime.targeted_skill_specs(
+                _apply_casual_device_phrases(_apply_device_word_typo_fixes(targeting_text)),
+                history,
+            )
             if targeted:
                 unavailable = next((spec for spec in targeted if not spec.get("runnable")), None)
                 if unavailable is not None:
@@ -3743,34 +4760,104 @@ class Brain:
             self.skill_manager = SkillManager(self.skill_runtime)
         retry_request = _retry_failed_device_request(text, history, skill_specs)
         retry_request = retry_request or _unapplied_device_request(text, history, skill_specs)
-        action_text = retry_request or text
+        action_text = _apply_casual_device_phrases(_apply_device_word_typo_fixes(retry_request or text))
+        # The user's own (typo/casual-fixed) words anchor the post-execution
+        # acknowledgment, even when the planner input gets grounded below.
+        acknowledgment_request = action_text
         color_intent = (
             _explicit_combined_color_intent(action_text, skill_specs)
             or _explicit_named_color_intent(action_text, skill_specs)
         )
         color_request_skill = _explicit_color_request_skill(action_text, skill_specs)
+        # Closed-loop relative brightness (Inner-Monologue pattern): with no
+        # explicit level, Core reads the device, derives the target from the
+        # observed state, and still confirms via readback afterwards.
+        relative_brightness = None
+        if _grounded_brightness_level(action_text) is None:
+            fuzzy_brightness = _fuzzy_brightness_language(action_text)
+            if fuzzy_brightness is not None:
+                # Hedged quantities ('a bit brighter') use the same closed
+                # read-then-act loop with a small disciplined delta.
+                relative_brightness = "dim" if fuzzy_brightness == "dim_small" else "brighten"
+            elif re.search(r"\b(?:dim|dimmer|darker|soften|less\s+bright)\b", action_text, re.IGNORECASE):
+                relative_brightness = "dim"
+            elif re.search(r"\b(?:brighten|brighter|more\s+bright)\b", action_text, re.IGNORECASE):
+                relative_brightness = "brighten"
         if color_request_skill is None and retry_request is not None:
             color_request_skill = _explicit_color_request_skill(text, skill_specs)
-        if retry_request is None and re.search(r"\b(?:that|it|same)\b", text, re.IGNORECASE):
-            previous_request = ""
-            if history and isinstance(history[-1], dict) and history[-1].get("role") == "user":
-                previous_request = str(history[-1].get("content") or "")
-            elif (
-                len(history) >= 2
-                and isinstance(history[-2], dict)
-                and isinstance(history[-1], dict)
-                and history[-2].get("role") == "user"
-                and history[-1].get("role") == "assistant"
+        pronoun_debug: dict[str, Any] = {"fired": False}
+        # Compound descriptive requests ("change the light color to the color
+        # of the sun and then turn off the light"): the power clause trips the
+        # explicit-color guards, but Core can still resolve the descriptive
+        # color from its own table. It feeds ONLY the deterministic grounded
+        # retry (Needle's measured-unreliable step) — the model keeps its
+        # shade freedom and the validation family check stays off.
+        compound_descriptive_color: str | None = None
+        if color_intent is None:
+            candidate = _descriptive_color_name(action_text)
+            if (
+                candidate is not None
+                and re.search(_COLOR_REQUEST_PATTERN, action_text, re.IGNORECASE)
+                and re.search(
+                    r"\b(?:set|change|switch|make|turn|apply|paint)\b",
+                    action_text,
+                    re.IGNORECASE,
+                )
+                and _mentioned_device_skill(action_text.casefold(), skill_specs) is not None
             ):
-                previous_request = str(history[-2].get("content") or "")
+                compound_descriptive_color = candidate
+                pronoun_debug["compound_descriptive_grounding"] = candidate
+        if retry_request is None and re.search(r"\b(?:that|it|same)\b", text, re.IGNORECASE):
+            # Pronoun targeting: the device comes from the most recent user
+            # turn that uniquely names one (immediately preceding turn first,
+            # then up to five turns back). A deviceless interjection ("good
+            # good") must not break the chain of "change it to ..." turns.
+            pronoun_debug["block_entered"] = True
+            previous_request = ""
+            user_turns = [
+                str(turn.get("content") or "")
+                for turn in (history or [])
+                if isinstance(turn, dict) and turn.get("role") == "user"
+            ]
+            for turn_text in reversed(user_turns[-6:]):
+                if _unique_device_alias_in_text(turn_text, skill_specs) is not None:
+                    previous_request = turn_text
+                    break
             prior_skill = _unique_device_alias_in_text(previous_request, skill_specs)
+            if prior_skill is None and len(skill_specs) == 1 and skill_specs[0].get("runnable"):
+                # Single-device setup: "it" in "change it to ..." can only
+                # mean the one installed device, even when the prior turn
+                # used a word ("the light") outside the declared aliases.
+                prior_skill = str(skill_specs[0]["skill_id"])
+                pronoun_debug["single_device_fallback"] = True
+            pronoun_debug.update({
+                "prior_skill": prior_skill,
+                "previous_request": previous_request[:60],
+                "user_turns": [turn[:40] for turn in user_turns[-8:]],
+            })
             if prior_skill:
+                survey_phrases = sorted(set(re.findall(_COLOR_VOCAB_PATTERN, text.casefold())))
                 current_colors = set(re.findall(
                     r"\b(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|warm|cool|amber)\b",
                     text.casefold(),
                 ))
-                if len(current_colors) == 1:
+                color_name = None
+                if len(survey_phrases) == 1:
+                    # A specific shade phrase ("light blue") outranks the basic
+                    # color word it contains ("blue"): the survey table carries
+                    # the measured RGB the user actually asked for.
+                    resolved = _resolve_color_grounding(survey_phrases[0])
+                    if resolved is not None:
+                        color_name = resolved["color_name"]
+                if color_name is None and len(current_colors) == 1:
                     color_name = next(iter(current_colors))
+                if color_name is None and not current_colors:
+                    # Vague descriptions ("the color of water", "hearts")
+                    # resolve through Core-owned tables, never a model guess.
+                    color_name = _descriptive_color_name(text)
+                if color_name is not None:
+                    pronoun_debug["fired"] = True
+                    pronoun_debug["color_name"] = color_name
                     device_name = next(
                         (
                             str(spec.get("device_name") or spec.get("name"))
@@ -3783,6 +4870,7 @@ class Brain:
                     # must not carry its old color into the new request.
                     action_text = f"change it to {color_name} for the {device_name}"
                     color_intent = (prior_skill, color_name)
+                    color_request_skill = prior_skill
         allowed_skill_ids: set[str] = set()
 
         try:
@@ -3903,12 +4991,84 @@ class Brain:
                 device_name = str(
                     next((spec.get("device_name") or spec.get("name") for spec in runnable_specs), "device")
                 )[:80]
-                normalized_request = self._normalize_skill_request_with_luna(
-                    user_request=action_text,
-                    device_name=device_name,
-                    conversation_id=conversation_id,
+                # When Core has already grounded the request end to end (a
+                # resolvable color on an explicitly addressed device), the
+                # user's own words are already the clean planner input; no
+                # model rewrite is needed.
+                grounding_complete = (
+                    color_intent is not None
+                    and _resolve_color_grounding(str(color_intent[1])) is not None
+                    and _mentioned_device_skill(
+                        " ".join(action_text.casefold().split()), skill_specs
+                    ) is not None
                 )
+                if grounding_complete:
+                    pronoun_debug["grounding_complete"] = True
+                    pronoun_debug["cleanser_steps"] = ["(skipped: grounded request)"]
+                    normalized_request = " ".join(action_text.split())
+                else:
+                    # Skill prompt cleanser (Qwen3-0.6B): clarify the raw
+                    # wording into explicit step tasks that are loaded one by
+                    # one onto Needle. Luna never touches skill requests.
+                    # Fill-in contract: hand the cleanser Core's concrete
+                    # color name for the user's color wording so the steps
+                    # carry the information Needle needs ("light blue" stays
+                    # "light blue", "the color of the sun" becomes orange).
+                    hint_phrases = sorted(set(re.findall(_COLOR_VOCAB_PATTERN, action_text.casefold())))
+                    cleanser_color_hint = (
+                        hint_phrases[0] if len(hint_phrases) == 1
+                        else _descriptive_color_name(action_text)
+                    )
+                    steps = self.skill_cleanser.cleanse(
+                        user_text=action_text,
+                        device_name=device_name,
+                        resolved_color=cleanser_color_hint,
+                    )
+                    pronoun_debug["cleanser_steps"] = steps[:8]
+                    cleansed = " and ".join(steps)
+                    try:
+                        self._validate_skill_request_normalization(action_text, cleansed)
+                        if not self._normalization_preserves_request_intent(action_text, cleansed):
+                            # Cleanser drifted (hallucinated actions or topics):
+                            # prefer the user's own words over a corrupted
+                            # rewrite. Fail-safe, not fail-closed.
+                            cleansed = " ".join(action_text.split())
+                    except SkillRuntimeError:
+                        cleansed = " ".join(action_text.split())
+                    # Exact user-supplied RGB must survive cleansing.
+                    exact_rgb = re.search(
+                        r"\bRGB\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)",
+                        action_text,
+                        re.IGNORECASE,
+                    )
+                    if exact_rgb is not None and not all(
+                        value in cleansed for value in exact_rgb.groups()
+                    ):
+                        cleansed = " ".join(action_text.split())
+                    normalized_request = cleansed
                 planner_input = normalized_request
+                try:
+                    _selected_id, selected_profile, _decider_bypassed = self._decide_skill_profile(
+                        normalized_request=planner_input,
+                        capability_data=capability_data,
+                        allowed_skill_ids=allowed_skill_ids,
+                    )
+                except Exception as exc:
+                    return {
+                        "route": CHAT,
+                        "rule": "nix_model_skill_profile_rejected",
+                        "reply": (
+                            "I didn't send a device command because the skill profile "
+                            f"decider could not select a matching skill profile ({str(exc)[:160]})."
+                        ),
+                        "details": {
+                            "model_called": False,
+                            "skill_decider_called": True,
+                            "conversation_model_called": False,
+                            "skill_execution_confirmed": False,
+                            "skill_decider_error": f"{type(exc).__name__}: {str(exc)[:200]}",
+                        },
+                    }
                 return self._run_skill_planner_and_execute(
                     user_request=action_text,
                     planner_input=planner_input,
@@ -3917,6 +5077,13 @@ class Brain:
                     skill_specs=skill_specs,
                     color_intent=color_intent,
                     color_request_skill=color_request_skill,
+                    profile_system_prompt=selected_profile.system_prompt,
+                    profile_id=selected_profile.profile_id,
+                    profile_decider_bypassed=_decider_bypassed,
+                    relative_brightness=relative_brightness,
+                    resolution_debug=pronoun_debug,
+                    acknowledgment_request=acknowledgment_request,
+                    descriptive_color_grounding=compound_descriptive_color,
                 )
             reply = self.ollama.chat(
                 system_prompt=self._chat_system_prompt(current_text=text),
@@ -4090,14 +5257,22 @@ class Brain:
                         }
                     arguments = matched.get("arguments") or {}
                     if arguments.get("action") == "color_catalog":
-                        reply_text = str(result.get("message") or "The Dot does not publish a named-color list; Luna selects RGB channels for each requested color.")
+                        reply_text = (
+                            "The ring light doesn't use a fixed color list — "
+                            "name any color and I'll match it with RGB."
+                        )
                     elif arguments.get("action") == "catalog":
                         effects = result.get("available_effects") or []
-                        reply_text = (
-                            "Firmware-reported effects: "
-                            + (", ".join(str(value) for value in effects) if effects else "none reported")
-                            + "."
-                        )
+                        if effects:
+                            names = [str(value) for value in effects]
+                            effect_list = (
+                                f"{names[0]} and {names[1]}" if len(names) == 2
+                                else ", ".join(names[:-1]) + f" and {names[-1]}" if len(names) > 2
+                                else names[0]
+                            )
+                            reply_text = f"Available effects: {effect_list}."
+                        else:
+                            reply_text = "The device reported no available effects."
                     elif arguments.get("action") == "state" and isinstance(result.get("state"), dict):
                         state = result["state"]
                         reply_text = (
@@ -4377,3 +5552,53 @@ class Brain:
                 result["details"]["keys_learned"] = learned
         except Exception:  # noqa: BLE001
             pass
+
+def _closest_color_label(rgb: Any) -> str | None:
+    """Nearest known color label for an RGB triple, or None past the gate."""
+    if (
+        not isinstance(rgb, list)
+        or len(rgb) != 3
+        or any(
+            not isinstance(channel, int) or not 0 <= channel <= 255
+            for channel in rgb
+        )
+    ):
+        return None
+    best_name: str | None = None
+    best_distance = float("inf")
+    for name, candidate in {**_NAMED_COLOR_CANONICAL_RGB, **_XKCD_COLOR_RGB}.items():
+        distance = _rgb_distance((rgb[0], rgb[1], rgb[2]), candidate)
+        if distance < best_distance:
+            best_distance = distance
+            best_name = name
+    if best_name is None:
+        return None
+    score = _weighted_rgb_similarity((rgb[0], rgb[1], rgb[2]), {**_NAMED_COLOR_CANONICAL_RGB, **_XKCD_COLOR_RGB}[best_name])
+    if score < _MIN_COLOR_SIMILARITY:
+        return None
+    return best_name
+
+
+def _reply_preserves_state_facts(reply: str, fact_line: str) -> bool:
+    """Check a companion reply against the template's verified facts."""
+    normalized = " ".join(str(reply or "").casefold().split())
+    facts = " ".join(str(fact_line or "").casefold().split())
+    percent_match = re.search(r"(\d{1,3})%", facts)
+    if percent_match is not None:
+        reply_percent = re.search(r"(\d{1,3})\s*(?:%|percent)", normalized)
+        if reply_percent is None or abs(int(reply_percent.group(1)) - int(percent_match.group(1))) > 4:
+            return False
+    color_match = re.search(r"showing ([a-z]+)", facts)
+    if color_match is not None and color_match.group(1) not in normalized:
+        # The confirmed color word must appear in the reply.
+        return False
+    on_match = re.search(r"device is (on|off)", facts)
+    if on_match is None:
+        return True
+    stated = re.search(r"\b(?:is|'s|turned?|switched?)\s+(on|off)\b", normalized)
+    if stated is None:
+        return False
+    if stated.group(1) != on_match.group(1):
+        return False
+    return True
+

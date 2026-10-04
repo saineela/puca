@@ -887,6 +887,11 @@ _NAME_TOKEN = re.compile(r"^[a-z][a-z' -]{0,29}$", re.IGNORECASE)
 _NAME_STOPWORDS = {
     "the", "a", "an", "my", "me", "nix", "assistant", "robot",
     "friend", "friend's", "going", "doing", "trying", "looking",
+    # negation/do-family: sentence-initial "dont ..." is an instruction,
+    # not a label for a key/secret owner
+    "do", "does", "did", "dont", "don't", "didnt", "didn't",
+    "doesnt", "doesn't", "not", "never", "nope",
+    "cant", "can't", "wont", "won't",
 }
 
 
