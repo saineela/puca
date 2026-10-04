@@ -14,6 +14,7 @@ from nix_knowledge.states import (
     follow_up_eligible,
     parse_state_statement,
     state_person_label,
+    state_person_name,
     store_state,
 )
 
@@ -110,10 +111,36 @@ def test_recovery_marks_prior_follow_up_answered(engine):
         "alright is good",
         "fine is doing well",
         "okay is alright",
+        # Regression: an instruction to the assistant starting with "dont"
+        # was captured as a person named "Dont" with a state scraped from
+        # the sentence tail ("... alright" -> state alright/valence good).
+        "dont ask me questions like in the start alright",
+        "dont worry about me im good",
+        "don't stress, everything is fine",
     ],
 )
 def test_parse_negative(text):
     assert parse_state_statement(text) is None
+
+
+def test_negation_word_is_never_a_person_name():
+    assert state_person_name("dont") is None
+    assert state_person_name("Dont") is None
+    assert state_person_name("don't") is None
+
+
+def test_people_label_rejects_negation_subject_records():
+    # Mirrors the live corrupt record written from "dont ask me questions
+    # like in the start alright": the People view must hide it entirely.
+    record = {
+        "value": "dont ask me questions like in the start alright",
+        "subject": "dont",
+        "statement_type": "current_state",
+        "state": "alright",
+        "valence": "good",
+        "learned_from": "dont ask me questions like in the start alright",
+    }
+    assert state_person_label(record) is None
 
 
 def test_typo_role_update_uses_canonical_person_state(engine):

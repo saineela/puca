@@ -206,6 +206,14 @@ _NAME_STOPWORDS = {
     "okay", "ok", "sorry", "hmm", "huh", "wow", "yeah", "yes",
     "no", "wait", "look", "listen", "guys", "someone", "somebody",
     "anyone", "anybody", "everyone", "everybody", "people", "person",
+    # negation/do-family: a sentence-initial "dont ..." ("dont ask me
+    # questions like in the start alright") is an instruction to the
+    # assistant, never a person's name. Left as a name it became a
+    # bogus person record with a state scraped from the tail of the
+    # sentence. Both apostrophe and unapostrophed spellings occur.
+    "do", "does", "did", "dont", "don't", "didnt", "didn't",
+    "doesnt", "doesn't", "not", "never", "nope",
+    "cant", "can't", "wont", "won't",
 }
 
 

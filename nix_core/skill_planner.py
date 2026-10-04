@@ -161,16 +161,37 @@ class SkillPlanner:
             "color_catalog": "List the colors supported by the ring firmware. This is not the effects or animations catalog.",
             "state": "Read the ring's current power, brightness, color, and effect state.",
         }
-        ordered_step_guidance = (
-            " For a multi-step request, include one call for every requested step, "
-            "including repeated or opposite actions, in the user's exact original order."
-        )
-
         tools: list[dict[str, Any]] = []
         bindings: dict[str, tuple[str, str, dict[str, str]]] = {}
         for (skill_id, tool_name, group), members in grouped.items():
             if selected_groups is not None and group not in selected_groups:
                 continue
+            # Measured: Needle3's confidence collapses on the manifest's generic
+            # multi-purpose description; a clean, single-purpose color tool
+            # description keeps the correct call above the suppression floor.
+            first_capability = next(
+                (item for item in capabilities if item.get("skill_id") == skill_id),
+                {},
+            )
+            device_label = str(
+                first_capability.get("device_name") or first_capability.get("name") or "device"
+            )[:48]
+            group_descriptions = {
+                "color": (
+                    f"Set the {device_label} color to one RGB triplet of three "
+                    "channels, each 0-255. Copy the exact RGB numbers provided "
+                    "in the request."
+                ),
+                "brightness": (
+                    f"Set the {device_label} brightness to one fraction from "
+                    "0.05 through 1.0. Copy the exact fraction provided in the "
+                    "request."
+                ),
+                "effect": (
+                    f"Run one exact firmware effect on the {device_label}. "
+                    "Copy the exact effect name provided in the request."
+                ),
+            }
             for func, action in members:
                 if selected_actions is not None and action not in selected_actions:
                     continue
@@ -180,13 +201,11 @@ class SkillPlanner:
                     required = []
                     mapping = {"__call__": action}
                     description = action_descriptions[action]
-                    if group == "power":
-                        description += ordered_step_guidance
                 else:
                     props = func["parameters"].get("properties", {})
                     required = func["parameters"].get("required", [])
                     mapping = {"__call__": action} if action is not None else {}
-                    description = func["description"]
+                    description = group_descriptions.get(group) or func["description"]
                     base_name = short_names.get(group, "do_" + re.sub(r"[^a-z0-9_]+", "_", group.casefold()).strip("_")[:24])
                     name = base_name
                     suffix = 2
@@ -223,7 +242,7 @@ class SkillPlanner:
             if not (re.search(r"\b(?:turn|switch|power)\b.{0,40}\boff\b", text)
                     and not re.search(r"\b(?:color|colour|hue|shade|rgb|hex)\b|\bto\s+(?:green|blue|red|purple|violet|pink|orange|yellow|cyan|teal|white|amber)\b|#[0-9a-f]{6}", text)):
                 groups.add("color")
-        if re.search(r"\b(?:brightness|bright|dim|dimmer)\b", text) and re.search(
+        if re.search(r"\b(?:brightness|bright|brighten|dim|dimmer|darker|lighter)\b", text) and re.search(
             r"\b(?:set|change|adjust|raise|lower|increase|decrease|brighten|dim|make)\b", text
         ):
             groups.add("brightness")
@@ -281,12 +300,51 @@ class SkillPlanner:
             )
         return groups
 
+    _STEP_SPLIT_PATTERN = re.compile(
+        r"\s*(?:\band\s+then\b|\bthen\b|\bafter\s+that\b|\band\b|;|,)\s*",
+        re.IGNORECASE,
+    )
+    _STEP_ACTION_PATTERN = re.compile(
+        r"\b(?:turn|switch|power|set|make|change|apply|enable|disable|start|stop|"
+        r"brighten|dim|run|play|animate|activate|on|off)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _split_plan_steps(cls, user_text: str) -> list[str] | None:
+        """Split a compound request so each step gets its own single-call run.
+
+        Needle3's confidence metric is well-calibrated for one call (~0.12-0.74
+        when grounded) but collapses on multi-call responses (~0.007 even for a
+        fully correct plan), which suppressed correct multi-action proposals.
+        Planning step-by-step keeps every call in the calibrated regime; Core's
+        multi-action count gate still requires the complete step set.
+        """
+        if not re.search(r"\band\b|\bthen\b|\bafter\s+that\b|;|,", user_text, re.IGNORECASE):
+            return None
+        fragments = [
+            fragment.strip(" .!?")
+            for fragment in cls._STEP_SPLIT_PATTERN.split(user_text)
+            if fragment.strip(" .!?")
+        ]
+        steps = [
+            fragment for fragment in fragments
+            if cls._STEP_ACTION_PATTERN.search(fragment)
+        ]
+        if len(steps) >= 2:
+            return steps[: cls.MAX_CALLS]
+        return None
+
     def plan(
         self,
         *,
         system_prompt: str,
         user_text: str,
         capabilities: list[dict[str, Any]],
+        color_grounding: dict[str, Any] | None = None,
+        brightness_grounding: dict[str, Any] | None = None,
+        effect_grounding: dict[str, Any] | None = None,
+        force_grounded: bool = False,
     ) -> list[dict[str, Any]]:
         """Ask Needle for calls and return proposals; Core owns validation and execution."""
         if not isinstance(capabilities, list) or len(capabilities) > 8:
@@ -295,16 +353,164 @@ class SkillPlanner:
             raise SkillPlannerError("Normalized skill request was empty or exceeded its size limit.")
         if not isinstance(system_prompt, str) or len(system_prompt) > 4000:
             raise SkillPlannerError("Skill planner instructions exceeded their size limit.")
+        steps = self._split_plan_steps(user_text)
+        if steps is not None:
+            proposals: list[dict[str, Any]] = []
+            for step in steps:
+                proposals.extend(
+                    self._plan_single(
+                        system_prompt=system_prompt,
+                        user_text=step,
+                        capabilities=capabilities,
+                        color_grounding=color_grounding,
+                        brightness_grounding=brightness_grounding,
+                        effect_grounding=effect_grounding,
+                        force_grounded=force_grounded,
+                    )
+                )
+            return proposals[: self.MAX_CALLS]
+        return self._plan_single(
+            system_prompt=system_prompt,
+            user_text=user_text,
+            capabilities=capabilities,
+            color_grounding=color_grounding,
+            brightness_grounding=brightness_grounding,
+            effect_grounding=effect_grounding,
+            force_grounded=force_grounded,
+        )
+
+    def _plan_single(
+        self,
+        *,
+        system_prompt: str,
+        user_text: str,
+        capabilities: list[dict[str, Any]],
+        color_grounding: dict[str, Any] | None = None,
+        brightness_grounding: dict[str, Any] | None = None,
+        effect_grounding: dict[str, Any] | None = None,
+        force_grounded: bool = False,
+    ) -> list[dict[str, Any]]:
+        """One bounded Needle run proposing calls for one request step."""
         selected_groups = self._requested_tool_groups(user_text, capabilities)
+        # Core-resolved arguments define the bypass groups even when the
+        # surface wording ("chartreuse", "a bit brighter") falls outside the
+        # regex tool-group detector: the grounding exists only because Core
+        # already matched that argument class in the request.
+        if force_grounded:
+            grounded_groups = {
+                "color" if color_grounding is not None else None,
+                "brightness" if brightness_grounding is not None else None,
+                "effect" if effect_grounding is not None else None,
+            }
+            grounded_groups.discard(None)
+            if grounded_groups and (selected_groups is None or selected_groups <= grounded_groups):
+                selected_groups = grounded_groups
+        # Core-resolved canonical colors never pass through the model: Needle3
+        # garbles 3-digit numbers ([255, 0, 0] -> [2, 55, 0]), so a named-color
+        # step is emitted deterministically and still passes schema validation
+        # plus the color-matcher and device-readback gates.
+        if (
+            force_grounded
+            and color_grounding is not None
+            and selected_groups == {"color"}
+            and isinstance(color_grounding.get("rgb"), list)
+            and isinstance(color_grounding.get("color_name"), str)
+        ):
+            _tools, bindings = self._needle_tool_definitions(capabilities, {"color"}, None)
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == "color":
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {
+                            "action": "color",
+                            "rgb": [int(channel) for channel in color_grounding["rgb"]],
+                        },
+                    }]
+            raise SkillPlannerError("No declared color function was available for the grounded color step.")
+        # Same for brightness: Needle3 computes '50 percent' -> 0.5 correctly
+        # but suppresses the call at ~0.0004 confidence, so Core-owned levels
+        # bypass the model and still pass schema validation and readback.
+        if (
+            force_grounded
+            and brightness_grounding is not None
+            and selected_groups == {"brightness"}
+            and isinstance(brightness_grounding.get("brightness"), (int, float))
+        ):
+            _tools, bindings = self._needle_tool_definitions(capabilities, {"brightness"}, None)
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == "brightness":
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {
+                            "action": "brightness",
+                            "brightness": float(brightness_grounding["brightness"]),
+                        },
+                    }]
+            raise SkillPlannerError("No declared brightness function was available for the grounded brightness step.")
+        # Effects: the exact firmware name from the live catalog is Core-owned
+        # data; case-matching it here removes the last ungrounded argument
+        # class from the model's hands.
+        if (
+            force_grounded
+            and effect_grounding is not None
+            and selected_groups == {"effect"}
+            and isinstance(effect_grounding.get("effect"), str)
+            and effect_grounding["effect"].strip()
+        ):
+            _tools, bindings = self._needle_tool_definitions(capabilities, {"effect"}, None)
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == "effect":
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {
+                            "action": "effect",
+                            "effect": effect_grounding["effect"],
+                        },
+                    }]
+            raise SkillPlannerError("No declared effect function was available for the grounded effect step.")
         selected_actions = None
         normalized_text = user_text.casefold()
         if selected_groups is not None and "read" in selected_groups:
             if re.search(r"\b(?:effects?|animations?|patterns?)\b", normalized_text):
                 selected_actions = {"catalog"}
             elif re.search(r"\b(?:colors?|colours?|rgb)\b", normalized_text):
-                selected_actions = {"color_catalog"}
+                # "what color is the ring right now" asks for the current
+                # state; "what colors are available" asks for the catalog.
+                if re.search(r"\bcolors\b|\bcolours\b", normalized_text) or not re.search(
+                    r"\b(?:is|are|right now|currently)\b", normalized_text
+                ):
+                    selected_actions = {"color_catalog"}
+                else:
+                    selected_actions = {"state"}
             elif re.search(r"\b(?:state|status)\b", normalized_text):
                 selected_actions = {"state"}
+        # Reads are side-effect-free, and Needle3's validation block is
+        # nondeterministic on question wording (measured live: omitted
+        # validation, false-positive negation flags). Under the grounded
+        # retry, a read-only request is emitted deterministically; the
+        # confirmation and readback gates still apply to the executed result.
+        if (
+            force_grounded
+            and selected_groups == {"read"}
+            and not (color_grounding or brightness_grounding or effect_grounding)
+        ):
+            read_action = next(iter(selected_actions)) if selected_actions else "state"
+            _tools, bindings = self._needle_tool_definitions(capabilities, {"read"}, {read_action})
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == read_action:
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {"action": read_action},
+                    }]
+            raise SkillPlannerError("No declared read function was available for the grounded read step.")
         tools, bindings = self._needle_tool_definitions(
             capabilities, selected_groups, selected_actions
         )
@@ -336,15 +542,42 @@ class SkillPlanner:
             raise SkillPlannerError(f"Needle 3 unavailable: {type(exc).__name__}: {str(exc)[:180]}") from exc
 
         if not isinstance(response, dict) or response.get("success") is not True:
-            raise SkillPlannerError("Needle 3 did not return a successful structured response.")
+            raise SkillPlannerError(
+                "Needle 3 did not return a successful structured response: "
+                + repr(response)[:220]
+            )
         if response.get("type") != "call":
-            raise SkillPlannerError("Needle 3 did not return a function-call response.")
+            raise SkillPlannerError(
+                "Needle 3 did not return a function-call response: " + repr(response)[:220]
+            )
         suppressed = response.get("suppressed_calls")
         validation = response.get("validation")
         if not isinstance(suppressed, list) or suppressed:
             raise SkillPlannerError("Needle 3 withheld one or more calls for confidence or grounding.")
-        if not isinstance(validation, dict) or validation.get("negation"):
-            raise SkillPlannerError("Needle 3 flagged a negated or invalid proposal.")
+        if not isinstance(validation, dict):
+            # Fail closed: an unvalidated proposal must not execute. Needle3
+            # measurably omits the validation block on some question wordings;
+            # the grounded read retry below covers the side-effect-free cases.
+            raise SkillPlannerError("Needle 3 omitted valid grounding validation.")
+        # A negation flag on a plainly non-control read request is a measured
+        # false positive ("what color is the device"): Core's own planner gate
+        # already rejects true negations ("do not turn ... on") before Needle
+        # runs, so a disagreement here only blocks verified reads. Honor the
+        # model flag only when Core also sees a negation cue, or the request
+        # looks like a control request.
+        if validation.get("negation"):
+            control_shaped = bool(re.search(
+                r"\b(?:turn|switch|power|set|change|make|apply|paint|enable|disable|activate|run|start|play|stop|open|close|brighten|dim)\b",
+                user_text,
+                re.IGNORECASE,
+            ))
+            core_sees_negation = bool(re.search(
+                r"\b(?:do\s+not|don't|never|not|without|avoid|stop)\b",
+                user_text,
+                re.IGNORECASE,
+            ))
+            if core_sees_negation or control_shaped:
+                raise SkillPlannerError("Needle 3 flagged a negated or invalid proposal.")
         ungrounded = validation.get("ungrounded")
         if not isinstance(ungrounded, list):
             raise SkillPlannerError("Needle 3 omitted valid grounding validation.")

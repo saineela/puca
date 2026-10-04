@@ -145,6 +145,97 @@ SKILL_LOGO_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg", ".webp"}
 TRACE: deque[dict] = deque(maxlen=600)
 _trace_lock = threading.Lock()
 
+# Live pipeline status panel: last activation per pipeline stage.
+PIPELINE_PAGE_PATH = os.path.join(CORE_DIR, "pipeline.html")
+PIPELINE_STAGES = [
+    {"id": "received", "label": "Received user query"},
+    {"id": "route", "label": "Core routing"},
+    {"id": "predictor", "label": "Nix_predictor · Qwen 2.5 0.5B"},
+    {"id": "knowledge", "label": "Knowledge retrieval & validation"},
+    {"id": "skill_cleanser", "label": "Qwen3-0.6B · skill prompt cleansing"},
+    {"id": "skill_decider", "label": "Needle skill decider · profile selection"},
+    {"id": "skill_executor", "label": "Needle skill executor · plan proposal"},
+    {"id": "skill_validation", "label": "Core schema validation"},
+    {"id": "device_execution", "label": "Skill worker execution & readback"},
+    {"id": "final", "label": "Assistant final response"},
+]
+PIPELINE_STAGE_STATE: dict[str, dict] = {}
+_pipeline_state_lock = threading.Lock()
+
+
+def _record_pipeline_stage(stage_id: str, *, status: str = "complete", ms: float | None = None) -> None:
+    with _pipeline_state_lock:
+        entry = PIPELINE_STAGE_STATE.setdefault(stage_id, {"count": 0})
+        entry["last_ts"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        entry["last_status"] = status
+        entry["last_ms"] = round(float(ms), 1) if ms is not None else None
+        entry["count"] = int(entry.get("count", 0)) + 1
+
+
+def _record_pipeline_activation(result: dict, request_trace: list[dict]) -> None:
+    """Update last-activated timestamps for the live pipeline status panel."""
+    details = result.get("details") if isinstance(result, dict) else None
+    details = details if isinstance(details, dict) else {}
+    trace_by_stage: dict[str, float] = {}
+    for event in request_trace:
+        stage = event.get("stage")
+        if stage and event.get("ms") is not None:
+            trace_by_stage[str(stage)] = float(event["ms"])
+
+    _record_pipeline_stage("received", ms=0.0)
+    routing = details.get("routing_engine") or {}
+    _record_pipeline_stage("route", ms=routing.get("latency_ms") if isinstance(routing, dict) else None)
+    predictor_ms = trace_by_stage.get("knowledge /classify (model gate)")
+    if predictor_ms is not None:
+        _record_pipeline_stage("predictor", ms=predictor_ms)
+    else:
+        _record_pipeline_stage("predictor", status="skipped", ms=0.0)
+    knowledge_ms = trace_by_stage.get("knowledge /process")
+    if knowledge_ms is not None:
+        _record_pipeline_stage("knowledge", ms=knowledge_ms)
+    else:
+        _record_pipeline_stage("knowledge", status="skipped", ms=0.0)
+
+    skill_called = bool(details.get("skill_planner_called"))
+    if skill_called or details.get("skill_planner_input") is not None:
+        _record_pipeline_stage("skill_cleanser")
+    else:
+        _record_pipeline_stage("skill_cleanser", status="skipped")
+    if skill_called or details.get("skill_decider_called"):
+        _record_pipeline_stage(
+            "skill_decider",
+            status="bypassed" if details.get("skill_profile_decider_bypassed") else "complete",
+        )
+    else:
+        _record_pipeline_stage("skill_decider", status="skipped")
+    if details.get("skill_plan_calls") is not None:
+        _record_pipeline_stage("skill_executor")
+    elif skill_called:
+        _record_pipeline_stage("skill_executor", status="error")
+    else:
+        _record_pipeline_stage("skill_executor", status="skipped")
+    if details.get("skill_plan_validated"):
+        _record_pipeline_stage("skill_validation")
+    elif skill_called:
+        _record_pipeline_stage(
+            "skill_validation", status="error" if details.get("skill_error") else "skipped"
+        )
+    else:
+        _record_pipeline_stage("skill_validation", status="skipped")
+    if details.get("skill_execution_confirmed") is True:
+        _record_pipeline_stage("device_execution")
+    elif skill_called:
+        _record_pipeline_stage(
+            "device_execution",
+            status="error" if details.get("skill_error") or details.get("skill_execution_confirmed") is False else "skipped",
+        )
+    else:
+        _record_pipeline_stage("device_execution", status="skipped")
+    if details.get("model_called") or details.get("conversation_model_called"):
+        _record_pipeline_stage("final")
+    else:
+        _record_pipeline_stage("final", status="skipped")
+
 
 def _trace(stage: str, detail: str, *, ok: bool = True, ms: float | None = None) -> None:
     with _trace_lock:
@@ -2564,6 +2655,30 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
 
+        if path.rstrip("/") == "/pipeline":
+            try:
+                with open(PIPELINE_PAGE_PATH, "r", encoding="utf-8") as handle:
+                    self._html(handle.read())
+            except OSError:
+                self._json({"ok": False, "error": "pipeline page unavailable"}, 500)
+            return
+
+        if path == "/api/pipeline":
+            with _pipeline_state_lock:
+                states = {
+                    stage_id: dict(state)
+                    for stage_id, state in PIPELINE_STAGE_STATE.items()
+                }
+            stages = []
+            for stage in PIPELINE_STAGES:
+                stages.append({**stage, **states.get(stage["id"], {})})
+            self._json({
+                "ok": True,
+                "stages": stages,
+                "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
+            })
+            return
+
         if path.rstrip("/") == "/NIX-Modeldev":
             try:
                 with open(MODELDEV_PATH, "r", encoding="utf-8") as handle:
@@ -3096,6 +3211,10 @@ class Handler(BaseHTTPRequestHandler):
             elapsed = (time.perf_counter() - t0) * 1000
             with _trace_lock:
                 request_trace = list(TRACE)[trace_before:]
+            try:
+                _record_pipeline_activation(result, request_trace)
+            except Exception:
+                pass
             trace_by_stage = {}
             for event in request_trace:
                 stage = event.get("stage")

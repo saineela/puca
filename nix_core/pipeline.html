@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIX · Active Pipeline</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #111823; --edge: #1f2b3a; --ink: #dbe7f4;
+    --dim: #7d8ea3; --good: #37d67a; --warn: #f5b942; --bad: #ff5c74;
+    --bypass: #8f9bb0; --accent: #4cc3ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px; background: var(--bg);
+    color: var(--ink); font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: .4px; }
+  .sub { color: var(--dim); font-size: 12px; margin-bottom: 18px; }
+  .live { color: var(--good); }
+  .live::before {
+    content: "●"; margin-right: 6px; animation: blink 1.6s infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+  .stage {
+    position: relative; background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 10px; padding: 12px 14px; margin: 0 0 26px 26px;
+  }
+  .stage::before {
+    content: ""; position: absolute; left: -27px; top: -26px; width: 2px; height: 52px;
+    background: linear-gradient(var(--edge), var(--edge));
+  }
+  .stage::after {
+    content: ""; position: absolute; left: -6px; top: 14px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--edge);
+  }
+  .stage.hot { border-color: var(--good); box-shadow: 0 0 14px rgba(55, 214, 122, .25); }
+  .stage.hot::after { background: var(--good); }
+  .stage.err { border-color: var(--bad); box-shadow: 0 0 14px rgba(255, 92, 116, .25); }
+  .stage.err::after { background: var(--bad); }
+  .stage.byp { border-color: var(--bypass); }
+  .stage.byp::after { background: var(--bypass); }
+  .flow {
+    position: absolute; left: -27px; top: -26px; width: 2px; height: 52px; overflow: hidden;
+  }
+  .flow i {
+    position: absolute; left: 0; width: 2px; height: 10px; border-radius: 2px;
+    background: var(--accent); animation: drop 1s linear infinite;
+  }
+  @keyframes drop { 0% { top: -12px; } 100% { top: 54px; } }
+  .name { font-weight: 700; }
+  .status {
+    float: right; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--edge); color: var(--dim); text-transform: uppercase;
+  }
+  .status.complete { color: var(--good); border-color: var(--good); }
+  .status.error { color: var(--bad); border-color: var(--bad); }
+  .status.bypassed { color: var(--bypass); }
+  .meta { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .empty { color: var(--dim); font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NIX · Active Pipeline</h1>
+  <div class="sub">
+    Live status of every stage — last activation, latency, and total activations.
+    <span class="live">LIVE</span> · refresh 2s ·
+    <a style="color:var(--accent)" href="/">back to console</a>
+  </div>
+  <div id="board" class="empty">waiting for first request…</div>
+</div>
+<script>
+const FRESH_MS = 6000;
+let stages = [];
+
+function relTime(iso) {
+  if (!iso) return "never";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "never";
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 5) return "just now";
+  if (s < 90) return s + "s ago";
+  if (s < 5400) return Math.round(s / 60) + "m ago";
+  if (s < 172800) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+
+function render(data) {
+  stages = data.stages || [];
+  const board = document.getElementById("board");
+  board.classList.remove("empty");
+  if (!stages.length) { board.textContent = "no stages reported"; return; }
+  board.innerHTML = stages.map((stage) => {
+    const status = stage.last_status || "idle";
+    const fresh = stage.last_ts && (Date.now() - new Date(stage.last_ts).getTime()) < FRESH_MS;
+    const cls = [
+      "stage",
+      status === "error" ? "err" : "",
+      status === "bypassed" ? "byp" : "",
+      fresh && status !== "skipped" ? "hot" : "",
+    ].filter(Boolean).join(" ");
+    const flow = fresh && status === "complete"
+      ? '<span class="flow"><i style="animation-delay:0ms"></i><i style="animation-delay:.5s"></i></span>'
+      : "";
+    const ms = stage.last_ms != null ? stage.last_ms + "ms" : "—";
+    return `<div class="${cls}" data-id="${stage.id}">${flow}
+      <span class="status ${status}">${status}</span>
+      <div class="name">${stage.label}</div>
+      <div class="meta">last activation: <b>${relTime(stage.last_ts)}</b>
+        (${stage.last_ts || "never"}) · latency: <b>${ms}</b>
+        · activations: <b>${stage.count || 0}</b></div>
+    </div>`;
+  }).join("");
+}
+
+async function poll() {
+  try {
+    const response = await fetch("/api/pipeline", { cache: "no-store" });
+    const data = await response.json();
+    if (data.ok) render(data);
+  } catch (error) { /* keep last known state */ }
+}
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

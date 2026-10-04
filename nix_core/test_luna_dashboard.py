@@ -250,12 +250,16 @@ def test_people_view_never_uses_state_words_as_person_names(monkeypatch, tmp_pat
             [
                 (1, json.dumps({"statement_type": "current_state", "name": "alright", "subject": "alright", "state": "alright", "valence": "good", "value": "alright is good"}), "now", "now"),
                 (2, json.dumps({"statement_type": "current_state", "name": None, "subject": "someone close", "state": "alright", "valence": "good", "value": "my sister is doing alright"}), "now", "now"),
+                (3, json.dumps({"statement_type": "current_state", "subject": "dont", "state": "alright", "valence": "good", "value": "dont ask me questions like in the start alright", "learned_from": "dont ask me questions like in the start alright"}), "now", "now"),
             ],
         )
     monkeypatch.setattr(console, "KNOWLEDGE_DB", str(database))
 
     people = console._people_view()
 
+    # Regression: an assistant-directed instruction starting with "dont"
+    # was once captured as a person named "Dont" with a state scraped
+    # from the sentence tail; it must never surface in the People view.
     assert len(people) == 1
     assert people[0]["subject"] == "Your sister"
     assert people[0]["state"] == "alright"

@@ -1197,3 +1197,53 @@ def test_oversized_post_body_returns_http_413(skills_state):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_runtime_targeting_resolves_state_questions_and_generic_antecedents(skills_state, monkeypatch):
+    skill_id = "github:example/ring-light:ring-light"
+    runtime = SkillRuntime(
+        state_path=skills_state / "skills.json",
+        install_dir=skills_state / "installed",
+        data_dir=skills_state / "data",
+    )
+    package = runtime.package_dir(runtime.install_dir, skill_id)
+    package.mkdir(parents=True)
+    (package / "worker.py").write_text("# mocked test package\\n", encoding="utf-8")
+    manifest = {
+        "kind": "nix-skill",
+        "id": "ring-light",
+        "name": "Ring Light",
+        "runtime": {"protocol": skill_runtime.PROTOCOL, "entrypoint": "worker.py"},
+        "files": ["worker.py"],
+        "tools": [{"name": "control_ring", "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}, "result_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}}],
+        "triggers": ["ring", "ring light"],
+    }
+    (package / "skill.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (skills_state / "skills.json").write_text(json.dumps({
+        "installed": [skill_id],
+        "device_names": {skill_id: "Studio Ring"},
+    }), encoding="utf-8")
+    monkeypatch.setattr(runtime, "status", lambda _skill_id: {
+        "configured": True, "trusted": True, "runnable": True, "worker_running": False,
+    })
+
+    # State questions route to the skill path for a verified device read
+    # instead of a chat-model guess.
+    assert runtime.targeted_skill_specs("is the light on")[0]["skill_id"] == skill_id
+
+    # A pronoun state question resolves against recent device turns.
+    device_history = [
+        {"role": "user", "content": "turn the ring light on"},
+        {"role": "assistant", "content": "The ring is on."},
+    ]
+    assert runtime.targeted_skill_specs("is it off", device_history)[0]["skill_id"] == skill_id
+
+    # A generic pronoun request after a device-state question still targets
+    # the only runnable skill instead of falling back to chat.
+    assert runtime.targeted_skill_specs("turn it off", [
+        {"role": "user", "content": "is the light on"},
+        {"role": "assistant", "content": "The ring is off."},
+    ])[0]["skill_id"] == skill_id
+
+    # Non-device questions still stay out of the skill path.
+    assert runtime.targeted_skill_specs("is the store open?") == []

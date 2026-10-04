@@ -23,12 +23,12 @@ CAPABILITIES = [{
         "input_schema": {
             "type": "object",
             "oneOf": [
-                {"type": "object", "properties": {"action": {"type": "string", "enum": ["on", "off", "state", "catalog"]}}, "required": ["action"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["catalog", "color_catalog", "state", "on", "off"]}}, "required": ["action"]},
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["color"]}, "rgb": RGB_SCHEMA}, "required": ["action", "rgb"]},
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["brightness"]}, "brightness": {"type": "number", "minimum": 0.05, "maximum": 1.0}}, "required": ["action", "brightness"]},
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["effect"]}, "effect": {"type": "string", "minLength": 1, "maxLength": 64}}, "required": ["action", "effect"]},
             ],
-            "properties": {"action": {"type": "string", "enum": ["on", "off", "state", "catalog", "color", "brightness", "effect"]}, "rgb": RGB_SCHEMA, "brightness": {"type": "number"}, "effect": {"type": "string"}},
+            "properties": {"action": {"type": "string", "enum": ["catalog", "color_catalog", "state", "on", "off", "color", "brightness", "effect"]}, "rgb": RGB_SCHEMA, "brightness": {"type": "number"}, "effect": {"type": "string"}},
             "required": ["action"],
             "additionalProperties": False,
         },
@@ -42,9 +42,14 @@ class FakeNeedle:
         self.captured = captured
 
     def complete(self, text, *, max_new_tokens):
+        self.captured.setdefault("texts", []).append(text)
         self.captured["text"] = text
         self.captured["max_new_tokens"] = max_new_tokens
-        return self.response
+        response = self.response
+        if isinstance(response, list):
+            index = min(len(self.captured["texts"]) - 1, len(response) - 1)
+            response = response[index]
+        return response
 
     def close(self):
         self.captured["closed"] = True
@@ -131,11 +136,12 @@ def test_multi_step_power_tools_explicitly_allow_ordered_repeated_calls():
     tools, bindings = SkillPlanner._needle_tool_definitions(CAPABILITIES, {"power"})
     by_name = {item["name"]: item for item in tools}
     assert {"turn_on", "turn_off"} == set(by_name)
-    for tool in by_name.values():
-        description = tool["description"].lower()
-        assert "every requested step" in description
-        assert "exact original order" in description
-        assert "repeated" in description
+    # Compound requests are planned step-by-step: each step runs one calibrated
+    # single-call inference, and Core's multi-action gate enforces completeness.
+    assert SkillPlanner._split_plan_steps(
+        "Turn the bedroom light off, then turn it back on"
+    ) == ["Turn the bedroom light off", "turn it back on"]
+    assert SkillPlanner._split_plan_steps("Turn the bedroom light off") is None
     assert bindings["turn_off"][2] == {"__call__": "off"}
     assert bindings["turn_on"][2] == {"__call__": "on"}
 
@@ -163,28 +169,33 @@ def test_semantic_read_tool_response_becomes_catalog_proposal():
 
 
 def test_ordered_repeated_power_proposals_preserve_user_order():
-    response = _success("turn_off", {})
-    response["function_calls"].append({"name": "turn_on", "arguments": {}})
-    planner, _captured = _planner(response)
+    # One calibrated single-call inference per step, concatenated in order.
+    planner, captured = _planner([
+        _success("turn_off", {}),
+        _success("turn_on", {}),
+    ])
     calls = planner.plan(
         system_prompt="Preserve all requested device actions in order.",
         user_text="Turn the bedroom light off, then turn it back on",
         capabilities=CAPABILITIES,
     )
     assert [item["arguments"]["action"] for item in calls] == ["off", "on"]
+    assert captured["texts"] == ["Turn the bedroom light off", "turn it back on"]
 
 
 def test_missing_ordered_power_step_fails_core_multi_action_count():
-    planner, _captured = _planner(_success("turn_on", {}))
-    calls = planner.plan(
-        system_prompt="Preserve all requested device actions in order.",
-        user_text="Turn the bedroom light off, then turn it back on",
-        capabilities=CAPABILITIES,
-    )
-    assert [item["arguments"]["action"] for item in calls] == ["on"]
-    # Brain's existing whole-plan gate rejects a one-call plan for this request;
-    # the semantic action tools let Needle propose each ordered step distinctly.
-    assert len(calls) < 2
+    # A step whose Needle run withholds fails the whole plan closed; a partial
+    # multi-action plan can never reach execution.
+    suppressed = _success("turn_on", {})
+    suppressed["suppressed_calls"] = [{"name": "turn_on", "arguments": {}}]
+    suppressed["function_calls"] = []
+    planner, _captured = _planner([_success("turn_off", {}), suppressed])
+    with pytest.raises(SkillPlannerError, match="withheld"):
+        planner.plan(
+            system_prompt="Preserve all requested device actions in order.",
+            user_text="Turn the bedroom light off, then turn it back on",
+            capabilities=CAPABILITIES,
+        )
 
 
 @pytest.mark.parametrize(("user_text", "group", "tool_name"), [
@@ -245,3 +256,92 @@ def test_effect_is_exposed_only_with_fresh_catalog_and_is_enum_limited():
     tools, _ = SkillPlanner._needle_tool_definitions(capabilities)
     effect = next(item for item in tools if item["name"] == "set_effect")
     assert effect["parameters"]["properties"]["effect"]["enum"] == ["Aurora Pulse", "Ocean Ripple"]
+
+
+def test_negation_flag_without_negation_cue_allows_read_request():
+    # Regression: Needle flagged "what color is the device" as negation,
+    # blocking verified state reads. Core honors the flag only when the
+    # request actually contains a negation cue or a control verb.
+    response = {
+        "type": "call",
+        "success": True,
+        "function_calls": [{"name": "read_state", "arguments": {}}],
+        "suppressed_calls": [],
+        "confidence": 0.8,
+        "validation": {"ungrounded": [], "negation": True},
+    }
+    planner, _ = _planner(response)
+    calls = planner.plan(
+        system_prompt="",
+        user_text="what color is the ring light right now",
+        capabilities=CAPABILITIES,
+    )
+    assert calls[0]["arguments"]["action"] == "state"
+
+
+def test_negation_flag_with_control_verb_still_fails_closed():
+    response = {
+        "type": "call",
+        "success": True,
+        "function_calls": [{"name": "turn_on", "arguments": {}}],
+        "suppressed_calls": [],
+        "confidence": 0.8,
+        "validation": {"ungrounded": [], "negation": True},
+    }
+    planner, _ = _planner(response)
+    with pytest.raises(SkillPlannerError):
+        planner.plan(
+            system_prompt="",
+            user_text="turn on the ring light",
+            capabilities=CAPABILITIES,
+        )
+
+
+def test_missing_validation_block_fails_closed_without_attribute_error():
+    # Regression: Needle3 measurably omits the validation block on some
+    # question wordings; the planner must fail closed with a planner error,
+    # not crash with AttributeError ('NoneType' has no attribute 'get').
+    response = {
+        "type": "call",
+        "success": True,
+        "function_calls": [{"name": "read_state", "arguments": {}}],
+        "suppressed_calls": [],
+        "confidence": 0.8,
+        "validation": None,
+    }
+    planner, _ = _planner(response)
+    with pytest.raises(SkillPlannerError, match="omitted valid grounding validation"):
+        planner.plan(
+            system_prompt="",
+            user_text="what color is the ring light right now",
+            capabilities=CAPABILITIES,
+        )
+
+
+def test_grounded_read_retry_emits_deterministic_state_read():
+    # Regression: the live color question ("What color is the ring light right
+    # now?") depended on Needle3 returning a usable validation block. Under
+    # the grounded retry a current-state color question emits the state read
+    # deterministically, without calling the model.
+    planner, captured = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="",
+        user_text="What color is the ring light right now?",
+        capabilities=CAPABILITIES,
+        force_grounded=True,
+    )
+    assert len(calls) == 1
+    assert calls[0]["arguments"] == {"action": "state"}
+    assert "init" not in captured  # the fake Needle factory was never used
+
+
+def test_grounded_read_retry_keeps_catalog_wording_on_color_catalog():
+    planner, _ = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="",
+        user_text="What colors are available on the ring light?",
+        capabilities=CAPABILITIES,
+        force_grounded=True,
+    )
+    assert len(calls) == 1
+    assert calls[0]["arguments"] == {"action": "color_catalog"}
