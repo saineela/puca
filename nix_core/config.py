@@ -82,6 +82,9 @@ TABBY_API_KEY = os.environ.get("NIX_TABBY_API_KEY", "")
 CASPER_BACKEND = os.environ.get("NIX_CASPER_BACKEND", "transformers").lower()
 # Ollama remains an explicit fallback/diagnostic backend.
 OLLAMA_MODEL = os.environ.get("NIX_OLLAMA_MODEL", "qwen3.5:4b")
+# Skill actions use a dedicated local Needle 3 planner and cached 20L weights.
+# It only proposes schema-bound calls; Core still validates and executes them.
+SKILL_PLANNER_MODEL = os.environ.get("NIX_SKILL_PLANNER_MODEL", "Needle3-20L-121M")
 # Casper is a non-thinking conversational model. These names remain as
 # compatibility constants for older imports, but environment variables cannot
 # re-enable hidden reasoning in the Casper path.

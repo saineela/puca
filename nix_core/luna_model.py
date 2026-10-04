@@ -151,6 +151,7 @@ class LunaTransformersClient:
         user_text: str,
         timeout: float | None = None,
         think: bool | None = None,
+        max_new_tokens: int | None = None,
     ) -> str:
         # This Transformers model has no separate reasoning-mode switch. Keep
         # caller requests from enabling one and, for V7, make final-answer-only
@@ -182,7 +183,7 @@ class LunaTransformersClient:
             ).to("cuda")
             output = self.model_instance.generate(
                 **inputs,
-                max_new_tokens=LUNA_MAX_NEW_TOKENS,
+                max_new_tokens=min(max_new_tokens, 1024) if max_new_tokens is not None else LUNA_MAX_NEW_TOKENS,
                 do_sample=False,
                 use_cache=True,
                 eos_token_id=generation_stop_ids(self.tokenizer),

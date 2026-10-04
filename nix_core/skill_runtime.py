@@ -785,8 +785,19 @@ class SkillRuntime:
             current,
         ))
         refers_back = len(current) <= 160 and bool(re.search(
-            r"\b(?:it|ti|that|this|they|them|those|there|one|ones)\b", current
+            r"\b(?:it|its|it's|that|this|they|them|their|those|there|one|ones)\b", current
         ))
+        if refers_back and history:
+            previous_user_requests = [
+                str(turn.get("content") or "")[:500]
+                for turn in history if isinstance(turn, dict) and turn.get("role") == "user"
+            ]
+            if previous_user_requests and re.search(
+                r"\b(?:turn|switch|power|set|make|change|apply|enable|disable|start|stop|brighten|dim|paint|animate|run|play)\b",
+                previous_user_requests[-1],
+                re.IGNORECASE,
+            ):
+                actionable = True
 
         def contains(text_value: str, term: str) -> bool:
             return bool(term and re.search(
