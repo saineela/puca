@@ -50,6 +50,7 @@ class TabbyClient:
         user_text: str,
         timeout: float | None = None,
         think: bool | None = None,
+        max_new_tokens: int | None = None,
     ) -> str:
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt}
@@ -70,7 +71,7 @@ class TabbyClient:
                 "model": self.model,
                 "messages": messages,
                 "stream": False,
-                "max_tokens": 120,
+                "max_tokens": min(max_new_tokens, 1024) if max_new_tokens is not None else 120,
                 "temperature": 0.2,
             },
             timeout=timeout or HTTP_TIMEOUT,

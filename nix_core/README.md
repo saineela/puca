@@ -307,3 +307,7 @@ The websocket subprocess suite may require the local service/model environment. 
 - `request_log.py` — JSONL request logging.
 - `analyze_logs.py` — log problem summaries and exports.
 - `config.py` — environment-backed service/runtime configuration.
+
+### Bounded skill plans
+
+Targeted skills use `NIX_SKILL_PLAN:` for both single-action and ordered multi-action requests. Core permits at most eight calls, validates every selected skill/tool/argument schema before dispatch, then executes sequentially and stops at the first failed or unconfirmed action. Model prose is never evidence of execution, and a plan that is missing, malformed, incomplete, or invalid executes no action. Existing explicit package trust, digest/configuration checks, worker isolation boundaries, and result validation remain in `SkillRuntime`.

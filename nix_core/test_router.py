@@ -141,3 +141,20 @@ def test_fragment_guard():
     # scheduling intent with the same words stays knowledge
     route, _ = classify("move my tsa meeting to next week")
     assert route == KNOWLEDGE
+
+
+def test_task_prioritization_is_chat_but_existing_task_recall_stays_knowledge():
+    for text in (
+        "prioritize my todo list",
+        "help me prioritize my tasks",
+        "how should I rank my to-do list?",
+        "sort my task list by urgency",
+        "my tasks are a mess; can you organize them by importance?",
+    ):
+        route, features = classify(text)
+        assert route == CHAT, f"{text!r}: expected chat, got {route} ({features.get('rule')})"
+        assert features["rule"] == "task_prioritization"
+
+    for text in ("list my tasks", "what tasks do I have?", "what are my todos?"):
+        route, _features = classify(text)
+        assert route == KNOWLEDGE, f"{text!r}: task recall should remain knowledge"

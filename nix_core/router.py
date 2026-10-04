@@ -347,6 +347,14 @@ _RECALL_LEADINS = (
     "any appointments",
 )
 
+_TASK_PRIORITY_ACTION_RE = re.compile(
+    r"\b(?:prioriti[sz](?:e|ed|ing|ation)?|rank|sort|organize|organise|"
+    r"reorganize|reorganise|arrange|triage|sequence)\b|"
+    r"\bdecide\s+(?:what|which)\s+(?:task|thing|item)s?\s+(?:to\s+do\s+)?first\b",
+    re.IGNORECASE,
+)
+_TASK_LIST_RE = re.compile(r"\b(?:tasks?|to[\s-]?dos?)\b", re.IGNORECASE)
+
 _RECALL_NOUNS = (
     "my schedule",
     "my calendar",
@@ -998,6 +1006,13 @@ def classify(
     ) and re.search(r"\b(?:my|our)\b", lowered):
         features.update(route=KNOWLEDGE, rule="incidental_note")
         return KNOWLEDGE, features
+
+    # NIX has no task manager or task-priority store. Requests to prioritize,
+    # sort, or organize tasks are advice/chat, not attempts to retrieve a
+    # persisted task list. Keep plain task-list recall on the Knowledge path.
+    if _TASK_LIST_RE.search(lowered) and _TASK_PRIORITY_ACTION_RE.search(lowered):
+        features.update(route=CHAT, rule="task_prioritization")
+        return CHAT, features
 
     # High-confidence indirect storage/action language gets a fast route
     # decision. The Knowledge engine remains authoritative about the exact

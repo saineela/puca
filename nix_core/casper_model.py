@@ -139,6 +139,7 @@ class CasperTransformersClient:
         user_text: str,
         timeout: float | None = None,
         think: bool | None = None,
+        max_new_tokens: int | None = None,
     ) -> str:
         # Casper never exposes a thinking path. Keep this invariant local to
         # the backend as well as in Core so callers cannot re-enable it by
@@ -167,9 +168,7 @@ class CasperTransformersClient:
             ).to("cuda")
             output = self.model_instance.generate(
                 **inputs,
-                max_new_tokens=(
-                    FAST_MAX_NEW_TOKENS
-                ),
+                max_new_tokens=min(max_new_tokens, 1024) if max_new_tokens is not None else FAST_MAX_NEW_TOKENS,
                 do_sample=False,
                 use_cache=True,
                 pad_token_id=self.tokenizer.eos_token_id,
