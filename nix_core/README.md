@@ -50,7 +50,7 @@ router.py
 
 Core remains the final response boundary after Knowledge. It may use the active official conversation model to format a grounded result; internal route labels such as `CHAT rule: ...` are diagnostics only and must never appear in the user-facing reply.
 
-The former Qwen 2.5 0.5B **Nix_predictor** is not required for deterministic high-confidence routes. The optional `routing_predictor.py` is a tiny CPU-first NumPy classifier for broad chat-vs-Knowledge ambiguity; it can abstain, never executes tools, and does not resolve dates or people. Keep `NIX_CORE_USE_KNOWLEDGE_MODEL_GATE=0`; do not enable a neural model gate for this V6 runtime/integration path. No Luna training or offline evaluation is authorized. High-confidence social checks and harmless food/drink preference questions bypass neural routing.
+The former Qwen 2.5 0.5B **Nix_predictor** is not required for deterministic high-confidence routes. The optional `routing_predictor.py` is a tiny CPU-first NumPy classifier for broad chat-vs-Knowledge ambiguity; it can abstain, never executes tools, and does not resolve dates or people. Keep `NIX_CORE_USE_KNOWLEDGE_MODEL_GATE=0`; do not enable a neural model gate for the V6 runtime/integration path. High-confidence social checks and harmless food/drink preference questions bypass neural routing.
 
 ## Official conversation-model runtime
 
@@ -69,47 +69,40 @@ configuration is not evidence of what a hosted service is serving.
 
 **Luna Pro v1 is retired from this repository's runtime.** Its adapter is not
 registered for selection/loading, and the former Luna model endpoint handlers
-return HTTP 410. This source-level status does not establish any hosted
-process's state. Keep historical Pro research, builders, manifests, source
-data, and artifacts as an archive only. Do not run Pro workflows or
-reuse/adapt their training approach or data for any model. Luna work is limited
-to its V6 runtime/integration path; no Luna training or offline evaluation is
-authorized. The historical notes below describe past research, not current
-tasks or permissions. Archived builder/evaluator CLIs are disabled; the Pro
+return HTTP 410. Historical Pro research, builders, manifests, source
+data, and artifacts are kept as an archive only: the Pro workflows and their
+training approach or data are not used by any model. Luna work is limited
+to the V6 runtime/integration path, and training/offline-evaluation tooling
+stays disabled. The historical notes below describe past research.
+Archived builder/evaluator CLIs are disabled; the Pro
 trainer's CPU-only, read-only `check-data` preflight is the only retained
 functional command. Its training/GPU commands fail closed.
 
 Historical V6 research records the public Llama 3.2 3B Instruct base and its
 official chat template. The repository retains earlier base-model, dataset,
 builder, and evaluation sources for provenance; builder CLI entry points are
-disabled, and no Luna training is authorized. The preserved clean-mix notes
-record exclusions and filtering, not an invitation to regenerate or train on
-those resources.
+disabled. The preserved clean-mix notes
+record exclusions and filtering only.
 
 Historical Luna prompts and corpora recorded a role boundary between Nix, its
-Casper PUCA, and the independent Luna model. These archived materials do not
-authorize new corpus generation, training, or adaptation. Casper identity and
+Casper PUCA, and the independent Luna model. Casper identity and
 personal-system facts remain Core-owned concerns for authoritative responses.
 
 Historical trainer implementations and their methods (including rsLoRA,
 DoRA, LoRA A/B learning-rate groups, exact-prefix masking, and token-weighted
-gradient accumulation) are retained for auditability only. Do not use or adapt
-the Luna Pro training approach for V6 or any other model. No Luna training is
-currently authorized.
+gradient accumulation) are retained for auditability only.
 
 Preserved research references include QLoRA, LoRA, rsLoRA, LoRA+, DoRA,
-LoftQ, NEFTune, LIMA, SFTMix, and GRAPE. These historical notes are not
-training guidance or permission to reuse the Pro approach for any model.
+LoftQ, NEFTune, LIMA, SFTMix, and GRAPE.
 
-The pre-moratorium notes transcribe 2/9 single-turn and 0/5 multi-turn checks
+Earlier research notes transcribe 2/9 single-turn and 0/5 multi-turn checks
 for an identity candidate, and 1/9 + 1/5 for a balanced rsLoRA checkpoint.
-These are historical reports, not active candidates or authorization to
-test/train; the creator case tested a Casper fact, not Luna's identity. The
+These are historical reports; the creator case tested a Casper fact, not Luna's identity. The
 corrected shared-harness Instruct baseline was reported at 5/9 single-turn and
 1/5 multi-turn without injected context, and 7/9 + 2/5 in synthetic context.
-The preserved pre-moratorium `luna-v6-contextual-v1` (60 steps from the Instruct
+The preserved `luna-v6-contextual-v1` (60 steps from the Instruct
 adapter) was reported at 4/9 + 1/5 without context and 6/9 + 2/5 with synthetic
-context, below that reported baseline. A pre-moratorium paired fictional
+context, below that reported baseline. A paired fictional
 diagnostic (9 cases / 15 turns) reported that context helped some
 state/ambiguity retrieval, but the candidate invented collaborator details,
 changed a four-day recurrence to four hours, and claimed a failed reminder
@@ -131,27 +124,24 @@ is source configuration, not proof of a loaded or hosted model. The former
 handlers return HTTP 410; Pro IDs are also rejected by official model/chat
 routes. The historical Pro pilot report is cited at
 `nix_knowledge/models/nixlm/luna-pro-v1-topical-v8-384-retry2/benchmark_report.md`;
-that ignored local artifact's current presence is not verified. The report is
-historical evidence only, not a release or runtime-status record.
+that Git-ignored local artifact's current presence is not verified. The report is
+historical evidence only.
 
-**Historical Pro v1 pilot record (pre-retirement; not actionable):** the
+**Historical Pro v1 pilot record (pre-retirement):** the
 retirement notes described a v8 run using one epoch and a 384-token limit, with
 718/1,219 train and 87/165 dev conversations and 90 optimizer steps. Its small
 fictional panel was not a quality certification or real stack test. The notes
 record quality defects and unresolved provenance/rights. Repository source
-keeps Pro retired and non-selectable; it does not establish any hosted state.
-Do not reproduce the run or transfer its approach/data to any model; ignored
-artifact presence is not verified.
+keeps Pro retired and non-selectable, and the run has not been reproduced; the
+Git-ignored artifacts' current presence is not verified.
 
 Synthetic context injects hand-authored memory/actions messages in an
 evaluator; it is not an end-to-end stack test. See the exact historical scores
-and lineage in [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md). The archive
-does not establish any production-ready Luna adapter; current local adapter
+and lineage in [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md); current local adapter
 presence is not verified.
 
 The code supports a Transformers/PEFT adapter when selected and local artifacts
-are present; this does not establish a hosted or currently loaded model. No
-verified development or deployed serving state is asserted here. See
+are present. See
 [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for code-level backend caveats.
 
 Relevant configuration includes:
@@ -183,8 +173,11 @@ Start the console:
 
 ```bash
 python nix_core/console_extend.py
-```The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict it) and serves the UI, every `/api/*` route, and the `/v1` OpenAI surface on that one fixed port. There is no port override; the port remains stable across restarts and browser reloads. This enables LAN access subject to firewall/network policy but does not provide internet port forwarding.
- Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens exactly one listening socket — a browser needs only the console URL. The optional Testing-page runner is the sole exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
+```
+
+The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict it) and serves the UI, every `/api/*` route, and the `/v1` OpenAI surface on that one fixed port. There is no port override; the port remains stable across restarts and browser reloads. This enables LAN access subject to firewall/network policy but does not provide internet port forwarding.
+
+Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens exactly one listening socket — a browser needs only the console URL. The optional Testing-page runner is the sole exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
 
 Useful console endpoints:
 
@@ -202,7 +195,7 @@ Useful console endpoints:
 - `POST /api/model` with `{"model":"casper-puca-qlora-v6"}` — switch the local adapter exclusively; Luna IDs are rejected here
 - `GET /api/luna/model`, `POST /api/luna/model`, and `POST /api/luna/chat` — retired direct-research endpoints; their handlers return HTTP 410 `model_retired`
 - Pro model IDs submitted to `/api/model`, `/api/send`, or `/v1/chat/completions` — rejected by the handlers with HTTP 410 `model_retired`
-- `POST /v1/chat/completions` — runs the server's configured official Core model when available; API Token Guard rejects OpenWebUI follow-up/title/tag metadata tasks with `api_token_guard_rejected` before Core/model execution. Local model inventory is not proof of hosted serving state
+- `POST /v1/chat/completions` — runs the server's configured official Core model when available; API Token Guard rejects OpenWebUI follow-up/title/tag metadata tasks with `api_token_guard_rejected` before Core/model execution
 
 The dashboard source is [`dashboard.html`](dashboard.html). It provides
 responsive Home, Models, Conversations, Memories, People, Events, Skills, API,
@@ -235,8 +228,7 @@ Neither this code default nor local status is proof of a hosted model or
 deployment state. Luna Pro v1 is retired from this repository's runtime
 registry, and former direct endpoint handlers return HTTP 410; its research is
 archived only. Luna V6 follows Core → Knowledge → Actions and shares the
-process-wide model slot with Casper. No Luna training or new offline evaluation
-is authorized. Both non-streaming and OpenAI SSE streaming run the full Core
+process-wide model slot with Casper. Both non-streaming and OpenAI SSE streaming run the full Core
 pipeline; native local token callbacks are not exposed. The API response
 includes the standard OpenAI `chat.completion` shape plus a small `nix`
 diagnostic object.
@@ -307,7 +299,31 @@ The websocket subprocess suite may require the local service/model environment. 
 - `request_log.py` — JSONL request logging.
 - `analyze_logs.py` — log problem summaries and exports.
 - `config.py` — environment-backed service/runtime configuration.
+- `skill_cleanser.py` — Qwen3-0.6B skill prompt cleanser (fail-closed rewrite of vague device requests).
+- `skill_profiles.py` — per-skill profiles and the Needle3 skill decider.
+- `skill_runtime.py` — explicitly trusted skill worker runtime.
 
-### Bounded skill plans
+### Device skill pipeline
 
-Targeted skills use `NIX_SKILL_PLAN:` for both single-action and ordered multi-action requests. Core permits at most eight calls, validates every selected skill/tool/argument schema before dispatch, then executes sequentially and stops at the first failed or unconfirmed action. Model prose is never evidence of execution, and a plan that is missing, malformed, incomplete, or invalid executes no action. Existing explicit package trust, digest/configuration checks, worker isolation boundaries, and result validation remain in `SkillRuntime`.
+Targeted device skills (for example the ring light) use a two-stage pipeline
+for both single-action and ordered multi-action requests:
+
+1. **Prompt cleansing (optional).** For vague or conversational requests, a
+   small local model — Qwen3-0.6B via Ollama (`NIX_SKILL_CLEANSE_MODEL`, default
+   `qwen3:0.6b`) — rewrites the user's words into one to eight short,
+   device-anchored imperative steps. Core resolves explicit color descriptions
+   first and passes the resolved color as a hint. The cleanser fails closed:
+   any model error, malformed JSON, or contract violation falls back to the
+   user's own words, and fully grounded requests skip this stage.
+2. **Planning, validation, and execution.** The Needle skill decider and
+   executor propose a `NIX_SKILL_PLAN:` envelope of at most eight calls. Core
+   validates every selected skill, tool, and argument schema before dispatch,
+   then executes sequentially through the skill worker and stops at the first
+   failed or unconfirmed action. The final acknowledgment is composed only
+   after the device readback confirms the results.
+
+Model prose is never evidence of execution, and a plan that is missing,
+malformed, incomplete, or invalid executes no action. Explicit package trust,
+digest/configuration checks, worker isolation boundaries, and result validation
+remain in `SkillRuntime`. The console pipeline view shows every stage,
+including “Qwen3-0.6B · skill prompt cleansing”.
