@@ -67,7 +67,7 @@ Application to Casper:
 **Predicting Turn-Taking and Backchannel in Human-Machine Conversations** (ACL 2025)
 <https://aclanthology.org/2025.acl-long.743/>
 
-The PDF endpoint is not directly machine-readable in this environment, but the published result motivates separating turn-taking decisions from response wording. V4 therefore keeps floor-control policy outside Casper's prose generation.
+The published result motivates separating turn-taking decisions from response wording. V4 therefore keeps floor-control policy outside Casper's prose generation.
 
 ## Why V5 feels covered-up
 
@@ -249,7 +249,7 @@ The model itself is still not certified by this optimization. The local V6 artif
 
 A direct isolated generation benchmark (same system prompt, 64-token ceiling, after one model load) measured approximately 8.35 s to load the base+adapter, then p50 1.64 s and max 4.28 s across five short prompts. Outputs still contained assistant-like behavior, including “How can I help?”, a digital-life disclaimer, and refusal to express a preference. This confirms that lowering the token ceiling helps the budget but cannot repair the adapter's behavior by itself.
 
-Optimization research reviewed for this pass:
+Optimization research reviewed:
 
 - Hugging Face assisted decoding: a smaller same-tokenizer assistant can draft tokens and let the target verify them in one pass; this is a future option, but loading another model is not acceptable until VRAM is measured on the 4060.
 - Hugging Face KV-cache guidance: cache strategy and bounded context affect autoregressive latency; the current runtime already enables `use_cache=True`, but should benchmark static cache/compiled variants separately.

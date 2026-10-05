@@ -1,8 +1,8 @@
-# Casper / Nix Project Handoff
+# Casper / NIX Project Handbook
 
-This document is the durable context for future agents working in this repository. It records the architecture, model lineage, runtime contracts, data boundaries, testing rules, and operational decisions that previously lived only in conversation history.
+This document is the complete engineering reference for the NIX PUCA stack. It records the architecture, model lineage, runtime contracts, data boundaries, testing rules, and operational decisions behind the project.
 
-> **Current Luna directive (2026-09-27):** Repository source retires Luna Pro v1 from the runtime registry; former Pro API handlers return HTTP 410. This does not establish the state of any hosted process. Preserve the Pro research, datasets, builders, manifests, and artifacts as historical records only. Never execute the Pro training workflow or reuse/adapt its data or training approach for **any** model. Luna work is limited to the V6 runtime/integration path; no Luna training or new offline evaluation is authorized. Later research notes in this handoff are historical context, not operational permission. This repository cannot establish any hosted deployment's serving model or live state.
+> **Luna Pro retirement (2026-09-27):** Repository source retires Luna Pro v1 from the runtime registry; former Pro API handlers return HTTP 410. The Pro research, datasets, builders, manifests, and artifacts are preserved as historical records only: the Pro training workflow is disabled, and its data or training approach is not used by any model. Luna development is limited to the V6 runtime/integration path. Research notes below are historical context.
 >
 > **Product identity:** The repository still uses `nix_*` package and environment names for compatibility. The PUCA/system identity is **Casper**. Casper's creator response is deterministic: **"Created and Built by Sai Neela, and living in NIX's PUCA system."**
 
@@ -119,7 +119,7 @@ Brain
   -> final reply
 ```
 
-In the repository's Transformers selector, Luna V6 is the startup default; Casper models require explicit selection. A non-Transformers backend bypasses that selector. This source-level selection is not evidence of the model served by any hosted process. The chat model must not invent personal memory; the memory block and structured Knowledge results are authoritative.
+In the repository's Transformers selector, Luna V6 is the startup default; Casper models require explicit selection. A non-Transformers backend bypasses that selector. This source-level selection is a configuration fact, not evidence of the model served by any hosted process. The chat model must not invent personal memory; the memory block and structured Knowledge results are authoritative.
 
 ### 3.2 Actions flow
 
@@ -147,7 +147,7 @@ Important metadata:
 - Architecture in `config.json`: `Qwen3_5ForConditionalGeneration`.
 - The local HF model is a multimodal Qwen3.5 architecture, not a simple legacy causal model.
 - The model index reports approximately 9.32 GB of unquantized safetensor data.
-- The directory is ignored by Git; its current presence and contents are not established by this repository snapshot.
+- The directory is ignored by Git.
 
 ### 4.2 Casper V5 adapter lineage
 
@@ -186,7 +186,7 @@ CASPER_FAST_MAX_NEW_TOKENS
 NIX_CASPER_MAX_CONCURRENT_REQUESTS
 ```
 
-When the Casper Transformers backend is selected, the implementation lazily loads a selected Casper adapter through Transformers + PEFT on CUDA; its code defaults are a `0.68` VRAM fraction and one concurrent decode. These defaults do not prove local artifact presence, a loaded model, or a hosted serving identity. Earlier development notes recorded an RTX 4060 and approximately 3.8–4.3 GiB GPU use; that is historical telemetry, not a statement about current deployment state.
+When the Casper Transformers backend is selected, the implementation lazily loads a selected Casper adapter through Transformers + PEFT on CUDA; its code defaults are a `0.68` VRAM fraction and one concurrent decode. Earlier development notes recorded an RTX 4060 and approximately 3.8–4.3 GiB GPU use; that is historical telemetry.
 
 ### 4.3 QLoRA/data scripts
 
@@ -244,21 +244,19 @@ They are ignored local artifacts. Treat them as evidence, not as an automated gu
 
 Luna is separate from Casper. Luna V6 is the only Luna model in the runtime
 registry and is the configured Transformers-selector startup default. A
-non-Transformers backend can
-bypass that selector. Local artifacts/status do not prove a hosted serving
-identity.
+non-Transformers backend can bypass that selector.
 
-**No Luna training is authorized.** Keep Luna work to the V6 runtime and
-integration path; do not run Luna training or dataset-building workflows.
-The Pro-specific data and training approach must not be reused or adapted for
+**Luna training is out of scope.** Luna work is limited to the V6 runtime and
+integration path; the Luna dataset-building and training workflows are disabled.
+The Pro-specific data and training approach is not reused or adapted for
 V6 or any other model. The research, builders, manifests, evaluation sources,
 and artifacts remain preserved for provenance only. The paths below identify
-historical source files, not approved commands; builder/trainer CLI entry points
+historical source files; their builder/trainer CLI entry points
 are disabled while helper implementations remain for provenance:
 
 ```text
 nix_knowledge/scripts/nixlm/build_luna_conversation.py      [CLI disabled]
-nix_knowledge/scripts/nixlm/train_luna_qlora.py             [not authorized]
+nix_knowledge/scripts/nixlm/train_luna_qlora.py             [disabled]
 nix_knowledge/scripts/nixlm/evaluate_luna_v6.py             [CLI disabled]
 nix_core/luna_runtime.py                                    [current V6 runtime]
 nix_knowledge/scripts/nixlm/build_luna_resource_mix.py      [CLI disabled]
@@ -268,22 +266,19 @@ Historical research used local DailyDialog and filtered FineTome-100k,
 No Robots, and UltraFeedback chosen-SFT resources, excluding Ubuntu's
 unrelated adjacent-line pairs and adding project-authored behavior controls.
 FineTome's card did not declare a clear license and was derived from The-Tome;
-source terms remain unresolved. Those notes describe preserved provenance,
-not permission to regenerate data, train, or reuse the Pro approach. The base
+source terms remain unresolved. The base
 checkpoint and tokenizer details below are retained as research lineage only.
 
 Historical `evaluate_luna_v6.py` runs used the same single-turn and multi-turn
 contracts as Casper V6 and reported failures without relabeling them. The creator
 case tested a Casper fact rather than Luna's identity. The historical evaluator
-is retained for provenance but its CLI is disabled; these records do not
-authorize training or new evaluations.
+is retained for provenance but its CLI is disabled.
 
 ### Archived Luna identity-correction research
 
 The pre-retirement identity work recorded the following Unsloth, TRL, and
-Transformers references. They are provenance only, not current guidance. All
-Luna corpus-building/offline-evaluation commands are disabled; retained helper
-code is not authorization to regenerate data, train, or evaluate:
+Transformers references as provenance. All
+Luna corpus-building/offline-evaluation commands are disabled:
 
 - The historical notes discussed exact chat-template rendering and assistant
   completion masking.
@@ -293,7 +288,7 @@ code is not authorization to regenerate data, train, or evaluate:
 - They stated that identity examples should not replace deterministic Core
   identity handling, Knowledge grounding, or memory validation.
 
-Historical references listed in the pre-retirement Luna research notes (archive only; not current guidance or run authorization):
+Historical references listed in the pre-retirement Luna research notes (archive only):
 
 - Unsloth LoRA and completion-only guidance:
   `https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide`
@@ -304,7 +299,7 @@ Historical references listed in the pre-retirement Luna research notes (archive 
 - Transformers chat-template and special-token guidance:
   `https://huggingface.co/docs/transformers/en/chat_templating`
 
-Historical implementation sources (preserved for provenance; not approved workflows):
+Historical implementation sources (preserved for provenance):
 
 ```text
 nix_knowledge/scripts/nixlm/luna_format.py
@@ -321,26 +316,22 @@ accumulation 8, a 512-token cap, 230 identity-control examples, and a recorded
 2.555 GiB peak allocation. Their score transcription gives checkpoint-160
 **2/9 single-turn and 0/5 multi-turn**, compared with checkpoint-80's **4/9 and
 0/5**, and describes a near-match `Sai Neella` plus regressions elsewhere.
-These are archive reports, not independently verified results here; the
-candidate is not registered, and no new reproduction, activation, training, or
-evaluation is authorized.
+These are archive reports; the
+candidate is not registered in the current runtime.
 
 The archive also records a balanced joint SFT/adapter-selection attempt and
 its non-promotion decision. Any former recommendation for follow-on training is
-superseded: no Luna training is authorized, and the Pro training approach must
-not be reused for any model. Core's deterministic identity guard remains the
+superseded. Core's deterministic identity guard remains the
 authority for exact creator attribution.
 
 The preserved `luna_format.py` documents historical role-separation research
 between Nix, Casper, and Luna. Casper's exact identity and personal facts remain
-Core-owned authoritative concerns; the archived material does not authorize
-new builds, training, evaluation, or Pro-method reuse.
+Core-owned authoritative concerns.
 
 The historical optimization notes describe an audit of token-weighted
 gradient accumulation and record exact-prefix label validation, PEFT rsLoRA,
 optional DoRA, and separate A/B LoRA learning rates. These notes and preserved
-implementation code are provenance only, not permission to reuse that approach
-for Luna V6 or any other model.
+implementation code are provenance only.
 
 Research reviewed for the Luna redesign:
 
@@ -361,14 +352,12 @@ Research reviewed for the Luna redesign:
 - GRAPE, `arXiv:2502.04194`: historical reference on response distribution.
 
 The archive lists Unsloth sources that were reviewed for the pre-retirement
-research; these references do not authorize a Luna run, new evaluation, or
-reuse of the Pro approach.
+research.
 
 The historical notes transcribe the first balanced rsLoRA checkpoint at **1/9
 single-turn and 1/5 multi-turn** in isolation. It is not registered in the
 current runtime source. The shared V6 harness's Casper creator case tests a
-Casper fact, not Luna's identity; that is a documented limitation, not an
-instruction to train or evaluate Luna.
+Casper fact, not Luna's identity; that is a documented limitation.
 
 ### Historical V6 score report transcriptions (2026-09-23; not actionable)
 
@@ -377,7 +366,7 @@ appending an assistant reply after each user turn and saving full traces.
 Earlier multi-turn scores from a harness that misread later user turns as
 assistant turns were marked invalid in the archive. The table below transcribes
 scores attributed to the corrected harness; they are historical reports, not
-independently verified results. No evaluator is authorized to run now.
+independently verified results. The evaluator's CLI is disabled.
 The `luna-instruct-v1` baseline was described as the trained Instruct adapter,
 not the bare Llama base; the unadapted base was reported at 2/9 single and 1/5
 multi in isolated mode. Current local adapters/reports are not verified here.
@@ -403,7 +392,7 @@ setup, with a reported regression for the candidate without context. The
 historical notes concluded that these results did not justify promotion at that
 time; this is not a claim about a currently loaded or hosted model.
 
-The pre-moratorium notes describe an experiment using the then-cited
+An earlier experiment (recorded before the Pro retirement) used the then-cited
 `luna_targeted_v6_contextual_v2_sft.jsonl` snapshot (reported as 2,653 rows;
 360 complete multi-turn trajectories; 223 examples with trusted Nix context;
 zero exact-normalized V6 user-prompt overlaps). Its metadata
@@ -423,7 +412,7 @@ that corrected data version. The notes also describe a separate corpus snapshot,
 223 contextual examples; 0 exact V6 prompt overlaps), described as generated
 after the fix and not trained or scored. Both corpus metadata files and JSONL
 snapshots are cited for provenance; current local presence is not established
-here. No new build, evaluation, or training run is authorized. The historical
+here. The historical
 adapter was reported at `models/nixlm/luna-v6-contextual-v1/`, initialized from
 `luna-instruct-v1`, with checkpoints recorded at steps 30 and 60. The notes list
 LR `1e-5`, rank-16 LoRA without rsLoRA, micro-batch 1, gradient accumulation 8,
@@ -444,9 +433,7 @@ clarification. These are reported historical quality/safety concerns, not
 current model observations.
 
 Other archived notes summarize ACT and ReSURE as research references. They do
-not describe implemented features or authorize follow-on work. No new Luna
-research/evaluation/training is authorized, and Pro-method reuse for any model
-is prohibited.
+not describe implemented features.
 
 - ACT, Google Research/ICLR 2025: `https://research.google/blog/learning-to-clarify-multi-turn-conversations-with-action-based-contrastive-self-training/`
 - ReSURE: `https://arxiv.org/html/2508.19996v1`
@@ -461,9 +448,7 @@ reasonable. Context-mode results are not end-to-end results, and historical
 scores should be read alongside their reported replies/traces (whose current
 artifact presence is unverified). The handoff archive separately reported
 harness/corpus tests passing **19/19** and four candidate reports completing;
-those historical claims are not revalidated here. This maintenance pass did not
-repeat model evaluations or verify GPU/process status; it ran only focused
-CPU/hermetic code tests, not model evaluation or live-runtime verification.
+those historical claims are not revalidated here.
 
 ## 6. Source-level backend selection and optional ExLlama path
 
@@ -473,7 +458,7 @@ CPU/hermetic code tests, not model evaluation or live-runtime verification.
 NIX_CASPER_BACKEND=transformers  # code default; environment-overridable
 ```
 
-Source config defaults the official Transformers selector to Luna V6; Casper V5/V6 require explicit selection. With `NIX_CASPER_BACKEND=transformers`, Casper's fallback can lazily load its configured QLoRA adapter through `casper_model.py`. Ollama may be configured as another backend. These are code paths, not evidence of local artifacts, a loaded process, or a hosted serving identity.
+Source config defaults the official Transformers selector to Luna V6; Casper V5/V6 require explicit selection. With `NIX_CASPER_BACKEND=transformers`, Casper's fallback can lazily load its configured QLoRA adapter through `casper_model.py`. Ollama may be configured as another backend.
 
 ### Tabby/ExLlama boundary
 
@@ -506,11 +491,11 @@ GET  /v1/models
 POST /v1/chat/completions
 ```
 
-Set `NIX_OPENAI_API_KEY` for Bearer authentication. The endpoint is wired to the same `Brain.handle` pipeline as the dashboard, preserving routing, Knowledge, Actions, temporal/person memory, conversation history, and final verification through the configured official conversation-model path. Both `stream: false` and OpenAI SSE `stream: true` are supported. The local Transformers path produces a complete grounded answer first, then emits it in progressive SSE chunks; native token callbacks are not exposed. These source-level details do not establish any hosted or live deployment state.
+Set `NIX_OPENAI_API_KEY` for Bearer authentication. The endpoint is wired to the same `Brain.handle` pipeline as the dashboard, preserving routing, Knowledge, Actions, temporal/person memory, conversation history, and final verification through the configured official conversation-model path. Both `stream: false` and OpenAI SSE `stream: true` are supported. The local Transformers path produces a complete grounded answer first, then emits it in progressive SSE chunks; native token callbacks are not exposed.
 
 ## 8. Knowledge engine and temporal correctness
 
-### 6.1 Temporal authority
+### 8.1 Temporal authority
 
 `nix_knowledge/nix_knowledge/temporal.py` and `context.py` are the only date/time authorities. The selector model must never decide absolute dates.
 
@@ -532,7 +517,7 @@ Calendar result entries should carry:
 - Relative label.
 - `temporal_grounding` with absolute values.
 
-### 6.2 Neuro-symbolic calendar boundary
+### 8.2 Neuro-symbolic calendar boundary
 
 The selector may propose a title and temporal expression. `temporal_hybrid.py` then:
 
@@ -561,7 +546,7 @@ Speech-normalized forms currently covered include:
 - `this weekend at 7pm` as one upcoming occurrence.
 - `this Friday` as the upcoming Friday when the current week’s Friday has passed.
 
-### 6.3 Person states
+### 8.3 Person states
 
 Person mood/health/well-being statements are temporal states, not durable facts. The state parser and store live in:
 
@@ -599,7 +584,7 @@ If this appears in a browser, determine whether it is a diagnostic trace/API fie
 
 ## 10. Dashboard and services
 
-### Source-configured service defaults (not verified live)
+### Source-configured service defaults
 
 ```text
 Knowledge API: 127.0.0.1:8100
@@ -609,13 +594,9 @@ Console:       0.0.0.0:49117 by default; fixed port (restrict host with NIX_CONS
 Timezone:      America/Chicago
 ```
 
-A dashboard URL recorded in historical development notes was:
+Historical development notes recorded a dashboard URL on a private network.
 
-```text
-http://100.108.149.71:35567/
-```
-
-Do not hard-code that address into source; use environment configuration.
+Do not hard-code any address into source; use environment configuration.
 
 ### Useful endpoints
 
@@ -639,7 +620,7 @@ Use the Knowledge virtual environment because it contains Torch/Transformers:
 /root/nix_knowledge/.venv/bin/python /root/nix_core/ws_server.py
 ```
 
-The startup code is intended to bind before model warm-up; this source-level behavior is not a verified observation of a running process.
+The startup code is intended to bind before model warm-up.
 
 ## 11. Sessions and follow-up behavior
 
@@ -720,9 +701,8 @@ The following are local and must remain ignored:
 - Downloaded model weights and adapters.
 - Training datasets and generated artifacts.
 - `.env` and credentials.
-- Agent/Freebuff state.
 
-Development environments may contain private shell history, local service state, Ollama files, and downloaded models. Do not add those to GitHub; this handoff does not verify the contents of any current machine.
+Development environments may contain private shell history, local service state, Ollama files, and downloaded models. Keep those out of Git; this document does not verify the contents of any current machine.
 
 ## 14. Known operational caveats
 
@@ -733,7 +713,7 @@ Development environments may contain private shell history, local service state,
 5. A log entry’s `rule=casper_transformers` is expected internal metadata. It is not a model answer unless the same text appears in the reply body.
 6. Local model cards contain placeholder fields from the generated Hugging Face template. The authoritative runtime paths are in `casper_model.py`, `casper_runtime.py`, and `config.py`.
 
-## 15. Safe change checklist for future agents
+## 15. Change checklist
 
 Before changing a routing or temporal rule:
 

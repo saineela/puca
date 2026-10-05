@@ -18,7 +18,6 @@
 
 <p align="center">
   <a href="https://github.com/saineela/puca">Repository</a> ·
-  <a href="https://github.com/saineela/puca/stargazers">☆ Star NIX PUCA</a> ·
   <a href="nix_core/README.md">Core docs</a> ·
   <a href="nix_knowledge/README.md">Knowledge docs</a> ·
   <a href="nix_actions/README.md">Actions docs</a> ·
@@ -27,21 +26,19 @@
 
 NIX PUCA is a modular software foundation for a **Personal User Companion Agent (PUCA)**: a self-hosted personal assistant built around explicit boundaries between conversation, durable memory, temporal interpretation, and scheduled actions. It is a Python project with local SQLite persistence and optional local or separately operated model backends.
 
-The design is intentionally more structured than a single prompt wrapped around an LLM. NIX Core routes and composes requests; NIX Knowledge stores and retrieves personal records; NIX Actions manages scheduled work. A configured conversational model can produce natural-language responses, while application code validates and manages persistence and scheduling. Deployment security and feature-specific permissions still require configuration, testing, and review.
+The design is intentionally more structured than a single prompt wrapped around an LLM. NIX Core routes and composes requests; NIX Knowledge stores and retrieves personal records; NIX Actions manages scheduled work. A configured conversational model produces natural-language responses, while application code validates and manages persistence and scheduling.
 
-**Project identity:** The source handoff identifies Casper as the user-facing NIX PUCA identity, created and built by Sai Neela in NIX. This product identity is separate from the local Transformers selector, which currently defaults to Luna V6. These are source-level settings; they do not prove weights are present, loaded, or used by any hosted service.
+**Project identity:** the user-facing assistant identity is **Casper**, created and built by Sai Neela in NIX. Casper is separate from the model adapters: the local Transformers selector currently defaults to **Luna V6**, and any supported backend can be selected through configuration.
 
-> **Project status:** This repository is a development foundation, not a claim of a certified, production-ready, or hosted AI product. Model quality, device compatibility, latency, VRAM use, privacy behavior, and service exposure depend on local configuration and require deployment-specific validation. **Public-release note:** no repository-level `LICENSE` is present; choose and add one before presenting the code as open source or inviting reuse/contributions.
+> **Project status:** this repository is a development foundation, not a certified or hosted product. Model quality, device compatibility, latency, VRAM use, and privacy behavior depend on local configuration and require deployment-specific validation. No license file has been added yet — see [License and contributions](#license-and-contributions).
 
 ## What is a PUCA?
 
-**PUCA** means **Personal User Companion Agent**. In NIX it describes a personal-assistant architecture where conversational language generation is only one part of the system. Personal facts, event times, reminders, presence signals, device access, and external integrations are handled by separately defined services and policies—not assumed to be safe or accurate because a model generated text.
-
-This is a project term, not a claim that NIX is the first PUCA, the first personal AI assistant, or a formally recognized product category.
+**PUCA** means **Personal User Companion Agent**. In NIX it describes a personal-assistant architecture where conversational language generation is only one part of the system. Personal facts, event times, reminders, presence signals, device access, and external integrations are handled by separately defined services and policies — never assumed to be correct just because a model generated text. PUCA is a project term for this architecture, not a standardized product category.
 
 ## Why NIX
 
-A personal assistant needs to do more than answer one prompt. It needs to distinguish a question from a request to store something, resolve “tomorrow” in the configured timezone, keep a reminder linked to the event that created it, ask when a person is ambiguous, and avoid claiming that an action succeeded before the scheduler confirms it.
+A personal assistant needs to do more than answer one prompt. It needs to distinguish a question from a request to store something, resolve “tomorrow” in the configured timezone, keep a reminder linked to the event that created it, ask when a person is ambiguous, and never claim an action succeeded before the scheduler confirms it.
 
 NIX makes these responsibilities visible in code:
 
@@ -60,7 +57,8 @@ NIX makes these responsibilities visible in code:
 - **Temporal interpretation:** converts supported relative dates and times to timezone-aware timestamps before storage or presentation.
 - **Deterministic scheduling:** Actions tracks pending, fired, failed, cancelled, and rescheduled operations and can link them to source Knowledge records.
 - **Conversation continuity:** bounded session history and clarification continuation scoped to a conversation.
-- **Core console:** browser dashboard, traces, conversations, event and memory views, model settings, and local administration. The dashboard follows NIX PUCA's official light-only black-and-white theme and logo.
+- **Device skills:** targeted device requests (for example ring-light power, color, and brightness) run through a validated plan pipeline — optional local prompt cleansing, per-step planning, Core schema validation, device execution, and readback — before the assistant confirms anything. See [Device skill pipeline](#device-skill-pipeline).
+- **Core console:** browser dashboard, traces, conversations, event and memory views, model settings, and local administration.
 - **OpenAI-compatible API:** `GET /v1/models` and `POST /v1/chat/completions` for compatible clients. API Token Guard rejects known Open WebUI follow-up/title/tag metadata jobs before Core/model invocation so they do not pollute conversations.
 - **WebSocket text gateway:** token-authenticated text transport for client/voice-gateway integrations. This is not, by itself, a complete speech-recognition or text-to-speech system.
 - **Optional semantic retrieval:** local Sentence Transformers/BGE embeddings when dependencies and model files are supplied.
@@ -69,7 +67,7 @@ NIX makes these responsibilities visible in code:
 
 ### Planned, not yet implemented
 
-The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-time voice, open-source Web Search, ESP32/OPNsense presence, opt-in location/timeline integrations, and Echo Dot research. The planned NIX Home mobile client has an [API and screen-flow blueprint](nix_core/MOBILE_APP_API.md); no mobile app or authenticated mobile API suite is implemented. These are future plans, not currently available features. In particular, the existing Skills marketplace saves bounded static files and does **not** execute skills; the catalog's Web Search entry is not a working search connector.
+The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-time voice, open-source Web Search, ESP32/OPNsense presence, opt-in location/timeline integrations, and Echo Dot research. The planned NIX Home mobile client has an [API and screen-flow blueprint](nix_core/MOBILE_APP_API.md); no mobile app or authenticated mobile API suite is implemented. These are future plans, not currently available features. In particular, the community Skills marketplace saves bounded static files and does **not** execute community code; the catalog's Web Search entry is not a working search connector. (Built-in device skills are a separate, code-owned pipeline described above.)
 
 ## Architecture
 
@@ -109,9 +107,29 @@ For “I have robotics practice tomorrow at 5pm; remind me,” the intended pipe
 1. Core identifies a personal/action request and forwards it to Knowledge.
 2. Knowledge resolves “tomorrow at 5pm” using `NIX_TZ`, validates the event details, and persists structured data.
 3. The Knowledge-to-Actions bridge captures a linked reminder, if the request and operation are valid.
-4. Core composes a response using the structured result. It should not state that the reminder succeeded if Actions did not confirm it.
+4. Core composes a response using the structured result. It does not state that the reminder succeeded unless Actions confirmed it.
 
 The exact outcome depends on the current route, service health, database, timezone, and model configuration. Use isolated test databases for experiments.
+
+### Device skill pipeline
+
+Requests that target a device — for example a ring light's power, color, or brightness — never go straight from model prose to hardware. They run through a staged, code-validated pipeline:
+
+```text
+user request
+  -> Core router (skill vs chat)
+  -> Qwen3-0.6B prompt cleanser   (optional; rewrites vague wording into
+                                   explicit device-anchored steps; fail-closed
+                                   to the user's own words)
+  -> Needle planner               (one step at a time, NIX_SKILL_PLAN envelope,
+                                   at most 8 steps)
+  -> Core schema validation       (skills, tools, arguments; exact RGB
+                                   preservation; intent preservation)
+  -> Skill worker execution       (device command + readback)
+  -> verified acknowledgment      (sent only after confirmed results)
+```
+
+The cleanser is an enhancement, never a gate: any model error or malformed output falls back to the user's own words, and fully grounded requests skip it. A plan that is missing, malformed, incomplete, or invalid executes no action, and the final reply is checked against the device's confirmed results before it is sent.
 
 ## High-level concepts, in plain language
 
@@ -123,16 +141,18 @@ The exact outcome depends on the current route, service health, database, timezo
 | **NIX Actions** | The scheduler: tracks supported reminders and other captured work through their lifecycle. |
 | **Nix-Skills** | The planned format/runtime for optional capabilities and integrations; it is not executable in the current repository. |
 | **LLM** | A large language model that generates or interprets text. NIX uses it as a replaceable component rather than as the database or scheduler. |
+| **Adapter / LoRA / QLoRA** | An adapter adds learned parameters to a base model; LoRA is a low-rank adapter method, and QLoRA trains LoRA adapters while loading a quantized base model. Neither replaces the surrounding application rules or data store. |
+| **Prompt cleanser** | A small local model (Qwen3-0.6B) that rewrites a vague device request into explicit steps before planning. It can only rephrase what the user asked for. |
+| **Device skill** | A built-in, code-owned capability (such as ring-light control) that executes through the validated plan pipeline above. |
+| **Readback** | Reading the device's actual state after a command, so a confirmation reflects reality rather than the model's claim. |
 | **Router** | A decision layer that selects a request path, such as chat or Knowledge. It does not generate the final answer; routing latency is not full-response latency. |
 | **p50 / p95 latency** | p50 is the median time across samples; p95 is the time at or below which 95% of measured samples completed. |
 | **Requests per second (RPS)** | A throughput calculation for the timed benchmark operation; it is not a count of full model-generated conversations per second. |
 | **Durable memory / Knowledge** | Structured records that can be read later, rather than relying only on what is in the current chat prompt. |
 | **Temporal grounding** | Converting phrases such as “tomorrow at 5” into a timezone-aware date and time before saving or reporting them. |
 | **Action scheduler** | A deterministic service that tracks when captured reminders or other supported operations are due. |
-| **Adapter / LoRA / QLoRA** | An adapter adds learned parameters to a base model; LoRA is a low-rank adapter method, and QLoRA trains LoRA adapters while loading a quantized base model. Neither replaces the surrounding application rules or data store. |
 | **VRAM** | GPU memory. Requirements depend on model weights, quantization, runtime, context size, and concurrent workloads. |
 | **Presence detection** | A signal that may estimate whether a device/person is at home or in a room; it is not automatically identity proof or precise location. |
-| **Skill** | A planned, permissioned capability/connector. In the current repository, marketplace packages are static files and are not executable. |
 | **SQLite** | A database stored in a local file; NIX uses it for structured records and service state. |
 | **OpenAI-compatible API** | An HTTP request/response format supported by many clients; compatibility does not imply that NIX is OpenAI or uses OpenAI-hosted models. |
 
@@ -172,7 +192,7 @@ python -m pip install -e ./nix_knowledge -e ./nix_actions
 python -m pip install requests websockets numpy
 ```
 
-The command above installs the sibling packages and basic Core/HTTP dependencies. It does not install `pytest`, Sentence Transformers, a CUDA-enabled PyTorch build, Transformers/PEFT/bitsandbytes, or a model. Add only the optional stack needed for your chosen use case. The repository does not currently lock every optional dependency to a tested version matrix.
+The command above installs the sibling packages and basic Core/HTTP dependencies. It does not install `pytest`, Sentence Transformers, a CUDA-enabled PyTorch build, Transformers/PEFT/bitsandbytes, or a model. Add only the optional stack needed for your chosen use case.
 
 ### 2. Configure trusted local settings
 
@@ -236,7 +256,8 @@ Common settings are documented in [`.env.example`](.env.example):
 | `NIX_ACTIONS_API_HOST` / `NIX_ACTIONS_API_PORT` | Actions service bind host and port. |
 | `NIX_WS_HOST` / `NIX_WS_PORT` | WebSocket bind host and port. |
 | `NIX_CONSOLE_HOST` | Dashboard/API bind host; port is fixed at `49117`. |
-| `NIX_CASPER_BACKEND` | `transformers`, `ollama`, or `tabby` transport selection; verify actual runtime configuration. |
+| `NIX_CASPER_BACKEND` | `transformers`, `ollama`, or `tabby` transport selection. |
+| `NIX_SKILL_CLEANSE_MODEL` | Ollama model used for skill prompt cleansing; default `qwen3:0.6b`. |
 | `NIX_REQUEST_LOG` / `NIX_REQUEST_LOG_DIR` | Core request logging (enabled by default) and its output directory. Logs do not rotate automatically. |
 
 Important operational notes:
@@ -249,22 +270,23 @@ Important operational notes:
 
 ## Models and inference
 
-### Model identities and source-level selection
+NIX treats every language model as a replaceable component. All backends below are optional and configured locally; model weights are never bundled with the repository.
 
-- The **Transformers selector defaults to the official Luna V6 ID** `luna-v6-contextual-v1` in source.
-- **Casper V5** (`casper-puca-qlora-v5`) and **Casper V6** (`casper-puca-qlora-v6`, local adapter directory `casper-puca-qlora-v6-final`) are separate selectable Casper choices. Casper V6 is documented as beta and is not the selector default.
-- **Luna Pro v1 is retired** from this repository's runtime. Do not reuse or adapt its training approach or data for any model. Luna development is V6 runtime/integration only; no Luna training or new offline evaluation is authorized.
-- When `NIX_CASPER_BACKEND` selects Ollama or TabbyAPI, that non-Transformers backend bypasses the Luna/Casper local adapter selector.
+| Backend | What it is | Notes |
+| --- | --- | --- |
+| Transformers + PEFT | Local PyTorch inference with LoRA/QLoRA adapters | Source default selects the Luna V6 adapter (`luna-v6-contextual-v1`). Casper V5 (`casper-puca-qlora-v5`) and Casper V6 (`casper-puca-qlora-v6-final`, beta) are selectable alternatives. |
+| Ollama | Separately installed local model server | Configured with `NIX_OLLAMA_MODEL` (default `qwen3.5:4b`); NIX never launches it automatically. |
+| TabbyAPI | Separately installed OpenAI-compatible server | Optional HTTP client in Core (`NIX_CASPER_BACKEND=tabby`); verify artifact compatibility before enabling. |
+| Qwen3-0.6B (Ollama) | Small utility model for skill prompt cleansing | Rewrites vague device requests into explicit steps; fail-closed to the user's own words. |
+| Qwen 2.5 0.5B | Optional Knowledge route gate (`Nix_predictor`) | Disabled by default (`NIX_CORE_USE_KNOWLEDGE_MODEL_GATE=0`). |
 
-These are **source-code facts**, not statements that any listed weights exist on your machine, that a model was loaded during this session, or that a hosted process serves one of those models. Check the running process and its health/configuration. Local models are separately downloaded and excluded from Git.
+**Luna Pro v1 is retired.** It is no longer registered for selection, its former direct API endpoints return HTTP 410 (`model_retired`), and its research artifacts are archived for provenance only. Luna development is limited to the V6 runtime/integration path.
 
-### GPU memory and the under-3-GB claim
+These statements describe source code and configuration, not any particular machine: weights must be downloaded separately, and `/api/health` or `/api/model` on a running instance reports what is actually loaded.
 
-NIX contains deterministic CPU-routed paths, optional CPU-first routing, optional semantic embeddings, and GPU-backed conversation model implementations. These are different workloads. A fast route decision does not mean the full conversation or every model pipeline uses less than 3 GB of VRAM.
+### GPU memory
 
-This repository does **not** currently establish a complete NIX conversation run under 3 GB of VRAM. Historical notes report a Luna V6 training allocation of about **3.074 GiB** and a Casper development GPU run around **3.8–4.3 GiB**; those are archived environment-specific figures, not a current hardware guarantee. A fixed per-process VRAM fraction is a cap/control, not a measurement of end-to-end peak memory. The local weights, quantization, GPU, runtime, context length, warm/cold state, and other GPU processes all affect actual use.
-
-For a defensible model-memory claim, publish a reproducible run with: exact GPU/driver, backend and package versions, exact base and adapter revisions, quantization, prompt/context/token settings, cold and warm runs, measured peak allocated **and reserved** VRAM, and repeated sample count. Until such a full-stack benchmark is recorded and independently repeatable, NIX does not advertise itself as “the world’s first PUCA under 3 GB VRAM.”
+Conversation models run on GPU; the project was developed on an RTX 4060 (8 GiB). Local loaders default to a `0.68` per-process CUDA memory fraction. Development records measured roughly 3–4.3 GiB for Casper and about 2.3 GiB inference / 3.1 GiB training for Luna-class adapters. Actual use depends on weights, quantization, runtime, context length, and other GPU workloads — measure your own configuration before drawing conclusions. The repository's router microbenchmark measures a Python classifier, not model generation; its timings are not end-to-end latency.
 
 ### Optional TabbyAPI / ExLlamaV2
 
@@ -281,15 +303,15 @@ PYTHONPATH=nix_core python nix_core/benchmarks/speed_benchmark.py \
   --benchmark router --repeats 100 --warmup 10
 ```
 
-A 100-sample run in the current development workspace reported **p50 0.106 ms**, **p95 0.145 ms**, mean **0.103 ms**, minimum **0.031 ms**, and maximum **0.189 ms** on the harness's built-in prompt set (10 warm-up samples; all 100 measured samples succeeded). The harness-calculated throughput was **9,673 requests/second** for this timed operation. Timing includes the classifier call and JSON serialization of the route and matched rule. These are local software-environment measurements, not universal latency guarantees or end-to-end assistant response/throughput. The benchmark does not measure the separate `CoreRoutingEngine.decide` API, HTTP/database work, model loading, or response generation. Its JSON result does not capture the host hardware, OS, Python version, or package versions; rerun the command in your own environment before making a comparison.
+A 100-sample run in the current development workspace reported **p50 0.106 ms**, **p95 0.145 ms**, mean **0.103 ms**, minimum **0.031 ms**, and maximum **0.189 ms** on the harness's built-in prompt set (10 warm-up samples; all 100 measured samples succeeded). The harness-calculated throughput was **9,673 requests/second** for this timed operation.
 
-The read-only router/predictor/dashboard-classification benchmark harness does not invoke a complete model response. See [`nix_core/benchmarks/README.md`](nix_core/benchmarks/README.md) for targets, limitations, and usage. Do not present its sub-millisecond route timing as total conversation latency.
+Timing covers only the classifier call and JSON serialization of the route and matched rule — not HTTP/database work, model loading, or response generation — and reflects one local software environment. Rerun the command in your own environment before making comparisons. See [`nix_core/benchmarks/README.md`](nix_core/benchmarks/README.md) for targets, limitations, and usage.
 
 ### Archived model-quality and latency evidence
 
 Small project-local evaluation suites are engineering checks, not human-subject studies or standardized language-quality scores. Historical Casper V6 notes report **7/8** in one policy-conditioned single-turn set and **1/5** in the latest documented direct multi-turn check; the V6 candidate is not promoted as the default. A historical isolated generation benchmark reported p50 **1.64 s** and max **4.28 s** over five short prompts after an approximately **8.35 s** load. The environment and protocol are in [`CASPER_V6_RESEARCH.md`](CASPER_V6_RESEARCH.md), and are not a claim of current serving performance.
 
-Historical Luna contextual scores were mixed and were recorded with synthetic injected context as well as isolated mode. Synthetic evaluator context is not a full Core/Knowledge/Actions integration test. Luna model development is restricted to V6 runtime/integration; no Luna training or new offline evaluation is authorized.
+Historical Luna contextual scores were mixed and were recorded with synthetic injected context as well as isolated mode; synthetic evaluator context is not a full Core/Knowledge/Actions integration test.
 
 NIX does not claim “human-level” or scientifically measured “human-like” speech. The project aims for natural, concise, grounded conversational behavior. Voice input/output is on the roadmap; current WebSocket support is text transport.
 
@@ -300,14 +322,14 @@ Run the package suites from the repository root:
 ```bash
 (cd nix_knowledge && python -m pytest tests -q)
 (cd nix_actions && PYTHONPATH=../nix_knowledge:. python -m pytest tests -q)
-(cd nix_core && python -m pytest -q)
+(cd nix_core && python -m pytest -q --ignore=benchmarks)
 PYTHONPATH=. python -m pytest -q nix_decision/nix_decision/test_engine.py
 ```
 
-Core's full suite may require configured services or model backends. A hermetic Core run that excludes the live subprocess integration test is:
+A hermetic Core run that also excludes the live subprocess integration test is:
 
 ```bash
-(cd nix_core && python -m pytest -q --ignore=test_e2e_subprocess.py)
+(cd nix_core && python -m pytest -q --ignore=benchmarks --ignore=test_e2e_subprocess.py)
 ```
 
 Test the API Token Guard and Open WebUI conversation-history isolation with:
@@ -331,6 +353,8 @@ README.md                       Project overview and developer guide
 ROADMAP.md                      Planned Nix-Skills, app, voice, and hardware features
 nix_core/                       Routing, response composition, console, API, gateway
 ├── dashboard.html              Local responsive dashboard
+├── skill_cleanser.py           Qwen3-0.6B skill prompt cleanser
+├── skill_runtime.py            Skill plan validation/execution runtime
 └── benchmarks/                 Safe read-only router/classification benchmark harness
 nix_knowledge/
 ├── nix_knowledge/              Durable memory and temporal interpretation
@@ -340,34 +364,25 @@ nix_knowledge/
 nix_actions/                    Deterministic actions and scheduling
 nix_decision/                   Explicit trigger/state-gate foundation (no rules enabled)
 testing-echo-connect/           Optional isolated integration prototype
+Nix-skills-repo/                Skill packaging guide and example skill
 data/                           Local SQLite/runtime state (Git-ignored)
 ```
 
 ## Documentation
 
 - [**Roadmap**](ROADMAP.md) — planned features, status, dependencies, and privacy gates.
-- [`nix_core/README.md`](nix_core/README.md) — routing, console, APIs, WebSocket text gateway, and model boundaries.
+- [`nix_core/README.md`](nix_core/README.md) — routing, console, APIs, WebSocket text gateway, device skill pipeline, and model boundaries.
 - [`nix_core/MOBILE_APP_API.md`](nix_core/MOBILE_APP_API.md) — NIX Home mobile API blueprint; clearly separates the copy prototype from proposed routes.
 - [`nix_knowledge/README.md`](nix_knowledge/README.md) — memory, temporal processing, API, and tests.
 - [`nix_actions/README.md`](nix_actions/README.md) — action lifecycle, scheduler, sessions, and API.
 - [`nix_decision/README.md`](nix_decision/README.md) — explicit trigger contract and safety gates.
-- [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md) — detailed architecture, operational boundaries, and historical research.
+- [`nix_core/benchmarks/README.md`](nix_core/benchmarks/README.md) — benchmark harness usage and limitations.
+- [`Nix-skills-repo/README.md`](Nix-skills-repo/README.md) — how to package and publish a NIX skill.
+- [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md) — detailed architecture, operational boundaries, and archived research.
 - [`CASPER_V6_RESEARCH.md`](CASPER_V6_RESEARCH.md) — archived Casper V6 experiments and performance/evaluation caveats.
+- [`LUNA_PRO_TRAINING_PLAN.md`](LUNA_PRO_TRAINING_PLAN.md) — archived Luna Pro research record (retired).
+- [`model_cards/luna-v6/`](model_cards/luna-v6/) and [`model_cards/casper-v5/`](model_cards/casper-v5/) — draft Hugging Face model cards.
 - [`NIX-Modeldev/index.html`](NIX-Modeldev/index.html) — model lineage, dataset provenance, and research archive.
-
-## GitHub discovery and project metadata
-
-GitHub repository topics classify a repository by its actual purpose, subject area, and language. Before a public launch, consider adding this accurate set through the repository's **About → Topics** control:
-
-`personal-assistant` · `personal-ai-assistant` · `personal-user-companion-agent` · `puca` · `ai-assistant` · `local-ai` · `local-llm` · `self-hosted` · `python` · `sqlite` · `conversational-ai` · `knowledge-management`
-
-These are suggested GitHub repository topics, not a claim that GitHub endorses or ranks NIX. The project-specific `PUCA` term is also useful in the project description and documentation, while generic topic labels help describe the current code to people browsing established topic pages. Because voice and smart-home integrations are roadmap items rather than released features, do not add `voice-assistant` or `smart-home` topics until those capabilities exist. The suggested set also omits `privacy-focused`: a local-first design is not itself a security guarantee, and deployment settings need a security review before making that marketing claim. Remove any topic that no longer accurately describes a released capability. The [GitHub topics documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics) notes that repositories can use up to 20 lowercase topic names (50 characters or fewer).
-
-Suggested concise repository description:
-
-> Local-first Personal User Companion Agent foundation in Python: modular conversation routing, durable personal memory, temporal grounding, and deterministic reminders.
-
-Target repository URL: [`github.com/saineela/puca`](https://github.com/saineela/puca). [Star NIX PUCA](https://github.com/saineela/puca/stargazers) if you find the project useful. Confirm the repository exists, is public, and this link resolves before announcing the launch. Add repository topics and description in GitHub settings; README text alone does not set GitHub's metadata or guarantee search ranking.
 
 ## License and contributions
 

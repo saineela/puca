@@ -35,7 +35,7 @@ V6 data uses:
 3. chosen/rejected pairs with explicit failure tags;
 4. held-out cases that are never used as training rows.
 
-We will not optimize for “human-like” at the expense of honesty. Casper must be natural but clearly not claim human experience or consciousness.
+NIX does not optimize for “human-like” at the expense of honesty. Casper must be natural but clearly not claim human experience or consciousness.
 
 ## Track 2 — Algorithms and model/inference architecture
 

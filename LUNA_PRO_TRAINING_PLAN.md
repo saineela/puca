@@ -1,21 +1,20 @@
 # Archived: Luna Pro training plan and local pilot record (retired)
 
-> **Retirement directive (2026-09-27):** This file is preserved as historical
-> research only, not as an active plan or authorization. Luna Pro v1 is retired
+> **Retirement record (2026-09-27):** This file is preserved as historical
+> research; it is not an active plan. Luna Pro v1 is retired
 > in this repository: it is not registered for model selection, and former
-> Luna API handlers return HTTP 410. These are source-level facts and do not
-> establish any hosted process's state. Preserve its research, builders,
-> manifests, data sources, and artifacts, but do not execute this plan or
-> reuse/adapt its training approach or data for **any** model.
-> Luna development is V6-only, and no Luna training is authorized. All commands,
+> Luna API handlers return HTTP 410. Its research, builders,
+> manifests, data sources, and artifacts are preserved, but this plan is not
+> executed and its training approach or data is not reused for any model.
+> Luna development is V6-only. All commands,
 > recommendations, environment notes, and model-run details below are archival.
 
 **Historical pilot record (as documented at retirement):** A local QLoRA pilot
 was recorded as completed from the frozen v8 candidate at 384 tokens. The
 adapter was described as separate from `luna-instruct-v1`, all V6 checkpoints,
 and Casper. At retirement, the record listed data defects and unresolved
-provenance/rights questions and stated that distribution was not authorized.
-The ignored local `benchmark_report.md` and `training_metadata.json` at
+provenance/rights questions and stated that distribution was ruled out.
+The Git-ignored local `benchmark_report.md` and `training_metadata.json` at
 `nix_knowledge/models/nixlm/luna-pro-v1-topical-v8-384-retry2/` were cited as
 records of the historical run; their current presence is not verified.
 
@@ -23,7 +22,7 @@ The original design plan below predates the recorded v8 pilot. It describes
 a V3 training proposal and explicitly not the data or procedure used by that
 historical run.
 
-## Historical paired-context probe record (not actionable)
+## Historical paired-context probe record (archived)
 
 A historical 2026-09-23 paired test was recorded for nine fictional cases / 15
 user turns, without external context and with injected fictional context,
@@ -33,7 +32,7 @@ the scanned Instruct mix, contextual V2 snapshot, and corrected V3 snapshot. It
 cited the trace report
 `nix_knowledge/models/nixlm/luna-generalization-probes-paired-20260923.json`
 and overlap audit at the same path plus `.overlap.json`; current artifact
-presence is not verified and no reproduction is authorized.
+presence is not verified.
 
 Results are diagnostic, not statistical proof. Context helped some recall and
 clarification turns, but both adapters failed important cases. The contextual
@@ -43,21 +42,19 @@ context, and claimed the action happened before any simulated result arrived.
 The Instruct baseline also hallucinated personal biography and successful
 actions when context was missing, and fell back to stale memory in one context
 case. This was described as supporting controlled research, **not release as a
-trusted memory/action agent**. The archive is not an authorization to continue
-that research. Never represent injected context as an end-to-end Nix
-Core/Knowledge/Actions result.
+trusted memory/action agent**. Injected context must never be represented as
+an end-to-end Nix Core/Knowledge/Actions result.
 
 ## Historical goals and boundaries
 
-The items in this section document superseded Pro-era research goals only.
-They are not current objectives, work requests, or permission to build, train,
-or evaluate a Luna model. The current directive at the top of this file governs.
+The items in this section document superseded Pro-era research goals only;
+they are not current objectives.
 
-The remaining sections are historical archives, not actionable instructions.
+The remaining sections are historical archives.
 All Luna dataset-builder and offline-evaluation CLIs are disabled. The Pro
 trainer's `check-data` command is retained as CPU-only/read-only and does not
 load weights; Pro training/GPU smoke and all new Luna evaluation commands fail
-closed. Archived procedures and data must not be reused for any model.
+closed.
 
 Before retirement, Pro was described as a model-quality experiment for
 context-aware, multi-turn conversational behavior. The historical goals were:
@@ -77,10 +74,9 @@ perform side effects. Production Core must remain authoritative for Knowledge
 and Actions. Pro is not a substitute for system policy, validators, tool result
 contracts, or safety handling.
 
-## Historical training-data and contamination notes (not instructions)
+## Historical training-data and contamination notes (archived)
 
-The preserved proposal recorded the following details and review criteria; they
-are not tasks or permission to regenerate, train, or adapt any data:
+The preserved proposal recorded the following details and review criteria:
 
 - **Base:** local
   `nix_knowledge/models/llama-3.2-3b-unsloth-instruct/`.
@@ -107,7 +103,7 @@ are not tasks or permission to regenerate, train, or adapt any data:
 ### Historical pre-pilot data proposal (superseded; not actionable)
 
 The historical proposal treated V3 as a starting snapshot and described
-additional coverage. This proposal is superseded and must not be executed. Its
+additional coverage. This proposal is superseded. Its
 archival categories were:
 
 1. Correct memory use versus missing/irrelevant/conflicting/noisy context.
@@ -123,13 +119,13 @@ archival categories were:
 
 The former proposal also called for balanced held-out splits, counterfactual
 pairs, negative controls, and human-reviewed targets. These are preserved as
-historical notes, not instructions.
+historical notes.
 
-## Archived Unsloth research notes (not actionable)
+## Archived Unsloth research notes (archived)
 
 Pre-retirement notes described Unsloth Core (Python API) as the preferred
 optimized trainer and recorded project use of Transformers, PEFT, and a custom
-token-weighted assistant-only trainer. They stated that the ignored
+token-weighted assistant-only trainer. The Git-ignored
 `.venvs/luna-pro-unsloth` environment was smoke-checked on 2026-09-23 without
 modifying `nix_knowledge/.venv` or loading model weights:
 
@@ -143,16 +139,13 @@ modifying `nix_knowledge/.venv` or loading model weights:
 - This was a package/device/template smoke check only. It did **not** load
   model weights, train, or verify a forward/backward pass, assistant-label
   masks, or checkpoint save/reload. That unverified scope is recorded as a
-  limitation of the historical check, not as a future prerequisite: Pro training
-  is not authorized.
+  limitation of the historical check.
 
 The remaining environment, installation, training-configuration, and evaluation
-material is retained solely as historical research. It does not authorize or
-recommend execution; the current directive above prohibits Luna training,
-Pro-method reuse, and new evaluations. The old procedural recommendations
-below are non-actionable archival records, not a plan for any future run.
+material is retained solely as historical research. The old procedural
+recommendations below are archival records.
 
-Historical pre-run notes (transcribed proposal; not to be executed or treated as future requirements):
+Historical pre-run notes (transcribed proposal):
 
 1. The proposal advised checking OS, Python, Torch/CUDA build, NVIDIA driver,
    free disk, package compatibility, and `nvidia-smi`; it also advised
@@ -163,12 +156,12 @@ Historical pre-run notes (transcribed proposal; not to be executed or treated as
    and advised checking package guidance and recording versions.
 3. It proposed a bounded model forward/backward and adapter save/load smoke
    test, including inspection of assistant-label masks and EOS/EOT behavior.
-   These were proposed checks only and are not authorized now.
+   These were proposed checks only.
 4. It proposed comparing any changed Unsloth/Llama/Transformers template,
    tokenizer, loss mask, checkpoint format, or inference path against local
    references before a run. This is retained solely as historical text.
 
-Official references listed in the pre-retirement research notes (archive only; no execution is authorized):
+Official references listed in the pre-retirement research notes (archive only):
 
 - Unsloth fine-tuning guide: <https://unsloth.ai/docs/get-started/fine-tuning-llms-guide>
 - Unsloth LoRA hyperparameter guide:
@@ -184,14 +177,12 @@ The historical reading notes summarized Unsloth's general guidance on Instruct
 models, QLoRA, adapter targets, assistant-only supervision, and held-out
 selection. They also recorded that TRL's `assistant_only_loss=True` depends on
 template-generated masks and discussed prefix/mask validation. This is source
-provenance only: none of those procedures is authorized for a Luna or other
-model run under the current directive. The links above are archival references,
-not instructions to recheck guidance before a future run.
+provenance only; the links above are archival references.
 
 ## Superseded historical run configuration (proposal; not executed)
 
 The pre-retirement proposal recorded the following comparison values; they are
-archival context only and must not be used to initiate or guide a run:
+archival context only:
 
 | Setting | Initial controlled value | Reason / guard |
 |---|---:|---|
@@ -215,15 +206,13 @@ The historical contextual experiment was recorded with LR `1e-5`, rank 16
 without rsLoRA, and 60 steps, without improvement on its matched checks. The
 old note cautioned that more steps, higher rank, rsLoRA, DoRA, DFT loss, packing,
 NEFTune, LoRA+, DPO, or GRPO were not proven improvements. Its run-isolation,
-output-path, logging, and resource-release advice is retained as history only;
-no Luna runs or evaluations are authorized.
+output-path, logging, and resource-release advice is retained as history only.
 
-## Historical evaluation/promotion proposal (not actionable)
+## Historical evaluation/promotion proposal (archived)
 
 These pre-retirement gates are preserved to explain the old research decision.
-They do not authorize new evaluations, model builds, previews, or promotion.
-The list below summarizes what the old proposal specified, not what anyone
-should do; its imperative wording is historical and non-actionable.
+The list below summarizes what the old proposal specified; its imperative
+wording is historical.
 
 1. **Pre-run:** validate data/template/mask integrity; freeze a train/eval/test
    manifest and hashes; audit benchmark/entity/trajectory leakage.
@@ -251,8 +240,7 @@ should do; its imperative wording is historical and non-actionable.
    independent expanded panel; archive raw traces and score adjudications.
 7. **Historical proposal:** the pre-retirement note contemplated an opt-in
    research preview after offline evaluation. This proposal is superseded: Pro
-   is retired, its preview path is disabled, and this file grants no release,
-   integration, or training authority.
+   is retired and its preview path is disabled.
 
 ## Recorded historical v8 pilot (September 2026; not independently verified here)
 
@@ -277,8 +265,7 @@ runtime registry and that former model/API routes return HTTP 410; these are
 source-level facts, not verification of a hosted process. The dashboard source
 labels Pro as retired. The record states that, at that time, no model had been
 published or distributed. The held-out fictional panel was not a real Nix
-integration test. Preserve this account for provenance; do not use it to restart
-Pro or inform training for another model.
+integration test. Preserve this account for provenance.
 
 ## Current retirement status (supersedes every proposal above)
 
@@ -286,4 +273,4 @@ Pro or inform training for another model.
 - The retirement record stated that no model had been published to a hub or distributed at that time; this is historical and does not verify current hosted/deployment state.
 - This document makes no claim about a live or hosted deployment.
 - The retirement record lists dataset provenance/rights and v8 review findings as unresolved.
-- Repository source marks Pro retired. No Pro-specific training method, data, or workflow may be reused for any model; no Luna training is authorized.
+- Repository source marks Pro retired; its training method, data, and workflow are not reused for any model.

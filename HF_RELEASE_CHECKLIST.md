@@ -1,6 +1,6 @@
 # Hugging Face Release Preparation — NIX PUCA Models
 
-**Status: draft only — no model weights have been uploaded.** These notes prepare two PEFT adapter releases for the Hugging Face Hub. They do not grant redistribution rights, constitute legal advice, authorize more Luna training/evaluation, or promise that the adapters are production-ready.
+**Status: draft only — no model weights have been uploaded.** These notes prepare two PEFT adapter releases for the Hugging Face Hub. They are not legal advice, do not grant redistribution rights, and do not promise that the adapters are production-ready.
 
 ## Proposed model repositories
 
@@ -23,7 +23,7 @@ Both releases are **PEFT LoRA adapters**, not complete standalone model checkpoi
 - **Candidate status:** V6 is a local official-source selector default, but its archived V6 experimental results did not show an improvement over the Instruct baseline on the small shared checks; the documented promotion record says “not promoted.” Treat the release as a research/experimental adapter unless the owner separately establishes a qualified release decision. The repo must disclose both isolated and synthetic-context protocol scopes; injected context was not a live end-to-end NIX stack test.
 - Resource evidence is historical and not a public inference guarantee: the stored run metadata says 3.074 GiB peak allocated during one training run and about 2.28 GiB peak during one archived inference evaluation. The exact GPU/software/protocol need verification and disclosure before using those figures. They do not substantiate “under 3 GB end-to-end” or “world's first.”
 - Dataset manifest references DailyDialog, No Robots, UltraFeedback chosen-SFT, FineTome-100k, and project-authored controls. The metadata lists non-commercial restrictions for at least DailyDialog and No Robots and unresolved FineTome provenance/rights. Confirm derivative-model redistribution is permitted for the exact source revisions and resulting adapter before public upload. Linking/citing source data is not sufficient clearance.
-- No Luna evaluation may be run as part of this preparation. The local policy limits Luna activity to existing V6 runtime/integration work and prohibits new offline evaluation/training.
+- No new Luna evaluation is part of this preparation; Luna activity remains limited to the existing V6 runtime/integration work.
 
 ### Casper V5 candidate
 
@@ -52,7 +52,7 @@ Both releases are **PEFT LoRA adapters**, not complete standalone model checkpoi
    - Verify adapter tensor keys/shape compatibility with its stated base architecture; ensure the public `base_model` ID and adapter-config public ID agree.
    - Test the **staged copy** in a clean environment with the documented dependency versions and authorized base-model access. Exercise deterministic one-turn load/generation, correct chat template and EOS behavior, CPU/CUDA expectations, and full adapter loading. Do not modify original weights.
    - For Casper, obtain a controlled, reproducible generation speed/VRAM report before listing any speed figures (GPU/driver, OS, Transformers/PyTorch/PEFT/bitsandbytes versions, base and adapter revisions, quantization, prompt set, warm-up/repeat count, input/output tokens, load vs warm latency, peak allocated/reserved VRAM). The current route benchmark is unrelated to model decoding.
-   - Luna must not be evaluated again under the current project directive. The release card may link and accurately summarize existing archived research, clearly labeling it historical and its synthetic context as non-end-to-end.
+   - No new Luna evaluation is planned under the current project policy. The release card may link and accurately summarize existing archived research, clearly labeling it historical and its synthetic context as non-end-to-end.
 4. **Hub account and review**
    - Verify the account namespace `saineela`, obtain explicit account-owner confirmation of the exact public repository IDs and visibility, and create repos through the Hub UI/API only after rights clearance.
    - Review the cards, metadata, files, checksums, and license text in a private/local staging review before the first public push. Publishing weights is an external, public, difficult-to-reverse action: obtain separate explicit approval before doing it.
