@@ -71,26 +71,7 @@ The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-
 
 ## Architecture
 
-```text
-                           NIX PUCA
-             Dashboard · OpenAI-compatible clients · WS text clients
-                                  |
-                                  v
-                         +----------------+
-                         |    NIX Core    |<----> Optional configured
-                         | route/compose |       conversation model
-                         +-------+--------+       (Transformers/PEFT,
-                                 |                 Ollama, or TabbyAPI)
-                                 v
-                         +----------------+
-                         | NIX Knowledge  |<----> NIX Actions
-                         | facts, people, | event  reminders, schedules,
-                         | time, retrieval| bridge lifecycle and sessions
-                         +----------------+
-
-       NIX Decision: separate explicit-trigger foundation;
-       no proactive rules are registered.
-```
+<img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1791167887/Gemini_Generated_Image_h8fdzkh8fdzkh8fd_p0v2qc.jpg" alt="NIX PUCA" width="360">
 
 | Component | Responsibility | Current boundary |
 | --- | --- | --- |
