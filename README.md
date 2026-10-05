@@ -384,6 +384,11 @@ data/                           Local SQLite/runtime state (Git-ignored)
 - [`model_cards/luna-v6/`](model_cards/luna-v6/) and [`model_cards/casper-v5/`](model_cards/casper-v5/) — draft Hugging Face model cards.
 - [`NIX-Modeldev/index.html`](NIX-Modeldev/index.html) — model lineage, dataset provenance, and research archive.
 
-## License and contributions
+## License
 
-No repository-level `LICENSE` file is currently present. Until a license is chosen and added, do not assume this repository grants permission to reuse or redistribute its code. Model and dataset licenses are separate and must be reviewed independently. Contributions should include focused tests and validation notes and must not add secrets, personal data, model weights, or generated datasets to Git.
+NIX PUCA is open-source software licensed under the **Apache License 2.0**.
+
+See [`LICENSE`](LICENSE) for the complete license text.
+
+Copyright © 2026 Sai Neela.
+
