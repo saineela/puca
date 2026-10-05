@@ -71,7 +71,7 @@ The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-
 
 ## Architecture
 
-<img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1791167887/Gemini_Generated_Image_h8fdzkh8fdzkh8fd_p0v2qc.jpg" alt="NIX PUCA" width="360">
+<img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1791167887/Gemini_Generated_Image_h8fdzkh8fdzkh8fd_p0v2qc.jpg" alt="NIX PUCA" width="900">
 
 | Component | Responsibility | Current boundary |
 | --- | --- | --- |
