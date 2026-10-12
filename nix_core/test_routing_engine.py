@@ -39,3 +39,17 @@ def test_compound_knowledge_clause_is_not_silently_downgraded():
     decision = CoreRoutingEngine().decide("remember that I like tea")
     assert decision.route == KNOWLEDGE
     assert decision.requires_knowledge is True
+
+
+def test_past_tense_cancellation_news_is_knowledge():
+    # Oct 5 production failure: "my robotics practice has been
+    # cancelled" fell to chat, leaving the stored reminder armed.
+    for text in (
+        "my robotics practice has been cancelled",
+        "my robotics practice is cancelled",
+        "i cancelled my robotics practice",
+    ):
+        decision = CoreRoutingEngine().decide(text)
+        assert decision.route == KNOWLEDGE, text
+        assert decision.requires_knowledge is True, text
+        assert decision.rule == "past_tense_cancellation", text

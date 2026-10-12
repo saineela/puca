@@ -418,6 +418,21 @@ _SCHEDULING_VERBS = (
     "remove my",
 )
 
+# Past-tense cancellation NEWS about the user's own plans ("my robotics
+# practice has been cancelled"): pragmatically a request to drop the
+# stored event + reminder, so it routes to Knowledge like an imperative
+# "cancel my ...". The possessive anchors it to the user's own record;
+# unrelated past-tense cancel chatter without it stays elsewhere.
+_PAST_CANCEL_RE = re.compile(
+    r"^(?:my|our)\s+.{1,80}?\b(?:has\s+been|have\s+been|is|are|was|"
+    r"were|got)\s+(?:cancell?ed|called\s+off)\b",
+    re.IGNORECASE,
+)
+_I_CANCELLED_RE = re.compile(
+    r"^i\s+(?:just\s+)?(?:cancell?ed|deleted|removed)\s+(?:my|our|the)\b",
+    re.IGNORECASE,
+)
+
 _ALARM_RE = re.compile(
     r"\b(?:alarm|wake\s*up\s*call|snooze)\b", re.IGNORECASE
 )
@@ -935,6 +950,15 @@ def classify(
             lowered,
         )
     )
+
+    # Past-tense cancellation news about the user's own plans routes to
+    # Knowledge: the stored event and its reminder must be dropped
+    # ("my robotics practice has been cancelled").
+    if not third_person and (
+        _PAST_CANCEL_RE.match(lowered) or _I_CANCELLED_RE.match(lowered)
+    ):
+        features.update(route=KNOWLEDGE, rule="past_tense_cancellation")
+        return KNOWLEDGE, features
 
     # "my alarm code is 2009" - a possessive statement is a fact to
     # store, not an alarm request. The personal_statement rule (below)

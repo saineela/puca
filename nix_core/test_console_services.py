@@ -78,7 +78,24 @@ def test_mobile_app_home_copy_routes_and_catalog_are_category_scoped():
         assert index.json()["category"] == "Mobile App"
         assert index.json()["mobile_application_included"] is False
         assert index.json()["live_endpoints"] == [
-            "GET /api/mobile/v1", "GET /api/mobile/v1/home-copy"
+            "GET /api/mobile/v1", "GET /api/mobile/v1/home-copy",
+            "GET /api/mobile/v1/music",
+            "GET /api/mobile/v1/music/now-playing",
+            "POST /api/mobile/v1/music/control",
+            "GET /api/mobile/v1/music/search",
+            "POST /api/mobile/v1/music/play",
+            "GET /api/mobile/v1/music/library",
+            "GET|POST /api/mobile/v1/music/queue",
+            "POST /api/mobile/v1/music/save",
+            "GET /api/mobile/v1/music/lyrics",
+            "POST /api/mobile/v1/devices/report",
+            "POST /api/mobile/v1/devices/discover",
+            "POST /api/mobile/v1/devices/register",
+            "POST /api/mobile/v1/devices/unregister",
+            "GET /api/mobile/v1/devices",
+            "GET /api/mobile/v1/devices/list",
+            "GET /api/mobile/v1/devices/{mac}",
+            "POST /api/mobile/v1/devices/mock/seed",
         ]
 
         response = requests.get(f"{base_url}/api/mobile/v1/home-copy", timeout=3)
@@ -86,7 +103,7 @@ def test_mobile_app_home_copy_routes_and_catalog_are_category_scoped():
         assert response.headers["Cache-Control"] == "no-store, max-age=0"
         payload = response.json()
         assert payload["category"] == "Mobile App"
-        assert payload["catalog_size"] == 150
+        assert payload["catalog_size"] == 500
         assert payload["data"]["copy_id"].startswith("home-")
         assert len(payload["data"]["suggestions"]) == 3
 
@@ -94,9 +111,9 @@ def test_mobile_app_home_copy_routes_and_catalog_are_category_scoped():
             f"{base_url}/api/mobile/v1/home-copy?catalog=1", timeout=3
         )
         variants = catalog.json()["variants"]
-        assert len(variants) == 150
-        assert len({item["copy_id"] for item in variants}) == 150
-        assert len({(item["headline"], item["subtitle"]) for item in variants}) == 150
+        assert len(variants) == 500
+        assert len({item["copy_id"] for item in variants}) == 500
+        assert len({(item["headline"], item["subtitle"]) for item in variants}) == 500
         assert all(len(item["suggestions"]) == 3 for item in variants)
 
         invalid = requests.get(

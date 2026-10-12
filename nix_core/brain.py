@@ -222,7 +222,7 @@ _COLOR_VOCAB_PATTERN = (
     r"denim\s+blue|cerulean\s+blue|burnt\s+orange|mountain\s+meadow|cotton\s+candy|"
     r"chartreuse|lime|mint|lavender|rose|coral|peach|magenta|indigo|turquoise|maroon|navy|olive|"
     r"salmon|apricot|mustard|plum|aubergine|burgundy|scarlet|crimson|ruby|sapphire|azure|aqua|"
-    r"gold|bronze|copper|silver|grey|gray|black|cream|ivory|beige|tan|khaki|moss|sage|jade|"
+    r"brown|gold|bronze|copper|silver|grey|gray|black|cream|ivory|beige|tan|khaki|moss|sage|jade|"
     r"emerald|fuchsia|mauve|orchid|periwinkle|cerulean|lemon|banana|tangerine|raspberry|cherry|"
     r"tomato|seafoam|puce|ochre|mahogany|blush|bubblegum|amethyst|lilac|wisteria|grape|viridian|"
     r"shamrock|denim|brick|terracotta|rust|charcoal|stone|slate|sandy|pearl|eggshell|strawberry"
@@ -255,6 +255,28 @@ _DESCRIPTIVE_COLOR_CANONICAL: dict[str, str] = {
     "snow": "white",
     "gold": "yellow",
     "golden": "yellow",
+    # Every remaining word in _DESCRIPTIVE_COLOR_PATTERN must have an entry
+    # here: a pattern word without a canonical mapping made the vague-color
+    # error path claim "I couldn't map 'sand'" for words the pattern itself
+    # declares descriptive (measured live: sand, hair, lavender, ...).
+    "moonlight": "blue",
+    "candlelight": "amber",
+    "lavender": "lavender",
+    "mint": "mint",
+    "rose": "rose",
+    "coral": "coral",
+    "peach": "peach",
+    "silver": "silver",
+    "iceberg": "white",
+    "sand": "tan",
+    "sandstone": "tan",
+    "strawberry": "strawberry",
+    "grape": "grape",
+    "plum": "plum",
+    "turquoise": "turquoise",
+    "indigo": "indigo",
+    "magenta": "magenta",
+    "hair": "brown",
 }
 
 
@@ -264,7 +286,7 @@ def _descriptive_color_name(text: str) -> str | None:
     if match is None:
         return None
     return _DESCRIPTIVE_COLOR_CANONICAL.get(match.group(0).casefold())
-_DESCRIPTIVE_COLOR_PATTERN = r"\b(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sea|water|sky|fire|flame|candlelight|lavender|mint|rose|coral|peach|gold|golden|silver|ice|iceberg|snow|forest|grass|leaves|leaf|hearts?|blood|sand|sandstone|strawberry|grape|plum|turquoise|indigo|magenta)\b"
+_DESCRIPTIVE_COLOR_PATTERN = r"\b(?:sun|sunlight|sunshine|sunset|sunrise|moonlight|ocean|sea|water|sky|fire|flame|candlelight|lavender|mint|rose|coral|peach|gold|golden|silver|ice|iceberg|snow|forest|grass|leaves|leaf|hearts?|blood|hair|sand|sandstone|strawberry|grape|plum|turquoise|indigo|magenta)\b"
 _COLOR_REQUEST_PATTERN = r"\b(?:color|colour|hue|shade|tone)\b"
 
 
@@ -488,6 +510,7 @@ _NAMED_COLOR_CANONICAL_RGB: dict[str, tuple[int, int, int]] = {
 # guess (xkcd colors + fabrication gate, round-3 research T2).
 _XKCD_COLOR_RGB: dict[str, tuple[int, int, int]] = {
     "chartreuse": (0, 158, 42),
+    "brown": (96, 64, 32),
     "lime": (134, 154, 8),
     "mint": (192, 255, 218),
     "lavender": (215, 181, 245),
@@ -669,9 +692,27 @@ def _apply_fuzzy_brightness_quantifier(
     return round(max(0.05, min(1.0, target)), 2)
 
 
+def _speaker_level_wording(text: str) -> bool:
+    """True when a level in the request is about loudness, not light."""
+    return bool(
+        re.search(
+            r"\b(?:volume|loudness|sound\s+level|speaker\s+level|louder|quieter|volume\s+up|volume\s+down)\b",
+            text,
+        )
+    )
+
+
 def _grounded_brightness_level(text: str) -> dict[str, float] | None:
-    """Extract a Core-owned brightness level from explicit phrasings only."""
+    """Extract a Core-owned brightness level from explicit phrasings only.
+
+    A bare percentage is a level, and the speaker's volume also uses one: a
+    request whose level belongs to loudness must not be grounded as brightness
+    ("set the volume to 30 percent" became a 30% brightness command on the same
+    device before this guard).
+    """
     normalized = " ".join((text or "").casefold().split())
+    if _speaker_level_wording(normalized):
+        return None
     percent = re.search(r"\b(\d{1,3})\s*(?:percent|%)", normalized)
     if percent is not None:
         value = min(1.0, max(0.05, int(percent.group(1)) / 100.0))
@@ -682,6 +723,37 @@ def _grounded_brightness_level(text: str) -> dict[str, float] | None:
         return {"brightness": 0.5}
     if re.search(r"\bquarter\b", normalized):
         return {"brightness": 0.25}
+    return None
+
+
+def _grounded_volume_level(text: str) -> dict[str, float] | None:
+    """Extract a Core-owned speaker volume level from explicit phrasings only.
+
+    The speaker's volume is a 0-1 fraction on the same device as the ring, so
+    Needle3's measured unreliability on percentages applies here too: Core owns
+    the number for the same reason it owns color, brightness and effect names.
+    """
+    normalized = " ".join((text or "").casefold().split())
+    if not _speaker_level_wording(normalized):
+        return None
+    # "30 percent" and "0.3" are different notations for the same level, so the
+    # percentage form is matched first and the bare number is only read as a
+    # fraction (a lone "30" is not a volume level).
+    percent = re.search(r"\b(\d{1,3})\s*(?:percent|pct)\b|\b(\d{1,3})%", normalized)
+    if percent is not None:
+        value = int(percent.group(1) or percent.group(2))
+        if 0 <= value <= 100:
+            return {"volume": min(1.0, max(0.0, value / 100.0))}
+        return None
+    fraction = re.search(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
+    if fraction is not None:
+        return {"volume": min(1.0, max(0.0, float(fraction.group(1))))}
+    if re.search(r"\b(?:full|max(?:imum)?)\b", normalized):
+        return {"volume": 1.0}
+    if re.search(r"\bhalf\b", normalized):
+        return {"volume": 0.5}
+    if re.search(r"\bquarter\b", normalized):
+        return {"volume": 0.25}
     return None
 
 
@@ -907,9 +979,10 @@ def _requires_multi_action_plan(text: str, skill_specs: list[dict[str, Any]]) ->
     if _unique_device_alias_in_text(text, skill_specs) is None:
         return False
     multi_action = re.search(
-        r"\b(?:and\s+then|then|after\s+that|and|;|\.\s*)\s*(?:(?:please|then)\s+)*(?:"
+        r"\b(?:and\s+then|then|after\s+that|while|also|plus|and|;|,|\.\s*)\s*"
+        r"(?:(?:please|then)\s+)*(?:"
         r"turn|switch|power|set|make|change|apply|enable|disable|start|stop|"
-        r"brighten|dim|run|play|animate|on|off)\b",
+        r"brighten|dim|run|play|animate|show|showing|on|off)\b",
         text,
         re.IGNORECASE,
     )
@@ -1269,6 +1342,32 @@ def request_requires_thinking(text: str) -> bool:
     return bool(_DEEP_REASONING_RE.search(normalized))
 
 
+def _consume_ollama_stream(response, streaming_module) -> str:
+    """Read Ollama NDJSON pieces, forwarding each as a stream token.
+
+    Returns the assembled full text so every downstream verification and
+    return path sees the exact same string as the non-streaming call.
+    """
+    parts: list[str] = []
+    for raw in response.iter_lines():
+        if not raw:
+            continue
+        try:
+            piece = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if piece.get("error"):
+            raise RuntimeError(str(piece["error"]))
+        message = piece.get("message") or {}
+        text = message.get("content") or piece.get("response") or ""
+        if text:
+            parts.append(text)
+            streaming_module.emit_token(text)
+        if piece.get("done"):
+            break
+    return "".join(parts)
+
+
 class OllamaClient:
     """Chat client for the local Ollama server (Qwen3.5 + SearXNG)."""
 
@@ -1320,6 +1419,36 @@ class OllamaClient:
                 "num_predict": max(1, min(int(max_new_tokens), 1024)) if max_new_tokens is not None else 120,
             },
         }
+        # Token streaming: inside a user-facing window with a sink attached,
+        # request NDJSON pieces and forward them as they arrive.
+        import streaming as _streaming
+
+        stream_sink = _streaming.active_sink()
+        if stream_sink is not None:
+            request_body["stream"] = True
+            with requests.post(
+                self.api_url,
+                json=request_body,
+                stream=True,
+                timeout=timeout or HTTP_TIMEOUT,
+            ) as response:
+                if response.status_code == 404:
+                    # Same fallback-model path as the non-streaming call.
+                    response.close()
+                    if OLLAMA_FALLBACK_MODEL and OLLAMA_FALLBACK_MODEL != self.model:
+                        request_body["model"] = OLLAMA_FALLBACK_MODEL
+                        with requests.post(
+                            self.api_url,
+                            json=request_body,
+                            stream=True,
+                            timeout=timeout or HTTP_TIMEOUT,
+                        ) as fallback:
+                            fallback.raise_for_status()
+                            return _consume_ollama_stream(fallback, _streaming)
+                    request_body["stream"] = False
+                else:
+                    response.raise_for_status()
+                    return _consume_ollama_stream(response, _streaming)
         response = requests.post(
             self.api_url,
             json=request_body,
@@ -1426,6 +1555,15 @@ def _format_event(entry: dict[str, Any]) -> str:
     return f"- {title}: {when}{suffix}{occurrence}"
 
 
+# Honest, jargon-free failure line for Knowledge results. Internal status
+# codes ("no_function_selected") must never reach the user; the full payload
+# stays in the turn details for the console and logs.
+_KNOWLEDGE_FAILURE_REPLY = (
+    "I couldn't complete that request, so nothing was saved or changed. "
+    "Could you phrase it another way?"
+)
+
+
 def format_knowledge_result(payload: dict[str, Any]) -> str:
     """
     Turn a KnowledgeResponse result into one user-facing paragraph.
@@ -1453,8 +1591,13 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
         return result.get("question") or "Who do you mean?"
 
     if not result.get("ok", True):
-        error = result.get("error") or result.get("status") or "failed"
-        return f"Knowledge engine could not handle that: {error}"
+        # A failed mutation may carry a user-facing question (e.g. a
+        # cancel lookup that found nothing). Ask it verbatim instead of
+        # the generic failure line.
+        question = result.get("question")
+        if question:
+            return question
+        return _KNOWLEDGE_FAILURE_REPLY
 
     operation = result.get("operation")
 
@@ -1483,14 +1626,29 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
         lines.append(f"Scheduled '{title}' {when}.")
         actions = result.get("actions") or {}
         if actions.get("ok"):
+            fire = str(actions.get("first_fire_at", ""))
+            try:
+                fire_dt = datetime.fromisoformat(fire)
+                fire = fire_dt.strftime("%b %d, %Y at %I:%M %p").replace(" 0", " ")
+            except (TypeError, ValueError):
+                pass  # keep the raw value; never invent a different one
             lines.append(
-                f"Action set: {actions.get('action_type')} fires "
-                f"{actions.get('first_fire_at', '')}."
+                f"Action set: {actions.get('action_type')} fires {fire}."
             )
         return " ".join(lines)
 
     if operation == "CANCEL":
-        return "Cancelled."
+        lookup = result.get("lookup") or {}
+        title = lookup.get("title")
+        actions_info = result.get("actions") or {}
+        lines = [f"Cancelled: {title}." if title else "Cancelled."]
+        removed = actions_info.get("cancelled_actions")
+        if actions_info.get("ok") and removed:
+            lines.append(
+                "Reminder removed." if removed == 1
+                else f"{removed} reminders removed."
+            )
+        return " ".join(lines)
 
     if operation == "UPDATE":
         return "Updated."
@@ -1771,6 +1929,141 @@ def _keys_reply(keys_found: list[str]) -> str:
         return f"Got it: {parts[0].rstrip('.')}."
     joined = ", ".join(part.rstrip(".") for part in parts)
     return f"Got it: {joined}."
+
+
+_SHOUT_TOKEN_RE = re.compile(r"\b[A-Z]{3,}\b")
+
+
+def _restore_grounding_casing(text: str, grounding_texts: list[str]) -> str:
+    """Undo model SHOUTING by restoring the grounding facts' spelling.
+
+    The model sometimes renders recalled entities in ALL CAPS
+    ("Your coworker DINESH is afraid of HEIGHTS"). The authoritative
+    spelling lives in the grounding inputs; match shouting tokens back
+    to it case-insensitively and restore the grounded form. Genuine
+    acronyms present in grounding as caps (TSA, NIX) stay untouched.
+    """
+    if not text or not _SHOUT_TOKEN_RE.search(text):
+        return text
+    grounding = "\n".join(t for t in grounding_texts if t)
+    if not grounding:
+        return text
+    # Map lowercase ground token -> as-written ground token.
+    # Prefer a form that actually carries casing ("Dinesh") over an
+    # all-lowercase store ("dinesh") so names stay capitalized.
+    ground_forms: dict[str, str] = {}
+    for word in re.findall(r"[A-Za-z][A-Za-z'\-]*", grounding):
+        key = word.lower()
+        existing = ground_forms.get(key)
+        if existing is None:
+            ground_forms[key] = word
+        elif existing.islower() and not word.islower():
+            ground_forms[key] = word
+
+    def _unshout(match: re.Match) -> str:
+        token = match.group(0)
+        grounded = ground_forms.get(token.lower())
+        if grounded is None:
+            return token  # not in grounding: leave as-is (invented word)
+        if grounded.isupper() and grounded.lower() != grounded:
+            return token  # grounding itself is uppercase: keep model's caps
+        return grounded
+
+    return _SHOUT_TOKEN_RE.sub(_unshout, text)
+
+
+# Clock times stated in a reply: "19:00", "7pm", "7:30 pm". Bare numbers
+# without am/pm or a colon are skipped so dates ("13th", "2026") never match.
+_STATED_CLOCK_RE = re.compile(
+    r"\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?\b|\b(\d{1,2}):(\d{2})\b",
+    re.IGNORECASE,
+)
+# Tokenizer garbling of raw ISO timestamps: "15: 00: 00", "08 T 15", "202 6".
+_GARBLED_TIME_RE = re.compile(r"\d:\s+\d|\d\s+T\s+\d|\b\d{3}\s+\d")
+
+
+def _clock_minute(match: re.Match) -> tuple[int, int]:
+    """Normalize a stated clock time to (24h hour, minute)."""
+    if match.group(3):
+        hour = int(match.group(1)) % 12
+        if match.group(3).lower() == "p":
+            hour += 12
+        return hour, int(match.group(2) or 0)
+    return int(match.group(4)) % 24, int(match.group(5))
+
+
+def _stated_times_are_grounded(text: str, authoritative_texts: list[str]) -> bool:
+    """Boundary check: every clock time the composer stated must exist in
+    the authoritative Knowledge values.
+
+    Small local models garble raw ISO timestamps when paraphrasing
+    ("19:00" -> "19:30"/"19:59") or render them with tokenized spaces
+    ("15: 00: 00"). The event record is authoritative, so a reply that
+    states a different clock time is wrong even when it sounds natural.
+    Times are compared at the canonical (hour, minute) level so "7pm",
+    "19:00" and ISO 19:00:00 all agree. If the authoritative inputs state
+    no clock time at all, nothing can be contradicted and the gate passes.
+    """
+    if not text:
+        return True
+    if _GARBLED_TIME_RE.search(text):
+        return False
+    ground = "\n".join(t for t in authoritative_texts if t)
+    ground_times = {
+        _clock_minute(m) for m in _STATED_CLOCK_RE.finditer(ground)
+    }
+    if not ground_times:
+        return True
+    for match in _STATED_CLOCK_RE.finditer(text):
+        if _clock_minute(match) not in ground_times:
+            return False
+    return True
+
+
+# Questions about the current wall-clock time only (not "what time is my
+# meeting tomorrow", which is a Knowledge lookup).
+_CURRENT_CLOCK_RE = re.compile(
+    r"\bwhat\s+time\s+is\s+it\b"
+    r"|\bwhat(?:'s| is)?\s+the\s+time\b"
+    r"|\bwhat(?:'s| is)?\s+the\s+current\s+time\b"
+    r"|\bcurrent\s+time\b",
+    re.IGNORECASE,
+)
+
+
+def _ground_reply_clock(user_text: str, reply: str) -> str:
+    """Correct invented clock times in chat replies (boundary gate).
+
+    The chat prompt states the authoritative local time, but small models
+    still hallucinate a plausible one ("It's currently 10:45 AM" at
+    5:54 PM). Direct clock questions are answered deterministically when
+    the model states no time; a stated wrong time is replaced with the
+    real local one. Within one minute of truth counts as correct so a
+    slow generation is not "corrected" into a wrong value.
+    """
+    if not _CURRENT_CLOCK_RE.search(user_text or ""):
+        return reply
+    try:
+        from zoneinfo import ZoneInfo
+
+        now = datetime.now(ZoneInfo(TIMEZONE))
+    except Exception:
+        now = datetime.now()
+    hour12 = now.strftime("%I").lstrip("0")
+    stamp = f"{hour12}:{now.minute:02d} {'am' if now.hour < 12 else 'pm'}"
+    now_minutes = now.hour * 60 + now.minute
+
+    matches = list(_STATED_CLOCK_RE.finditer(reply))
+    if not matches:
+        return f"It's currently {stamp}."
+    corrected = reply
+    for match in reversed(matches):
+        hour, minute = _clock_minute(match)
+        if abs(hour * 60 + minute - now_minutes) > 1:
+            corrected = (
+                corrected[: match.start()] + stamp + corrected[match.end() :]
+            )
+    return corrected
 
 
 # ----------------------------------------------------------------------
@@ -2266,6 +2559,10 @@ class Brain:
                 "role": result.get("role"),
                 "candidates": candidates,
                 "question": result.get("question") or "Who do you mean?",
+                # Event clarifications carry a completion template
+                # ("cancel my {selected}"); person-state clarifications
+                # use the role-based completion below.
+                "continuation_template": result.get("continuation_template"),
             }
 
     def _take_clarification_answer(
@@ -2299,6 +2596,11 @@ class Brain:
 
     @staticmethod
     def _complete_state_clarification(request: str, pending: dict[str, Any], name: str) -> str:
+        template = pending.get("continuation_template")
+        if template and "{selected}" in str(template):
+            # Event mutations ("cancel my {selected}"): rebuild the
+            # deterministic imperative with the user's chosen event.
+            return str(template).format(selected=name)
         role = pending.get("role")
         if role:
             pattern = re.compile(rf"\bmy\s+{re.escape(str(role))}\b", re.IGNORECASE)
@@ -2560,7 +2862,7 @@ class Brain:
             return _finish(
                 {
                     "route": KNOWLEDGE,
-                    "reply": pending["question"] + " (Please name one of the listed people.)",
+                    "reply": pending["question"] + " (Please name one of the listed options.)",
                     "rule": "clarification_still_pending",
                     "details": {"pending_clarification": True},
                 }
@@ -3136,7 +3438,7 @@ class Brain:
             or is_sensitive_write
             or deterministic.startswith(
                 (
-                    "Knowledge engine could not handle that",
+                    "I couldn't complete that request",
                     "No matching events found",
                     "No current states stored yet",
                     "I don't have that",
@@ -3188,9 +3490,17 @@ class Brain:
         )
 
         try:
-            composed = self.ollama.chat(
-                system_prompt=(
-                    _identity_context_for_model(assistant_name, assistant_role)
+            import streaming as _streaming
+
+            with _streaming.user_facing(
+                transform=lambda piece: _restore_grounding_casing(
+                    piece,
+                    [deterministic, source_json, memory_context, raw_request],
+                )
+            ):
+                composed = self.ollama.chat(
+                    system_prompt=(
+                        _identity_context_for_model(assistant_name, assistant_role)
                     + (
                         "\n\nThe Knowledge request completed. Tell the user what happened naturally, "
                         "using the confirmed result below."
@@ -3202,7 +3512,10 @@ class Brain:
                     )
                     + (
                         "\n\nHere is the confirmed result from NIX. Tell the user about it "
-                        "in your usual voice, staying faithful to the facts."
+                        "in your usual voice, staying faithful to the facts. "
+                        "Never SHOUT: write names, places, objects and feelings in "
+                        "normal sentence casing exactly as the grounding facts spell "
+                        "them - no ALL-CAPS emphasis anywhere in the reply."
                         if luna_formatter_prompt
                         else (
                             "conversation context below are grounding inputs; use "
@@ -3223,6 +3536,9 @@ class Brain:
                             "next week, use the TEMPORAL GROUNDING block below; "
                             "the Knowledge clock and ISO timestamps are authoritative.\n"
                             "- Never invent anything new.\n"
+                            "- Never SHOUT: keep names, places and objects in normal "
+                            "sentence casing as spelled in the grounding facts; no "
+                            "ALL-CAPS emphasis.\n"
                             f"- {format_policy}\n"
                             "- No offers, no sign-offs.\n\n"
                             f"{envelope.as_prompt_block()}"
@@ -3304,9 +3620,12 @@ class Brain:
         soft_missing = _missing(haystack, soft)
         if soft_missing:
             try:
-                composed = self.ollama.chat(
-                    system_prompt=(
-                        _identity_context_for_model(assistant_name, assistant_role)
+                import streaming as _streaming
+
+                with _streaming.user_facing():
+                    composed = self.ollama.chat(
+                        system_prompt=(
+                            _identity_context_for_model(assistant_name, assistant_role)
                         + "\n\n"
                         + (
                             "Please keep these details from the confirmed result: "
@@ -3348,6 +3667,13 @@ class Brain:
             if (_missing(haystack, hard) or _missing(haystack, soft)) and not luna_formatter_prompt:
                 return deterministic
 
+        # Clock-time gate: the model must not state a time Knowledge never
+        # produced ("19:00" -> "19:59") nor echo garbled ISO tokens.
+        if not _stated_times_are_grounded(
+            composed, [deterministic, source_json, temporal_grounding]
+        ):
+            return clean_response_text(deterministic)
+
         valid, _failures = verify_reply(
             envelope,
             composed,
@@ -3358,6 +3684,12 @@ class Brain:
         # Casper must not paraphrase or obscure what was persisted.
         if is_sensitive_write:
             return deterministic
+        # Model SHOUTING gets restored to grounding spelling before the
+        # reply crosses the boundary ("DINESH" -> "Dinesh").
+        composed = _restore_grounding_casing(
+            composed,
+            [deterministic, source_json, memory_context, raw_request],
+        )
         if luna_formatter_prompt:
             return clean_response_text(composed)
         return clean_response_text(composed) if valid else clean_response_text(deterministic)
@@ -3466,7 +3798,7 @@ class Brain:
             )
             or deterministic.startswith(
                 (
-                    "Knowledge engine could not handle that",
+                    "I couldn't complete that request",
                     "No matching events found",
                     "No current states stored yet",
                     "I don't have that",
@@ -3993,6 +4325,9 @@ class Brain:
             elif descriptive_color_grounding:
                 color_grounding = _resolve_color_grounding(descriptive_color_grounding)
             brightness_grounding = _grounded_brightness_level(planner_input)
+            # The speaker's level is the same argument class as brightness (a
+            # fraction the model gets wrong), so Core owns it the same way.
+            volume_grounding = _grounded_volume_level(planner_input)
             if brightness_grounding is None and relative_brightness and capabilities:
                 try:
                     skill_id0 = capabilities[0].get("skill_id")
@@ -4089,7 +4424,7 @@ class Brain:
             try:
                 calls = self.skill_planner.plan(**plan_kwargs)
             except SkillPlannerError:
-                if not (color_grounding or brightness_grounding or effect_grounding):
+                if not (color_grounding or brightness_grounding or effect_grounding or volume_grounding):
                     # Reads are side-effect-free: Needle's flaky validation
                     # block (omitted validation, false-positive negation flags
                     # on question wording) must not block a verified read. The
@@ -4109,6 +4444,7 @@ class Brain:
                 calls = self.skill_planner.plan(
                     color_grounding=color_grounding,
                     brightness_grounding=brightness_grounding,
+                    volume_grounding=volume_grounding,
                     effect_grounding=effect_grounding,
                     force_grounded=True,
                     **plan_kwargs,
@@ -4117,7 +4453,31 @@ class Brain:
                 {"tool": call.get("tool"), "arguments": call.get("arguments")}
                 for call in calls[:8]
             ]
-            validated = self.skill_manager.validate(calls, allowed_skill_ids)
+            try:
+                validated = self.skill_manager.validate(calls, allowed_skill_ids)
+            except SkillRuntimeError:
+                if not (color_grounding or brightness_grounding or effect_grounding or volume_grounding):
+                    raise
+                # Needle's own attempt can return schema-invalid arguments
+                # even when the plan shape is right (measured live on a
+                # compound color+effect request: rgb ['green', 'green',
+                # 'green']). Core-resolved arguments rescue exactly the
+                # measured-unreliable argument classes; the validation and
+                # readback gates still apply to the rescued plan.
+                details["skill_planner_grounded_retry"] = True
+                calls = self.skill_planner.plan(
+                    color_grounding=color_grounding,
+                    brightness_grounding=brightness_grounding,
+                    volume_grounding=volume_grounding,
+                    effect_grounding=effect_grounding,
+                    force_grounded=True,
+                    **plan_kwargs,
+                )
+                details["skill_plan_calls"] = [
+                    {"tool": call.get("tool"), "arguments": call.get("arguments")}
+                    for call in calls[:8]
+                ]
+                validated = self.skill_manager.validate(calls, allowed_skill_ids)
             has_self_sufficient_color_action = (
                 color_request_skill is not None
                 and len(validated) == 1
@@ -4256,8 +4616,18 @@ class Brain:
                 if len(execution["outcomes"]) == 1
                 else execution
             )
-            details["conversation_model_called"] = True
-            details["model_called"] = True
+            # A pure catalog read is answered from Core's deterministic
+            # data-to-text (the companion model previously acknowledged it
+            # with "The device action was executed successfully.", dropping
+            # the data the user asked for); the companion only phrases
+            # device CHANGES.
+            read_only = (
+                len(validated) == 1
+                and (validated[0].get("arguments") or {}).get("action")
+                in {"catalog", "color_catalog"}
+            )
+            details["conversation_model_called"] = not read_only
+            details["model_called"] = not read_only
             reply = self._compose_verified_skill_reply(
                 execution,
                 user_request=acknowledgment_request if acknowledgment_request else user_request,
@@ -4346,6 +4716,16 @@ class Brain:
         template verbatim, so the reply can never drift from the device.
         """
         outcomes = execution.get("outcomes", [])
+        # Read-only results answer a question; they are deterministic data,
+        # so Core answers directly instead of asking the companion model to
+        # phrase them (measured live: a catalog read was acknowledged with
+        # the useless template "The device action was executed successfully.").
+        read_reply = self._read_outcome_reply(outcomes)
+        if read_reply is not None:
+            return read_reply
+        skill_reply = self._skill_message_reply(outcomes)
+        if skill_reply is not None:
+            return skill_reply
         fact_line = self._device_state_fact_line(execution)
         if fact_line is not None:
             performed = []
@@ -4371,10 +4751,13 @@ class Brain:
             }
             try:
                 assistant_name, assistant_role, _model_id = _active_assistant_identity()
-                response = self.ollama.chat(
-                    system_prompt=(
-                        _identity_context_for_model(assistant_name, assistant_role)
-                        + "\n\nThe user's request below was ALREADY executed and confirmed by the "
+                import streaming as _streaming
+
+                with _streaming.user_facing():
+                    response = self.ollama.chat(
+                        system_prompt=(
+                            _identity_context_for_model(assistant_name, assistant_role)
+                            + "\n\nThe user's request below was ALREADY executed and confirmed by the "
                         "device skill. You receive an extremely simple JSON describing exactly what "
                         "was performed. Write ONE short, warm sentence telling the user it is done. "
                         "Use ONLY the facts in the JSON — no RGB numbers, no machine words, no JSON "
@@ -4422,10 +4805,13 @@ class Brain:
         )
         try:
             assistant_name, assistant_role, _model_id = _active_assistant_identity()
-            response = self.ollama.chat(
-                system_prompt=(
-                    _identity_context_for_model(assistant_name, assistant_role)
-                    + "\n\nCore has already performed the requested device action(s). The attached results "
+            import streaming as _streaming
+
+            with _streaming.user_facing():
+                response = self.ollama.chat(
+                    system_prompt=(
+                        _identity_context_for_model(assistant_name, assistant_role)
+                        + "\n\nCore has already performed the requested device action(s). The attached results "
                     "are the only verified source of what happened. You are only writing a brief user-facing "
                     "acknowledgment; do not infer or plan the original request, execute or suggest further "
                     "actions, or claim anything beyond these results. Use one short sentence. Do not invent "
@@ -4448,6 +4834,76 @@ class Brain:
             return result_text
         except Exception:
             return fallback
+
+    def _read_outcome_reply(self, outcomes: list[Any]) -> str | None:
+        """Deterministic answer for a confirmed read-only outcome.
+
+        Catalog reads return data the user explicitly asked for ("what
+        effects are available"), so the reply must carry that data, not an
+        execution acknowledgment. Returns None when the outcomes are not a
+        pure single read (state reads keep the fact-line rendering).
+        """
+        if (
+            not isinstance(outcomes, list)
+            or len(outcomes) != 1
+            or not isinstance(outcomes[0], dict)
+        ):
+            return None
+        outcome = outcomes[0]
+        arguments = outcome.get("arguments") if isinstance(outcome.get("arguments"), dict) else {}
+        action = arguments.get("action")
+        result = outcome.get("result") if isinstance(outcome.get("result"), dict) else {}
+        if action == "catalog":
+            effects = [
+                str(effect).strip()
+                for effect in (result.get("available_effects") or [])
+                if isinstance(effect, str) and effect.strip()
+                and effect.strip().casefold() not in {"", "none"}
+            ]
+            if effects:
+                return (
+                    f"Your light supports {len(effects)} effects: "
+                    + ", ".join(effects)
+                    + "."
+                )
+            return None
+        if action == "color_catalog":
+            return (
+                "Your light can display any color — name one you like "
+                "(for example teal, pink, or the color of the sun)."
+            )
+        return None
+
+    def _skill_message_reply(self, outcomes: list[Any]) -> str | None:
+        """Deterministic answer when a skill returns its own user-facing message.
+
+        A worker that performs a request hands back a ready ``message`` (for
+        example OpenDeck's "Playing ... on OpenDeck."). Asking the companion
+        model to rephrase it produced generic, sometimes wrong wording
+        ("The user's request was successfully executed." for a search or a
+        now-playing question), so a non-device result is answered with the
+        worker's own sentence. Ring outcomes keep their device fact-line
+        rendering and are never routed here.
+        """
+        if (
+            not isinstance(outcomes, list)
+            or not outcomes
+            or len(outcomes) > 8
+            or not all(isinstance(outcome, dict) for outcome in outcomes)
+        ):
+            return None
+        messages: list[str] = []
+        for outcome in outcomes:
+            if self._ring_action_fact_fragment(outcome) is not None:
+                return None
+            result = outcome.get("result")
+            if not isinstance(result, dict):
+                return None
+            message = result.get("message")
+            if not isinstance(message, str) or not message.strip():
+                return None
+            messages.append(" ".join(message.split())[:500])
+        return " ".join(messages)
 
     def _device_state_fact_line(self, execution: dict[str, Any]) -> str | None:
         """Render confirmed ring outcomes as deterministic, human-readable text.
@@ -5085,13 +5541,23 @@ class Brain:
                     acknowledgment_request=acknowledgment_request,
                     descriptive_color_grounding=compound_descriptive_color,
                 )
-            reply = self.ollama.chat(
-                system_prompt=self._chat_system_prompt(current_text=text),
-                history=history,
-                user_text=user_text,
-                think=think,
-                max_new_tokens=None,
-            )
+            import streaming as _streaming
+
+            with _streaming.user_facing():
+                reply = self.ollama.chat(
+                    system_prompt=self._chat_system_prompt(current_text=text),
+                    history=history,
+                    user_text=user_text,
+                    think=think,
+                    max_new_tokens=None,
+                )
+            if "NIX_SKILL_PLAN:" in reply or "NIX_SKILL_CALL:" in reply:
+                # Internal envelope text must never stay on screen: discard
+                # any provisional tokens from this generation.
+                sink = _streaming.attached_sink()
+                if sink is not None and sink.streamed_chars:
+                    sink.push_event({"type": "reset"})
+                    sink.reset_stream()
             if len(reply) > self.skill_manager.MAX_RESPONSE_CHARS:
                 raise SkillRuntimeError("The model response exceeded the skill plan size limit.")
             has_proposal_marker = "NIX_SKILL_PLAN:" in reply or "NIX_SKILL_CALL:" in reply
@@ -5479,6 +5945,8 @@ class Brain:
                     avoid=conversation_policy(text).get("avoid_nonessential_questions", False),
                 )
             reply = clean_response_text(reply)
+            # Current-clock gate: never let an invented wall-clock time stand.
+            reply = _ground_reply_clock(text, reply)
             # For simple relational/social turns, replace the model's generic
             # uncertainty with a bounded natural response. This fixes the
             # observed "you are sweet" and "good to know you" failures without
@@ -5498,10 +5966,13 @@ class Brain:
                 and reply.strip().endswith("?")
                 and re.search(r"\b(?:one|single)\s+word\b", text, re.I)
             ):
-                reply = self.ollama.chat(
-                    system_prompt=(
-                        _identity_context_for_model(assistant_name, assistant_role)
-                        + "\n\nAnswer the user's factual question directly. "
+                import streaming as _streaming
+
+                with _streaming.user_facing():
+                    reply = self.ollama.chat(
+                        system_prompt=(
+                            _identity_context_for_model(assistant_name, assistant_role)
+                            + "\n\nAnswer the user's factual question directly. "
                         "Return exactly one word and nothing else. Do not "
                         "ask a question or request more context."
                     ),

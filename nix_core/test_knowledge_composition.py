@@ -232,3 +232,125 @@ def test_multi_clause_pipeline_has_real_routing_metadata():
     assert routing["rule"] == "multi_clause"
     assert routing["latency_ms"] >= 0
     assert len(routing["clauses"]) == 2
+
+
+def test_restore_grounding_casing_undoes_model_shouting():
+    from brain import _restore_grounding_casing
+
+    # Model SHOUTS an entity recalled from facts; grounding spelling wins.
+    text = "Your coworker DINESH is afraid of HEIGHTS."
+    grounding = ["my coworker dinesh is afraid of heights", "coworker Dinesh is afraid of heights"]
+    assert _restore_grounding_casing(text, grounding) == (
+        "Your coworker Dinesh is afraid of heights."
+    )
+
+    # Tokens absent from grounding are invented and must be untouched.
+    assert _restore_grounding_casing("Weird CHATTER here", ["some fact"]) == (
+        "Weird CHATTER here"
+    )
+
+    # Plain replies pass through unchanged.
+    assert _restore_grounding_casing("All calm.", ["fact"]) == "All calm."
+
+
+def test_stated_times_gate_rejects_invented_and_garbled_times():
+    from brain import _stated_times_are_grounded
+
+    ground = [
+        "Scheduled 'dinner' with sister Emma tuesday 7pm. "
+        "Action set: reminder fires Oct 13, 2026 at 07:00 PM.",
+        "start=2026-10-13T19:00:00-05:00 "
+        "(Tuesday, October 13, 2026 at 7:00:00 PM)",
+    ]
+    # Equivalent renderings of the authoritative time all pass.
+    assert _stated_times_are_grounded("Dinner is set for Tuesday at 7pm.", ground)
+    assert _stated_times_are_grounded("Dinner is set for Tuesday 19:00.", ground)
+    # Hallucinated clock times fail (harness saw 19:30 / 19:59 for 19:00).
+    assert not _stated_times_are_grounded("Dinner is set for Tuesday 19:30.", ground)
+    assert not _stated_times_are_grounded("reminder fires 19:59", ground)
+    # Tokenizer-garbled ISO timestamps never reach the user.
+    assert not _stated_times_are_grounded(
+        "fires 202 6-10 - 08 T 15: 00: 00 - 05: 00", ground
+    )
+    # No authoritative clock time -> nothing to contradict.
+    assert _stated_times_are_grounded("see you at 9", ["no times here"])
+    # am/pm-less bare numbers (dates like "13th", "2026") are not clock times.
+    assert _stated_times_are_grounded(
+        "Scheduled on the 13th of October 2026.", ground
+    )
+
+
+def test_format_knowledge_result_renders_fire_time_readably():
+    from brain import format_knowledge_result
+
+    payload = {
+        "result": {
+            "ok": True,
+            "operation": "CREATE",
+            "record_type": "event",
+            "data": {"title": "dinner"},
+            "temporal": {"when": "tuesday 7pm"},
+            "actions": {
+                "ok": True,
+                "action_type": "reminder",
+                "first_fire_at": "2026-10-13T19:00:00-05:00",
+            },
+        }
+    }
+    reply = format_knowledge_result(payload)
+    # Human-readable local rendering instead of raw ISO the model garbles.
+    assert "Oct 13, 2026 at 7:00 PM" in reply
+    assert "19:00:00-05:00" not in reply
+
+
+def test_ground_reply_clock_fixes_invented_wall_clock():
+    from datetime import datetime
+
+    from brain import _ground_reply_clock
+
+    # Wrong stated time is replaced with the real local clock.
+    fixed = _ground_reply_clock("what time is it right now?", "It's currently 10:45 AM.")
+    assert "10:45" not in fixed
+    assert "currently" in fixed
+    # Correct (same minute) time passes through untouched.
+    now = datetime.now().strftime("%I:%M %p").lstrip("0").lower()
+    kept = _ground_reply_clock("what time is it?", f"It's currently {now}.")
+    assert kept == f"It's currently {now}."
+    # No time stated on a direct clock question: deterministic answer.
+    answered = _ground_reply_clock("what's the time?", "Sure thing!")
+    assert answered.startswith("It's currently ")
+    # Non-clock questions and Knowledge lookups are never touched.
+    assert _ground_reply_clock("how are you?", "It's currently 10:45 AM.") == (
+        "It's currently 10:45 AM."
+    )
+    assert _ground_reply_clock(
+        "what time is my meeting tomorrow?", "Your meeting is at 3pm."
+    ) == "Your meeting is at 3pm."
+
+
+def test_keys_reply_single_key_has_no_space_before_period():
+    from brain import _keys_reply
+
+    reply = _keys_reply(["user's coworker is named Dinesh"])
+    assert reply.endswith(".")
+    assert " ." not in reply
+
+
+def test_humanize_worker_error_translates_network_dumps():
+    from skill_runtime import _humanize_worker_error
+
+    raw = (
+        "SocketAPIError: Error connecting to [AddrInfo(family=<AddressFamily.AF_INET: 2>, "
+        "type=<SocketKind.SOCK_STREAM: 1>, proto=6, sockaddr=IPv4Sockaddr("
+        "address='192.168.0.55', port=6053))]: [Errno 113] Connect call failed "
+        "('192.168.0.55', 6053)"
+    )
+    msg = _humanize_worker_error(raw)
+    assert "no route to host" in msg
+    assert "192.168.0.55:6053" in msg
+    assert "AddrInfo" not in msg
+    # Other error classes keep their meaning in plain language.
+    assert "refused the connection" in _humanize_worker_error("[Errno 111] Connection refused")
+    assert "did not respond in time" in _humanize_worker_error("[Errno 110] Connection timed out")
+    # Unknown errors pass through untouched.
+    assert _humanize_worker_error("device said no") == "device said no"

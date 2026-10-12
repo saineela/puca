@@ -218,10 +218,10 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
 ):
     package_root = Path(console.CORE_DIR) / "ring_light_package"
     manifest = json.loads(
-        (package_root / "skills" / "ring-light" / "skill.json").read_text(encoding="utf-8")
+        (package_root / "skills" / "echo-connect" / "skill.json").read_text(encoding="utf-8")
     )
     repository_manifest = json.loads((package_root / "nix-skills.json").read_text(encoding="utf-8"))
-    package_dir = package_root / "skills" / "ring-light"
+    package_dir = package_root / "skills" / "echo-connect"
     base = "https://raw.githubusercontent.com/example/ring-light-local/main"
     payloads = {
         "https://api.github.com/repos/example/ring-light-local": {
@@ -230,10 +230,10 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
             "default_branch": "main",
         },
         f"{base}/nix-skills.json": json.dumps(repository_manifest).encode(),
-        f"{base}/skills/ring-light/skill.json": json.dumps(manifest).encode(),
+        f"{base}/skills/echo-connect/skill.json": json.dumps(manifest).encode(),
     }
     for relative in manifest["files"]:
-        payloads[f"{base}/skills/ring-light/{relative}"] = (
+        payloads[f"{base}/skills/echo-connect/{relative}"] = (
             package_dir / relative
         ).read_bytes()
 
@@ -270,13 +270,13 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
             "repository_url": "https://github.com/example/ring-light-local",
         })
         skill = next(item for item in preview["skills"] if item["community"])
-        assert skill["id"] == "github:example/ring-light-local:ring-light"
+        assert skill["id"] == "github:example/ring-light-local:echo-connect"
         assert skill["installed"] is False
         assert skill["runtime_declared"] is True
         assert skill["device_ui"]["visualization"] == {
             "type": "ring", "color_path": "state.rgb", "active_path": "state.on", "label_path": "device_name"
         }
-        assert [control["label"] for control in skill["device_ui"]["controls"]] == ["Turn on", "Turn off", "Set color", "Set brightness"]
+        assert [control["label"] for control in skill["device_ui"]["controls"]] == ["Turn on", "Turn off", "Set color", "Set brightness", "Set effect", "Set volume", "Mute", "Unmute", "Say text", "Speak with a tuned voice", "Stop speaking", "Play URL", "Pause", "Resume"]
         assert skill["trusted"] is False
         assert skill["runnable"] is False
 
@@ -290,14 +290,30 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
         assert record["setup_fields"] == manifest["setup_fields"]
         assert record["device_ui"]["visualization"] == manifest["device_ui"]["visualization"]
         assert record["device_ui"]["fields"] == manifest["device_ui"]["fields"]
-        assert manifest["version"] == "1.1.1"
+        assert manifest["version"] == "1.5.2"
+        # The speaker's own wording has to be declared, or a request like "set the
+        # volume to 30 percent" never reaches this skill.
+        assert {"volume", "mute", "unmute", "say"} <= set(manifest["triggers"])
         assert manifest["device_ui"]["visualization"] == {
             "type": "ring", "color_path": "state.rgb", "active_path": "state.on", "label_path": "device_name"
         }
         tool_schema = manifest["tools"][0]["input_schema"]
         assert "palette" not in tool_schema["properties"]
         assert "color" not in tool_schema["properties"]
-        assert manifest["tools"][0]["result_schema"]["required"] == ["ok", "action", "device_connected", "device_name", "available_effects", "message"]
+        assert "volume" in tool_schema["properties"]
+        assert "text" in tool_schema["properties"]
+        # The Voice Lab control passes a tuned Piper voice alongside the text.
+        assert "voice" in tool_schema["properties"]
+        tuned_control = next(
+            control for control in manifest["device_ui"]["controls"]
+            if control["label"] == "Speak with a tuned voice"
+        )
+        assert [field["name"] for field in tuned_control["fields"]] == ["text", "voice", "speed", "expressiveness", "variability"]
+        assert "voice" in manifest["tools"][0]["result_schema"]["properties"]
+        assert "voice_speed" in manifest["tools"][0]["result_schema"]["properties"]
+        # Speech results also carry the provider/quota snapshot.
+        assert "tts" in manifest["tools"][0]["result_schema"]["properties"]
+        assert manifest["tools"][0]["result_schema"]["required"] == ["ok", "action", "state", "speaker", "device_connected", "device_name", "available_effects", "message", "tts"]
         assert [command[1:3] for command in dependency_commands] == [["-m", "venv"], ["-m", "pip"]]
         assert "--only-binary=:all:" in dependency_commands[1]
         assert "--user" not in dependency_commands[1]
@@ -320,12 +336,29 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
         assert refreshed_record["setup_fields"] == manifest["setup_fields"]
         assert refreshed_record["device_ui"]["visualization"] == manifest["device_ui"]["visualization"]
         assert refreshed_record["device_ui"]["fields"] == manifest["device_ui"]["fields"]
+
+        # A saved repository record can also be stale rather than empty: an older
+        # catalog entry lists the previous field set and version, but the
+        # installed package is what runs, so its setup fields (including provider
+        # API keys) and version must reach the settings API.
+        saved = json.loads(Path(console.SKILLS_STATE_PATH).read_text(encoding="utf-8"))
+        saved_skill = saved["repositories"][0]["skills"][0]
+        saved_skill["setup_fields"] = [
+            dict(field) for field in manifest["setup_fields"][:2]
+        ]
+        saved_skill["version"] = "1.2.0"
+        Path(console.SKILLS_STATE_PATH).write_text(json.dumps(saved), encoding="utf-8")
+        stale_field_record = next(
+            item for item in console._skills_payload()["skills"] if item["id"] == skill["id"]
+        )
+        assert [field["id"] for field in stale_field_record["setup_fields"]] == [
+            field["id"] for field in manifest["setup_fields"]
+        ]
+        assert stale_field_record["version"] == manifest["version"]
         dashboard = console._dashboard_markup()
         assert "Skill settings" in dashboard
-        assert "aliasInput.name=aliasInput.id" in dashboard
         assert 'name="${inputId}" data-settings-field=' in dashboard
-        assert "device-ring.is-animated{background:conic-gradient" in dashboard
-        assert "device-ring-spectrum 3s linear infinite" in dashboard
+        assert "device-ring" not in dashboard
         assert "community&&skill.runtime_declared?`<div class=\"skill-details-warning\">" in dashboard
         assert 'id="skill-settings"' in dashboard
         assert "function renderSkillSettings()" in dashboard
@@ -333,13 +366,16 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
         assert 'data-settings-skill="${safeId}"' in dashboard
         assert "if(installing)openSkillSettings(skillId)" in dashboard
         assert "Expected JSON from ${path}, received ${contentType||'an unknown content type'}" in dashboard
-        assert "The JSON response from ${path} was invalid (HTTP ${r.status})." in dashboard
+        # The reader names the response rather than a one-letter local, and both
+        # messages are still rendered by the same shared helper.
+        assert "The JSON response from ${path} was invalid (HTTP ${response.status})." in dashboard
+        assert "async function readJson(response,path){" in dashboard
         assert 'data-settings-save' in dashboard
         assert 'data-settings-trust' in dashboard
         assert 'data-settings-runtime="connect"' in dashboard
         assert 'data-settings-auto-update' in dashboard
         assert "if(!skill.installed){const installButton=dialog.querySelector('.skill-details-install')" in dashboard
-        assert "device_label||device.name" in dashboard
+        assert "function devLabel(" in dashboard
         assert "data-save-settings" in dashboard
         assert "${skill.configured&&skill.trusted?'<button type=\"button\" data-runtime-action=\"connect\">Connect / test</button>':''}" in dashboard
 
@@ -355,7 +391,7 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
         for relative in manifest["files"]:
             assert (package / relative).read_bytes() == (package_dir / relative).read_bytes()
         assert requested[-len(manifest["files"]):] == [
-            f"{base}/skills/ring-light/{relative}" for relative in manifest["files"]
+            f"{base}/skills/echo-connect/{relative}" for relative in manifest["files"]
         ]
 
         # Simulate an old runtime which saved this GitHub package as static-only.
@@ -420,6 +456,32 @@ def test_local_ring_package_uses_github_import_and_install_flow_without_executio
         assert configured["configured"] is True
         assert configured["configuration"]["api_key"] == {"configured": True}
         assert test_key not in json.dumps(configured_payload)
+
+        # Provider API keys use the masked `token` setup type: arbitrary text,
+        # stored in the same private config file, never echoed back, and a blank
+        # field keeps the stored value.
+        token = "us_live_token_1234567890"
+        token_payload = post("/api/skills", {
+            "action": "configure",
+            "skill_id": skill["id"],
+            "configuration": {"device_ip": "192.168.1.20", "unrealspeech_api_key": token},
+        })
+        token_skill = next(item for item in token_payload["skills"] if item["id"] == skill["id"])
+        assert token_skill["configuration"]["unrealspeech_api_key"] == {"configured": True}
+        assert token_skill["configuration"]["api_key"] == {"configured": True}
+        assert token not in json.dumps(token_payload)
+        config_path = runtime._config_path(skill["id"])
+        stored = json.loads(config_path.read_text(encoding="utf-8"))
+        assert stored["unrealspeech_api_key"] == token
+        assert stored["api_key"] == test_key
+        assert (config_path.stat().st_mode & 0o777) == 0o600
+
+        # A token with control characters is refused rather than stored.
+        with pytest.raises(SkillRuntimeError, match="Token values"):
+            runtime.save_configuration(skill["id"], {
+                "device_ip": "192.168.1.20", "api_key": test_key, "unrealspeech_api_key": "bad\ntoken",
+            })
+        assert json.loads(config_path.read_text(encoding="utf-8"))["unrealspeech_api_key"] == token
 
         trusted_payload = post("/api/skills", {
             "action": "trust",
@@ -569,8 +631,8 @@ def test_runtime_targeting_uses_device_alias_and_nearest_relevant_history(skills
 
 
 def test_runtime_match_rewrites_configured_alias_for_skill_parser(skills_state, monkeypatch):
-    skill_id = "github:example/ring-light:ring-light"
-    source = Path(console.CORE_DIR) / "ring_light_package" / "skills" / "ring-light"
+    skill_id = "github:example/ring-light:echo-connect"
+    source = Path(console.CORE_DIR) / "ring_light_package" / "skills" / "echo-connect"
     manifest = json.loads((source / "skill.json").read_text(encoding="utf-8"))
     runtime = SkillRuntime(
         state_path=skills_state / "skills.json",
@@ -606,7 +668,7 @@ def test_runtime_match_rewrites_configured_alias_for_skill_parser(skills_state, 
 
     assert matched["skill_id"] == skill_id
     assert matched["arguments"] == {"action": "off"}
-    assert worker.calls == [("match", {"text": "can you turn off the Ring Light"})]
+    assert worker.calls == [("match", {"text": "can you turn off the Echo Connect"})]
 
 
 def test_runtime_binds_single_tool_match_arguments_to_declared_tool(skills_state, monkeypatch):
@@ -700,15 +762,15 @@ def test_runtime_rejects_pip_options_without_invoking_installer(skills_state, mo
 
 
 def test_device_ui_schema_rejects_untrusted_or_unbounded_dashboard_metadata():
-    manifest = json.loads((Path(console.CORE_DIR) / "ring_light_package" / "skills" / "ring-light" / "skill.json").read_text(encoding="utf-8"))
+    manifest = json.loads((Path(console.CORE_DIR) / "ring_light_package" / "skills" / "echo-connect" / "skill.json").read_text(encoding="utf-8"))
     manifest["device_ui"]["visualization"]["type"] = "script"
     with pytest.raises(console.SkillRepositoryError, match="unsupported visualization"):
-        console._parse_skill_manifest(manifest, "skills/ring-light/skill.json", "test")
+        console._parse_skill_manifest(manifest, "skills/echo-connect/skill.json", "test")
 
-    manifest = json.loads((Path(console.CORE_DIR) / "ring_light_package" / "skills" / "ring-light" / "skill.json").read_text(encoding="utf-8"))
+    manifest = json.loads((Path(console.CORE_DIR) / "ring_light_package" / "skills" / "echo-connect" / "skill.json").read_text(encoding="utf-8"))
     manifest["device_ui"]["controls"][2]["fields"][0]["widget"] = "html"
     with pytest.raises(console.SkillRepositoryError, match="uniquely satisfy"):
-        console._parse_skill_manifest(manifest, "skills/ring-light/skill.json", "test")
+        console._parse_skill_manifest(manifest, "skills/echo-connect/skill.json", "test")
 
 
 def test_runtime_device_status_requires_explicit_connect_and_trust(skills_state, monkeypatch):
@@ -725,8 +787,8 @@ def test_runtime_device_status_requires_explicit_connect_and_trust(skills_state,
 
 
 def test_device_controls_sharing_a_tool_select_matching_declared_arguments(skills_state, monkeypatch):
-    skill_id = "github:example/ring-light:ring-light"
-    source = Path(console.CORE_DIR) / "ring_light_package" / "skills" / "ring-light"
+    skill_id = "github:example/ring-light:echo-connect"
+    source = Path(console.CORE_DIR) / "ring_light_package" / "skills" / "echo-connect"
     manifest = json.loads((source / "skill.json").read_text(encoding="utf-8"))
     package = SkillRuntime.package_dir(skills_state / "installed", skill_id)
     package.mkdir(parents=True)
@@ -1081,8 +1143,7 @@ def test_devices_api_reads_only_existing_worker_state(skills_state, monkeypatch,
             console._set_skill_device_name(skill_id, "bad" + chr(10) + "name")
         assert console._set_skill_device_name(skill_id, "   ") == ""
         assert skill_id not in console._read_skills_state()["device_names"]
-        assert "data-device-name-save" in console._dashboard_markup()
-        assert "device_label||device.name" in console._dashboard_markup()
+        assert "function devControl(" in console._dashboard_markup()
     finally:
         server.shutdown()
         server.server_close()
@@ -1143,7 +1204,7 @@ def test_zip_upload_serves_logo_and_stays_manual_update_only(skills_state):
 
 def test_runtime_manifest_rejects_unhashable_schema_values_as_validation_errors():
     package_root = Path(console.CORE_DIR) / "ring_light_package"
-    manifest_path = package_root / "skills" / "ring-light" / "skill.json"
+    manifest_path = package_root / "skills" / "echo-connect" / "skill.json"
     source = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     malformed = []
@@ -1169,7 +1230,32 @@ def test_runtime_manifest_rejects_unhashable_schema_values_as_validation_errors(
 
     for manifest in malformed:
         with pytest.raises(console.SkillRepositoryError):
-            console._parse_skill_manifest(manifest, "skills/ring-light/skill.json", "test")
+            console._parse_skill_manifest(manifest, "skills/echo-connect/skill.json", "test")
+
+
+def test_manifest_accepts_masked_tokens_and_rejects_unknown_setup_types():
+    """`token` is the setup type for provider API keys: masked like a secret but
+    with no fixed encoding. Anything else is still refused."""
+    manifest_path = (
+        Path(console.CORE_DIR) / "ring_light_package" / "skills" / "echo-connect" / "skill.json"
+    )
+    source = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    parsed = console._parse_skill_manifest(
+        json.loads(json.dumps(source)), "skills/echo-connect/skill.json", "test"
+    )
+    assert [field["id"] for field in parsed["setup_fields"]] == [
+        "device_ip", "api_key", "tts_provider", "unrealspeech_api_key",
+        "unrealspeech_api_key_2", "unrealspeech_api_key_3", "unrealspeech_voice",
+        "unrealspeech_monthly_characters", "unrealspeech_monthly_audio_hours",
+    ]
+    assert [field["type"] for field in parsed["setup_fields"][3:6]] == ["token", "token", "token"]
+    assert all(field["required"] is False for field in parsed["setup_fields"][2:])
+
+    malformed = json.loads(json.dumps(source))
+    malformed["setup_fields"][2]["type"] = "password"
+    with pytest.raises(console.SkillRepositoryError, match="setup field schema is invalid"):
+        console._parse_skill_manifest(malformed, "skills/echo-connect/skill.json", "test")
 
 
 def test_oversized_post_body_returns_http_413(skills_state):
@@ -1247,3 +1333,178 @@ def test_runtime_targeting_resolves_state_questions_and_generic_antecedents(skil
 
     # Non-device questions still stay out of the skill path.
     assert runtime.targeted_skill_specs("is the store open?") == []
+
+
+def test_runtime_targeting_sends_queue_preferences_to_the_music_skill(skills_state, monkeypatch):
+    """"repeat this song" and "loop the queue" are the music provider's own
+    commands: the declared trigger must reach the player even though "repeat"
+    and "loop" are ordinary chat words ("repeat what you said" stays chat)."""
+    skill_id = "github:example/opendeck-skill:opendeck"
+    runtime = SkillRuntime(
+        state_path=skills_state / "skills.json",
+        install_dir=skills_state / "installed",
+        data_dir=skills_state / "data",
+    )
+    package = runtime.package_dir(runtime.install_dir, skill_id)
+    package.mkdir(parents=True)
+    (package / "worker.py").write_text("# mocked test package\n", encoding="utf-8")
+    manifest = {
+        "kind": "nix-skill",
+        "id": "opendeck",
+        "name": "OpenDeck",
+        "runtime": {"protocol": skill_runtime.PROTOCOL, "entrypoint": "worker.py"},
+        "files": ["worker.py"],
+        "device_ui": {"media": {"provider": {"play": {"tool": "opendeck_music", "arguments": {"action": "play"}}}}},
+        "tools": [{"name": "opendeck_music", "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}, "result_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}}],
+        "triggers": ["opendeck", "play music", "queue", "shuffle", "shuffle the queue", "repeat this song", "repeat the queue", "stop repeating"],
+    }
+    (package / "skill.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (skills_state / "skills.json").write_text(json.dumps({
+        "installed": [skill_id],
+        "device_names": {},
+    }), encoding="utf-8")
+    monkeypatch.setattr(runtime, "status", lambda _skill_id: {
+        "configured": True, "trusted": True, "runnable": True, "worker_running": False,
+    })
+
+    for phrase in (
+        "repeat this song",
+        "Repeat this song.",
+        "can you repeat this song",
+        "loop this song",
+        "repeat the queue",
+        "stop repeating",
+        "shuffle the queue",
+        "repeat the album",
+    ):
+        targeted = runtime.targeted_skill_specs(phrase)
+        assert [spec["skill_id"] for spec in targeted] == [skill_id], phrase
+
+    # Ordinary chat repeats are not music commands; they belong to the
+    # conversation model, which is the only surface that can answer them.
+    for phrase in (
+        "repeat what you said",
+        "can you repeat that?",
+        "could you repeat yourself",
+        "please repeat the last thing you told me about the store",
+    ):
+        assert runtime.targeted_skill_specs(phrase) == [], phrase
+
+
+def test_worker_request_serializes_concurrent_callers():
+    """Concurrent callers must never steal each other's correlated responses."""
+    import queue
+    import threading
+    import time
+
+    worker = skill_runtime._Worker.__new__(skill_runtime._Worker)
+    worker.timeout = 5.0
+    worker.lock = threading.Lock()
+    worker.responses = queue.Queue()
+    events = []
+
+    class FakeStdin:
+        def write(self, line):
+            request = json.loads(line)
+            key, request_id = request["n"], request["id"]
+            events.append(("write", key))
+            if key == "A":
+                # A's confirmation is slow; B must not be written until A is done.
+                timer = threading.Timer(
+                    0.15,
+                    lambda: (events.append(("respond", "A")), worker.responses.put(json.dumps({"id": request_id, "ok": True, "result": "from-A"}))),
+                )
+                timer.daemon = True
+                timer.start()
+            else:
+                worker.responses.put(json.dumps({"id": request_id, "ok": True, "result": "from-B"}))
+
+        def flush(self):
+            return None
+
+    class FakeProcess:
+        stdin = FakeStdin()
+
+        def poll(self):
+            return None
+
+    worker.process = FakeProcess()
+    outcomes = {}
+
+    def run(key):
+        outcomes[key] = worker.request("execute", {"n": key})["result"]
+
+    thread_a = threading.Thread(target=run, args=("A",))
+    thread_a.start()
+    time.sleep(0.05)
+    thread_b = threading.Thread(target=run, args=("B",))
+    thread_b.start()
+    thread_a.join(timeout=4)
+    thread_b.join(timeout=4)
+
+    assert outcomes == {"A": "from-A", "B": "from-B"}
+    # B's request may only be written after A's response was consumed.
+    assert events == [("write", "A"), ("respond", "A"), ("write", "B")]
+
+
+def test_device_execute_worker_reported_error_keeps_worker_running(skills_state, monkeypatch):
+    """A worker-reported failure must not disconnect the skill; transport failures still stop it."""
+    skill_id = "github:example/ring-light:echo-connect"
+    runtime = SkillRuntime(
+        state_path=skills_state / "skills.json",
+        install_dir=skills_state / "installed",
+        data_dir=skills_state / "data",
+    )
+    manifest = {
+        "kind": "nix-skill",
+        "id": "echo-connect",
+        "name": "Echo Connect",
+        "runtime": {"protocol": skill_runtime.PROTOCOL, "entrypoint": "worker.py"},
+        "files": ["worker.py"],
+        "tools": [{
+            "name": "control_ring",
+            "input_schema": {"type": "object", "properties": {"action": {"type": "string", "enum": ["on"]}}, "required": ["action"], "additionalProperties": False},
+            "result_schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"], "additionalProperties": False},
+        }],
+    }
+    package = SkillRuntime.package_dir(skills_state / "installed", skill_id)
+    package.mkdir(parents=True)
+    (package / "skill.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (package / "worker.py").write_text("# fake\n", encoding="utf-8")
+
+    class FakeWorker:
+        def __init__(self):
+            self.calls = []
+            self.process = SimpleNamespace(poll=lambda: None)
+
+        def request(self, operation, payload):
+            self.calls.append(operation)
+            if len(self.calls) == 1:
+                raise skill_runtime.WorkerOperationError("TimeoutError: Echo Dot did not confirm the requested ring state.")
+            return {"result": {"ok": True}}
+
+        def stop(self):
+            return None
+
+    fake_worker = FakeWorker()
+    runtime._workers[skill_id] = fake_worker
+    monkeypatch.setattr(runtime, "status", lambda _skill_id: {"configured": True, "trusted": True, "runnable": True, "worker_running": True})
+    stopped = []
+    monkeypatch.setattr(runtime, "stop", lambda _skill_id: stopped.append(_skill_id))
+
+    with pytest.raises(SkillRuntimeError, match="did not confirm"):
+        runtime._device_tool_call(skill_id, "control_ring", {"action": "on"})
+    assert stopped == []
+    assert fake_worker.calls == ["execute"]
+
+    assert runtime._device_tool_call(skill_id, "control_ring", {"action": "on"}) == {"ok": True}
+    assert stopped == []
+    assert fake_worker.calls == ["execute", "execute"]
+
+    def transport_failure(_operation, _payload):
+        raise SkillRuntimeError("Skill worker timed out.")
+
+    monkeypatch.setattr(fake_worker, "request", transport_failure)
+    with pytest.raises(SkillRuntimeError, match="timed out"):
+        runtime._device_tool_call(skill_id, "control_ring", {"action": "on"})
+    assert stopped == [skill_id]

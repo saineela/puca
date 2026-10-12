@@ -1,0 +1,287 @@
+/* devices-page.css — the NIX Home Devices UI, regenerated.
+   Everything is scoped to #devices. The page keeps the approved light NIX
+   Home look: paper cards on a light canvas, near-black stages for the ring
+   artwork, rounded pills, and RingFx canvases. --dev-ring is rewritten live
+   by the dashboard aura tick so borders, dots, halos and glows follow the
+   running effect colour. */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+#devices {
+  --dev-ring: #0080FF;          /* live ring colour (JS writes per view/card) */
+  --dev-ok: #1B5E20;
+  --dev-bad: #B00020;
+  --dev-live: #3BE07C;
+  --dev-dim: #8A8A94;
+  --dev-stage: #0B0B0F;         /* near-black canvas behind ring art */
+  --dev-stage-line: #1A1A22;
+  --dev-mist: var(--soft, #f3f3f3);
+  --dev-card-radius: 16px;
+}
+
+/* ── Shell & section views ──────────────────────────────────────────────── */
+#devices .dview { display: none }
+#devices .dview.show { display: block; animation: devviewin .28s ease }
+@keyframes devviewin { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+#devices .devcontent { max-width: 1280px; margin: 0 auto; padding: 26px 30px 50px }
+#devices .pagehead { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 6px }
+#devices .pagehead .t { flex: 1; min-width: 0 }
+#devices .d-h1 { margin: 0; color: var(--ink); font-size: 32px; line-height: 40px; font-weight: 800; letter-spacing: -.5px }
+#devices .d-sub { font-size: 14px; color: var(--muted) }
+#devices .seclabel { font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted) }
+#devices .devcrumb { display: flex; align-items: center; gap: 14px }
+#devices .backbtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border: 1px solid var(--line); border-radius: 50px; background: var(--paper); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s }
+#devices .backbtn:hover { background: var(--dev-mist); border-color: var(--accent) }
+#devices .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--dev-card-radius) }
+#devices .chev { font-size: 24px; line-height: 1; color: var(--muted) }
+#devices .gap10 { height: 10px }
+#devices .gap14 { height: 14px }
+#devices .gap20 { height: 20px }
+
+/* ── Header stat pills ──────────────────────────────────────────────────── */
+#devices .devstats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px }
+#devices .devstats span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 50px; background: var(--paper); box-shadow: 0 2px 8px #00000008; font-size: 12.5px; font-weight: 650; color: var(--muted) }
+#devices .devstats b { color: var(--ink); font-weight: 800 }
+#devices .devstats i { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--sd, #9aa0a6); box-shadow: 0 0 8px var(--sd, #9aa0a6) }
+#devices .devstats .live i { background: var(--dev-live); box-shadow: 0 0 8px #3BE07C99; animation: devpulse 1.1s ease-in-out infinite alternate }
+
+/* ── Grid view: pairing card ────────────────────────────────────────────── */
+#devices .gridcards { display: grid; gap: 16px; margin-top: 18px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) }
+#devices .pair { display: flex; align-items: center; padding: 22px; cursor: pointer; border-style: dashed; transition: box-shadow .15s, transform .15s, border-color .15s }
+#devices .pair:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 10px 26px #00000014 }
+#devices .pairart { position: relative; display: grid; place-items: center; width: 66px; height: 66px; flex: none }
+#devices .pairart span { position: absolute; inset: 0; border: 2px solid var(--accent); border-radius: 50%; opacity: 0; animation: pairping 2.6s cubic-bezier(.2, .6, .3, 1) infinite }
+#devices .pairart .r2 { animation-delay: .85s }
+#devices .pairart .r3 { animation-delay: 1.7s }
+#devices .pairart .plus { z-index: 1; display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-deep, #000)); color: #fff; font-size: 24px; font-weight: 700; box-shadow: 0 8px 20px #7553cf45; transition: transform .15s ease }
+#devices .pair:hover .pairart .plus { transform: scale(1.06) }
+@keyframes pairping { 0% { transform: scale(.55); opacity: .7 } 70% { opacity: .12 } 100% { transform: scale(1.14); opacity: 0 } }
+#devices .pair .txt { flex: 1; min-width: 0; margin-left: 16px }
+#devices .pair .txt .a { font-size: 16px; font-weight: 700 }
+#devices .pair .txt .b { font-size: 13px; color: var(--muted) }
+
+/* ── Grid view: ring tiles ──────────────────────────────────────────────── */
+#devices .devtile { position: relative; display: flex; flex-direction: column; align-items: center; padding: 22px 20px 18px; cursor: pointer; text-align: center; transition: box-shadow .15s, transform .15s, border-color .2s }
+#devices .devtile:hover { transform: translateY(-2px); border-color: var(--dev-ring); box-shadow: 0 12px 30px #0000001c, 0 0 24px -8px var(--dev-ring) }
+#devices .devtile .stage { position: relative; display: grid; place-items: center; width: 158px; height: 158px; margin-top: 2px }
+#devices .devtile .stage .aura { position: absolute; inset: 12px; border-radius: 50%; background: radial-gradient(circle, var(--dev-ring) 0%, transparent 65%); opacity: .15; filter: blur(10px); transition: opacity .25s ease }
+#devices .devtile:hover .stage .aura { opacity: .36 }
+#devices .devtile canvas { position: relative; z-index: 1; display: block; width: 140px; height: 140px }
+#devices .devtile .nm { margin-top: 12px; font-size: 16px; font-weight: 700 }
+#devices .devtile .st { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--dev-ring) }
+#devices .devtile .st::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--dev-ring); box-shadow: 0 0 8px var(--dev-ring); animation: devpulse 1.2s ease-in-out infinite alternate }
+#devices .devtile .meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 11px }
+#devices .devtile .meta span { padding: 4px 9px; border: 1px solid var(--line); border-radius: 50px; background: var(--surface-alt, #fafafa); font-size: 9.5px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase; color: var(--muted) }
+#devices .devtile .meta .good { color: var(--dev-ok); border-color: #1b5e2033; background: #1b5e200f }
+#devices .devtile .meta .warn { color: #8a6d1b; border-color: #8a6d1b33; background: #8a6d1b0f }
+
+/* ── Grid view: Nix Dev unit card ───────────────────────────────────────── */
+#devices .devunit { position: relative; overflow: hidden; padding: 20px 22px; cursor: pointer; transition: box-shadow .15s, transform .15s }
+#devices .devunit:hover { transform: translateY(-2px); box-shadow: 0 10px 26px #00000024 }
+#devices .devunit::before { content: ""; position: absolute; top: -46px; right: -46px; width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, var(--dev-ring) 0%, transparent 70%); opacity: .12; pointer-events: none }
+#devices .devunit .label { position: relative; margin-bottom: 12px; font-size: 11px; font-weight: 700; letter-spacing: 2.4px; color: var(--muted) }
+#devices .devunit .row { position: relative; display: flex; align-items: center; gap: 14px }
+#devices .devunit .bt { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; flex: none; overflow: hidden; padding: 0; border: 1px solid var(--dev-stage-line); border-radius: 50%; background: var(--dev-stage) }
+#devices .devunit .bt canvas { display: block; width: 44px; height: 44px }
+#devices .devunit .mid { flex: 1; min-width: 0 }
+#devices .devunit .mid .n { font-size: 16px; font-weight: 700 }
+#devices .devunit .mid .id { font-size: 12px; letter-spacing: .5px; color: var(--muted) }
+#devices .devunit .note { position: relative; margin-top: 12px; font-size: 12.5px; color: var(--dev-ok) }
+#devices .state-ok { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 14px; font-weight: 700; color: var(--dev-ok) }
+#devices .state-off { white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--muted) }
+#devices .pdot { width: 8px; height: 8px; border-radius: 50%; background: var(--dev-live); box-shadow: 0 0 10px #3BE07C99, 0 0 0 4px #3BE07C1f; animation: devpulse 1.1s ease-in-out infinite alternate }
+@keyframes devpulse { from { opacity: .35 } to { opacity: 1 } }
+
+/* ── Empty / error state ────────────────────────────────────────────────── */
+#devices .devempty { grid-column: 1 / -1; display: grid; justify-items: center; padding: 52px 20px; text-align: center; color: var(--muted) }
+#devices .devempty .emptyart { position: relative; width: 96px; height: 96px; margin-bottom: 16px }
+#devices .devempty .emptyart span { position: absolute; inset: 0; border: 2px dashed var(--line); border-radius: 50%; animation: emptyspin 24s linear infinite }
+#devices .devempty .emptyart .r2 { inset: 15px; border-style: solid; border-color: #e6e6e6; animation-duration: 15s; animation-direction: reverse }
+#devices .devempty .emptyart i { position: absolute; inset: 32px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffff, #eaeaea); box-shadow: 0 8px 18px #00000014; color: #a6a6a6; font-style: normal; font-size: 20px }
+@keyframes emptyspin { to { transform: rotate(360deg) } }
+#devices .devempty strong { display: block; margin-top: 2px; color: var(--ink); font-size: 17px; font-weight: 750 }
+#devices .devempty p { margin: 6px 0 0; color: var(--muted); font-size: 13px }
+
+/* ── Detail view: heading, dot stage, chips ─────────────────────────────── */
+#devices .titlerow { display: flex; align-items: center; gap: 10px }
+#devices .connstate { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--dev-ok) }
+#devices .connstate.off { color: var(--muted) }
+#devices .detail-grid { display: grid; gap: 20px; margin-top: 20px; grid-template-columns: minmax(320px, 5fr) minmax(400px, 7fr); align-items: start }
+#devices .stack { display: flex; flex-direction: column; gap: 20px }
+#devices .dot-visual { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; aspect-ratio: 1.6; border: 1px solid var(--dev-stage-line); border-radius: 20px; background: var(--dev-stage); box-shadow: 0 34px 80px -46px var(--dev-ring), 0 18px 44px -32px #00000066 }
+#devices .dot-visual canvas { position: absolute; inset: 0; width: 100%; height: 100% }
+#devices .dot-visual .halo { position: absolute; inset: -16%; background: radial-gradient(circle at 50% 56%, var(--dev-ring) 0%, transparent 60%); opacity: .16; animation: devhalo 4.5s ease-in-out infinite alternate; pointer-events: none }
+#devices .dot-visual::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, #ffffff08 0 1px, transparent 1px 4px); pointer-events: none }
+@keyframes devhalo { from { transform: scale(.94); opacity: .10 } to { transform: scale(1.06); opacity: .24 } }
+#devices .dot-visual .labels { position: relative; z-index: 1; margin-top: -12%; text-align: center; pointer-events: none }
+#devices .dot-visual .labels .l { font-size: 19px; line-height: 26px; font-weight: 700; color: #EDEDF2 }
+#devices .dot-visual .labels .s { font-size: 13px; font-weight: 500; color: #7A7A86 }
+#devices .dot-visual .labels .s.on { color: var(--dev-ring) }
+#devices .dot-visual .badge { position: absolute; top: 14px; right: 16px; z-index: 1; padding: 5px 11px; border: 1px solid #ffffff1a; border-radius: 50px; background: #ffffff12; font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: #9A9AA6 }
+#devices .dot-visual .badge i { font-style: normal; color: var(--dev-ring) }
+#devices .chiprow { display: flex; flex-wrap: wrap; gap: 10px }
+#devices .schip { display: flex; align-items: center; gap: 9px; padding: 9px 15px; border: 1px solid var(--line); border-radius: 50px; background: var(--paper) }
+#devices .schip .lbl { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted) }
+#devices .schip .val { font-size: 14px; font-weight: 600 }
+
+/* ── Detail view: control deck ──────────────────────────────────────────── */
+#devices .deck { padding: 24px }
+#devices .deck .head { display: flex; align-items: center; gap: 10px }
+#devices .deck .head .ttl { flex: 1; font-size: 18px; font-weight: 700 }
+#devices .obtn { padding: 9px 22px; border: 1px solid var(--line); border-radius: 50px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, color .15s }
+#devices .obtn:hover { background: var(--dev-mist) }
+#devices .obtn.ok { border-color: var(--dev-ok); color: var(--dev-ok) }
+#devices .obtn.ok.active { background: #1b5e2014 }
+#devices .obtn:disabled { opacity: .45; cursor: default }
+#devices .dialwrap { display: flex; justify-content: center; padding: 6px 0 2px }
+#devices .dial { position: relative; width: 200px; height: 200px; cursor: pointer; touch-action: none }
+#devices .dial svg { display: block; transform: rotate(-90deg) }
+#devices .dial .ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none }
+#devices .dial .ctr .pct { font-size: 30px; font-weight: 800 }
+#devices .dial .ctr .hint { font-size: 11px; font-weight: 600; color: var(--muted) }
+#devices #dialArc { transition: stroke .2s ease; filter: drop-shadow(0 0 6px var(--dev-ring)) }
+#devices .flow { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 8px }
+#devices .fx { padding: 8px 16px; border: 1px solid var(--line); border-radius: 50px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer; transition: background .12s, color .12s, border-color .12s }
+#devices .fx:hover { border-color: var(--ink) }
+#devices .fx.sel { background: var(--ink); border-color: var(--ink); color: var(--paper) }
+#devices .colors { display: flex; gap: 10px }
+#devices .colors .c { flex: 1; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 12px; cursor: pointer; transition: transform .12s, border-color .12s }
+#devices .colors .c:hover { transform: translateY(-2px) }
+#devices .colors .c.sel { border-color: var(--ink); box-shadow: 0 0 0 2px var(--paper) inset }
+
+/* ── Unit view: hero ────────────────────────────────────────────────────── */
+#devices .hero { position: relative; isolation: isolate; overflow: hidden; margin-top: 18px; padding: 30px 34px 26px; border: 1px solid #0000008c; border-radius: 26px; background: linear-gradient(135deg, var(--accent) 0, #000000c7 100%); color: #fff }
+#devices .hero::after { content: ""; position: absolute; inset: 0; z-index: 0; background: radial-gradient(130% 100% at 100% 0%, #ffffff2b 0%, transparent 48%), radial-gradient(100% 90% at 0% 100%, #ffffff17 0%, transparent 42%); pointer-events: none; animation: heroshimmer 7s ease-in-out infinite alternate }
+@keyframes heroshimmer { from { opacity: .55 } to { opacity: 1 } }
+#devices .hero .deco { position: absolute; border-radius: 50%; background: #ffffff17; pointer-events: none }
+#devices .hero .deco.a { width: 240px; height: 240px; top: -70px; right: -50px }
+#devices .hero .deco.b { width: 200px; height: 200px; bottom: -80px; left: -60px; background: #ffffff12 }
+#devices .hero .who { position: relative; z-index: 1; display: flex; align-items: center; gap: 18px }
+#devices .hero .disc { display: grid; place-items: center; width: 72px; height: 72px; flex: none; overflow: hidden; border: 1px solid #ffffff33; border-radius: 50%; background: var(--dev-stage); box-shadow: 0 0 26px -6px var(--dev-ring), inset 0 0 0 1px #ffffff14; animation: devbreathe 1.5s cubic-bezier(.55, .06, .68, .19) infinite alternate }
+@keyframes devbreathe { from { transform: scale(.85) } to { transform: scale(1) } }
+#devices .hero .disc canvas { display: block; width: 70px; height: 70px }
+#devices .hero .who .nm { font-size: 26px; font-weight: 800; letter-spacing: -.3px }
+#devices .hero .who .meta { font-size: 14px; color: #ffffffd9 }
+#devices .hero .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px }
+#devices .hero .chip { display: flex; align-items: center; gap: 8px; padding: 7px 15px; border-radius: 999px; background: #ffffff2e; backdrop-filter: blur(3px); font-size: 14px; font-weight: 600 }
+#devices .hero .foot { position: relative; z-index: 1; margin-top: 16px; font-size: 13.5px; color: #ffffffeb }
+#devices .hero .hspark { position: absolute; z-index: 0; border-radius: 50%; background: #ffffff9c; box-shadow: 0 0 12px #ffffff8c; pointer-events: none; animation: hspark 5.5s ease-in-out infinite alternate }
+#devices .hero .hspark.h1 { width: 8px; height: 8px; top: 30px; right: 150px }
+#devices .hero .hspark.h2 { width: 5px; height: 5px; bottom: 38px; right: 70px; animation-delay: 1.6s }
+#devices .hero .hspark.h3 { width: 4px; height: 4px; top: 66px; left: 52%; animation-delay: 3.1s }
+@keyframes hspark { from { transform: translate(0, 0); opacity: .3 } to { transform: translate(12px, -18px); opacity: 1 } }
+
+/* ── Unit view: facts & controls ────────────────────────────────────────── */
+#devices .dev-grid { display: grid; gap: 20px; margin-top: 20px; grid-template-columns: minmax(300px, 5fr) minmax(400px, 7fr); align-items: start }
+#devices .stats { padding: 20px 22px }
+#devices .stats .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; margin-top: 14px }
+#devices .stats .k { font-size: 11px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted) }
+#devices .stats .v { margin-top: 2px; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+#devices .ctrlcard { padding: 24px }
+#devices .ctrlcard .ttl { font-size: 18px; font-weight: 700 }
+#devices .ctrlcard .sub { margin-top: 2px; font-size: 14px; color: var(--muted) }
+#devices .ctrlrows { display: flex; flex-direction: column; margin-top: 14px }
+#devices .ctrlrow { display: flex; align-items: center; gap: 16px; width: 100%; padding: 15px 4px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; cursor: pointer; color: var(--ink); transition: background .12s }
+#devices .ctrlrow:hover { background: var(--dev-mist) }
+#devices .ctrlrow .ic { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: #00000024 }
+#devices .ctrlrow.danger .ic { background: #b0002024; color: var(--dev-bad) }
+#devices .ctrlrow .tx { flex: 1; min-width: 0 }
+#devices .ctrlrow .tx .a { display: block; font-size: 15.5px; font-weight: 600 }
+#devices .ctrlrow .tx .b { display: block; font-size: 13px; color: var(--muted) }
+#devices .ctrlrow .chev { font-size: 22px; color: var(--muted) }
+#devices .blefoot { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted) }
+#devices .blefoot b { color: var(--ink) }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+/* ── Rename control (pencil next to the device name) ───────────────── */
+#devices .nameedit { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; transition: color .15s, border-color .15s, background .15s, transform .15s }
+#devices .nameedit:hover { color: var(--accent-ink); border-color: var(--accent); background: var(--dev-mist); transform: translateY(-1px) }
+#devices .nameform { display: flex; gap: 8px; margin-top: 10px }
+#devices .nameform[hidden] { display: none }
+#devices .nameform input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: var(--paper); color: var(--ink); font-size: 14px }
+#devices .nameform input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #7553cf20 }
+
+/* ── Speaker panel (volume, say/stop, voice lab) ────────────────────────
+   One borderless composition: a soft volume dial with the live level in its
+   centre, an icon-led say row, and a quiet voice lab. Depth comes from fills,
+   shadows and type — never from outlines. */
+#devices .spkblock { display: flex; flex-direction: column; gap: 18px }
+#devices .spkrow { display: flex; align-items: center; gap: 10px }
+
+/* — Volume: heading, dial with the level in the middle, then ▲ / ▼ — */
+#devices .spkvol { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; padding: 10px 0 2px }
+#devices .spkvol .volhead { display: flex; align-items: center; gap: 8px }
+#devices .spkvol .spkicon { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border: 0; background: none; color: var(--muted, #666) }
+#devices .spkicon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; background: var(--surface-alt, #fafafa); color: var(--accent-ink) }
+#devices .vollbl { font-size: 11px; font-weight: 750; letter-spacing: 2px; text-transform: uppercase; color: var(--muted, #666) }
+#devices .volwheel { position: relative; display: grid; place-items: center; width: 168px; height: 168px; flex: none; cursor: grab; touch-action: none; border: 0; border-radius: 50%; background: radial-gradient(circle at 50% 34%, #ffffff 0%, #f7f7f9 56%, #ececf0 100%); box-shadow: 0 12px 32px -14px #00000024, 0 2px 8px #0000000a; transition: transform .18s cubic-bezier(.2, .8, .3, 1), box-shadow .18s ease }
+#devices .volwheel::after { content: ""; position: absolute; inset: 15px; border-radius: 50%; box-shadow: inset 0 1px 3px #00000012; pointer-events: none }
+#devices .volwheel:hover { box-shadow: 0 16px 38px -14px #7553cf3d, 0 2px 8px #0000000a }
+#devices .volwheel.dragging, #devices .volwheel:active { cursor: grabbing; transform: scale(1.035) }
+#devices .volwheel:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--accent-soft, #eee), 0 16px 38px -14px #7553cf3d }
+#devices .volwheel > svg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; transform: rotate(-90deg) }
+#devices .volwheel .voltrack { stroke: #e3e3e9 }
+#devices .volwheel .volarc { stroke: #111111; transition: stroke-dasharray .2s cubic-bezier(.2, .8, .3, 1); filter: drop-shadow(0 0 5px #7553cf6b) }
+#devices .volwheel .volhalo { position: absolute; inset: -18px; border-radius: 50%; background: radial-gradient(circle, #7553cf1f 0%, transparent 66%); opacity: .8; animation: devhalo 4.5s ease-in-out infinite alternate; pointer-events: none }
+#devices .volwheel .ctr { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; pointer-events: none }
+#devices .volwheel .ctr .hint { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted, #666) }
+#devices .volnum { font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; color: var(--ink, #171717) }
+/* Stepper: a compact ▲ / ▼ segmented pill — no outlines anywhere. */
+#devices .volstep { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: var(--soft, #f4f4f4) }
+#devices .volstep-div { width: 1px; height: 18px; margin: 0 2px; background: #00000014 }
+#devices .volbtn { display: grid; place-items: center; width: 42px; height: 38px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted, #666); cursor: pointer; transition: background .15s, color .15s, transform .1s }
+#devices .volbtn:hover:not(:disabled) { background: var(--paper, #fff); color: var(--ink, #171717) }
+#devices .volbtn:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--accent-soft, #eee) }
+#devices .volbtn:active:not(:disabled) { transform: scale(.9) }
+#devices .volbtn:disabled { opacity: .28; cursor: default }
+#devices .deck .head .spkmute { margin-left: 2px }
+/* Say row: a soft field with a leading mark, then icon-led buttons. */
+#devices .spkinput { flex: 1; min-width: 0; height: 46px; padding: 0 16px 0 42px; border: 0; border-radius: 999px; outline: 0; background-color: var(--soft, #f4f4f4); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='%238e8e98'%3E%3Cpath d='M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 16px center; background-size: 15px 15px; color: var(--ink); font-size: 13.5px; transition: background-color .15s, box-shadow .15s }
+#devices .spkinput::placeholder { color: var(--muted, #999) }
+#devices .spkinput:focus { background-color: var(--paper, #fff); box-shadow: 0 0 0 3px var(--accent-soft, #eee) }
+#devices .spkblock .obtn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--soft, #f4f4f4); color: var(--ink); font-size: 13.5px; font-weight: 700; transition: background .15s, color .15s, transform .1s }
+#devices .spkblock .obtn svg { flex: none }
+#devices .spkblock .obtn:hover { background: var(--lav, #ededed) }
+#devices .spkblock .obtn:active { transform: scale(.97) }
+#devices .spkblock .obtn:disabled { opacity: .4; cursor: default }
+#devices .spkblock #btnSay { background: var(--accent, #111111); color: var(--paper, #fff) }
+#devices .spkblock #btnSay:hover:not(:disabled) { background: var(--accent-deep, #000000) }
+#devices .obtn.muted { border: 0; color: #8a6d1b; background: #8a6d1b14 }
+
+/* ── Voice Lab (tune the on-device neural voice) ───────────────────────── */
+#devices .voicelab { display: flex; flex-direction: column; gap: 14px; margin-top: 2px; padding: 18px 18px 16px; border: 0; border-radius: 20px; background: linear-gradient(180deg, #f7f7f9 0%, #f2f2f6 100%) }
+#devices .voicelab .vltop { display: flex; align-items: center; justify-content: space-between; gap: 10px }
+#devices .voicelab .vlttl { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: 1.9px; text-transform: uppercase; color: var(--muted, #666) }
+#devices .voicelab .vlttl svg { opacity: .75 }
+#devices .voicelab .vlreset { height: 32px; padding: 0 15px; font-size: 12px }
+#devices .voicelab .vlrow { display: grid; grid-template-columns: 104px minmax(0, 1fr) 56px; align-items: center; gap: 14px; font-size: 13px }
+#devices .voicelab .vlrow.wide select { grid-column: 2 / 4 }
+#devices .voicelab .vlk { font-weight: 650; color: var(--ink, #171717) }
+#devices .voicelab select { height: 38px; min-width: 0; padding: 0 12px; border: 0; border-radius: 11px; outline: 0; background: var(--paper, #fff); color: var(--ink, #171717); font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px #0000000f; transition: box-shadow .15s }
+#devices .voicelab select:focus { box-shadow: 0 0 0 3px var(--accent-soft, #eee) }
+#devices .voicelab .vlv { text-align: right; font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--ink, #171717) }
+/* Custom sliders: hairline track with a filled span fed by --vlfill (set live
+   by devVoiceSync) and a ringed thumb, so they read as designed, not default. */
+#devices .voicelab input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; cursor: pointer; --vlfill: 0% }
+#devices .voicelab input[type="range"]:focus-visible { outline: 2px solid var(--accent-soft, #e6e6e6); outline-offset: 3px; border-radius: 999px }
+#devices .voicelab input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--accent, #111111) 0 var(--vlfill), #e2e2e8 var(--vlfill) 100%) }
+#devices .voicelab input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -5px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #00000038, 0 0 0 2px var(--accent, #111111); transition: transform .12s ease }
+#devices .voicelab input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.14) }
+#devices .voicelab input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: #e2e2e8 }
+#devices .voicelab input[type="range"]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent, #111111) }
+#devices .voicelab input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #00000038, 0 0 0 2px var(--accent, #111111) }
+#devices .voicelab .vlhint { margin: 2px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted, #666) }
+#devices .voicelab .vlhint b { color: var(--ink, #171717) }
+
+@media (max-width: 1120px) {
+  #devices .detail-grid, #devices .dev-grid { grid-template-columns: 1fr }
+}
+@media (max-width: 560px) {
+  #devices .devcontent { padding: 20px 15px 44px }
+  #devices .d-h1 { font-size: 26px; line-height: 32px }
+  #devices .gridcards { grid-template-columns: 1fr }
+  #devices .devtile .stage { width: 136px; height: 136px }
+  #devices .devtile canvas { width: 120px; height: 120px }
+  #devices .hero { padding: 23px; border-radius: 20px }
+  #devices .hero .hspark { display: none }
+  #devices .stats .rows { grid-template-columns: 1fr }
+}

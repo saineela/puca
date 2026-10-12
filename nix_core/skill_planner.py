@@ -12,6 +12,82 @@ from config import SKILL_PLANNER_MODEL
 
 _NEEDLE_INFERENCE_LOCK = threading.Lock()
 
+# Shuffle and repeat are a music provider's queue preferences rather than queue
+# contents: "shuffle the queue", "repeat this song", "stop repeating". The words
+# a preference request is built from are checked against a small vocabulary, so a
+# request that names a track ("search for shuffle") is left to the planner
+# instead of being read as a queue operation. This mirrors the matcher in the
+# installed OpenDeck worker, which answers the same phrases when it is the one
+# asked, so speech and the page reach the same queue flag either way.
+_MUSIC_PREFERENCE_WORD = re.compile(r"\b(?:shuffl\w*|randomi[sz]\w*|repeat\w*|loop\w*)\b", re.IGNORECASE)
+_MUSIC_SHUFFLE_WORD = re.compile(r"\b(?:shuffl(?:e|es|ed|ing)|randomi[sz]e[ds]?)\b", re.IGNORECASE)
+_MUSIC_REPEAT_WORD = re.compile(r"\b(?:repeat(?:ing|s)?|loop(?:ing)?)\b", re.IGNORECASE)
+# "can you shuffle the queue", "shuffle the queue please": the same request
+# with manners on it, so a polite frame comes off before the words are checked.
+_MUSIC_PREFERENCE_LEAD = re.compile(
+    r"^(?:(?:please|hey\s+nix|nix|ok|okay)[,\s]+)*"
+    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?",
+    re.IGNORECASE,
+)
+_MUSIC_PREFERENCE_TRAIL = re.compile(
+    r"(?:\s+(?:please|thanks|thank\s+you|for\s+me))+\s*$", re.IGNORECASE
+)
+_MUSIC_PREFERENCE_OFF_WORD = re.compile(r"\b(?:off|stop|no|cancel|end|un|without)\b", re.IGNORECASE)
+_MUSIC_PREFERENCE_ONE_WORD = re.compile(
+    r"\b(?:one|single|same|current|this|that|it|song|track|tune)\b", re.IGNORECASE
+)
+_MUSIC_PREFERENCE_ALL_WORD = re.compile(
+    r"\b(?:all|everything|whole|entire|queue|list|playlist|music|songs|tracks|tunes|rest)\b",
+    re.IGNORECASE,
+)
+_MUSIC_PREFERENCE_WORDS = frozenset(
+    "shuffle shuffles shuffled shuffling randomize randomizes randomise randomises random randomly"
+    " repeat repeating repeats loop loops looping"
+    " on off stop start begin end cancel no more turn turning toggle switch"
+    " it this that these those them one all everything whole rest same current"
+    " queue list playlist music song songs track tracks tune tunes"
+    " and then also now again please for me my our the a an of in to up back".split()
+)
+# "queue up shuffle" names a track that happens to be called Shuffle: an explicit
+# add is read as one, and the preference matcher stays out of its way.
+_MUSIC_QUEUE_ADD_WORD = re.compile(
+    r"\bqueue\s+up\b|"
+    r"\b(?:add|put|drop|throw|queue)\b[^,;]{0,60}?\b(?:to|into|onto)\s+(?:the|my)\s+queue\b",
+    re.IGNORECASE,
+)
+
+
+def _music_queue_preference(text: str) -> dict[str, Any] | None:
+    """A spoken shuffle/repeat request as queue arguments, or None.
+
+    "shuffle the queue" and "turn shuffle off" set the queue's flag; "repeat this
+    song", "repeat the queue" and "stop repeating" set its mode. Shuffle is
+    switched on rather than toggled - the page's button is the toggle - and a bare
+    "repeat" cycles, which is what the provider does with no mode given.
+    """
+    lowered = _MUSIC_PREFERENCE_TRAIL.sub(
+        "", _MUSIC_PREFERENCE_LEAD.sub("", text.casefold()).strip()
+    ).strip()
+    if _MUSIC_PREFERENCE_WORD.search(lowered) is None:
+        return None
+    words = re.findall(r"[a-z']+", lowered)
+    if not words or any(word not in _MUSIC_PREFERENCE_WORDS for word in words):
+        return None
+    if _MUSIC_QUEUE_ADD_WORD.search(lowered) is not None:
+        return None
+    shuffles = _MUSIC_SHUFFLE_WORD.search(lowered)
+    repeats = _MUSIC_REPEAT_WORD.search(lowered)
+    if repeats is None or (shuffles is not None and shuffles.start() < repeats.start()):
+        return {"action": "queue", "op": "shuffle",
+                "on": _MUSIC_PREFERENCE_OFF_WORD.search(lowered) is None}
+    if _MUSIC_PREFERENCE_OFF_WORD.search(lowered) is not None:
+        return {"action": "queue", "op": "repeat", "mode": "off"}
+    if _MUSIC_PREFERENCE_ONE_WORD.search(lowered) is not None:
+        return {"action": "queue", "op": "repeat", "mode": "one"}
+    if _MUSIC_PREFERENCE_ALL_WORD.search(lowered) is not None:
+        return {"action": "queue", "op": "repeat", "mode": "all"}
+    return {"action": "queue", "op": "repeat"}
+
 
 class SkillPlannerError(RuntimeError):
     """The dedicated planner was unavailable or did not return valid calls."""
@@ -231,7 +307,15 @@ class SkillPlanner:
     ) -> set[str] | None:
         """Narrow choices only when unambiguous surface wording maps to declared actions."""
         text = user_text.casefold()
-        if re.search(r"\b(?:do not|don't|never|not|without|stop|avoid)\b", text):
+        # "stop speaking" and "stop the music" are the actions themselves, not a
+        # negation of a plan, so they are removed before the negation guard runs.
+        negation_text = re.sub(
+            r"\bstop\s+(?:speaking|talking|playing|the\s+music|the\s+audio|the\s+song|"
+            r"repeating|looping|shuffling|the\s+repeat|the\s+shuffle)\b",
+            " ",
+            text,
+        )
+        if re.search(r"\b(?:do not|don't|never|not|without|stop|avoid)\b", negation_text):
             raise SkillPlannerError("Negated or excluded device requests are not eligible for planning.")
         groups: set[str] = set()
         color = re.search(
@@ -247,7 +331,10 @@ class SkillPlanner:
         ):
             groups.add("brightness")
         if re.search(r"\b(?:effect|animation|pattern)\b", text):
-            if re.search(r"\b(?:run|start|activate|play|set|use|apply)\b", text):
+            # "change to <name> effect" and "switch to <name> effect" are
+            # activation wordings (measured live on compound requests), not
+            # catalog reads; only question/list wording selects "read".
+            if re.search(r"\b(?:run|start|activate|play|set|use|apply|change|switch)\b", text):
                 groups.add("effect")
             elif re.search(r"\b(?:list|show|read|what|available|catalog)\b", text):
                 groups.add("read")
@@ -265,8 +352,15 @@ class SkillPlanner:
             )
             if isinstance(effect, str) and effect.strip()
         ]
+        # A named effect from the live catalog plus any activation verb —
+        # including "show"/"display" ("while showing the rainbow twinkle
+        # effect") — is an effect run, never a catalog read: the read verbs
+        # only win when no specific effect name is present ("show available
+        # effects").
         if any(effect.casefold() in text for effect in available_effects) and re.search(
-            r"\b(?:run|start|activate|play|set|use|apply|enable|turn)\b", text
+            r"\b(?:run|start|activate|play|set|use|apply|enable|turn|change|switch|"
+            r"show(?:s|ing|n)?|display(?:s|ing)?|put)\b",
+            text,
         ):
             groups.add("effect")
         if re.search(r"\b(?:state|status|current state)\b", text) and re.search(
@@ -280,8 +374,73 @@ class SkillPlanner:
         if (
             re.search(r"\b(?:turn|switch|power)\b.{0,60}\b(?:on|off)\b", text)
             or re.search(r"\b(?:on|off)\b.{0,40}\b(?:light|ring|device)\b", text)
-        ) and re.search(r"\b(?:turn|switch|power)\b", text):
+        ) and re.search(r"\b(?:turn|switch|power)\b", text) and _music_queue_preference(text) is None:
+            # "turn shuffle off" and "turn off repeat" switch a queue preference,
+            # not a device: without this they would narrow the request to a power
+            # action the provider does not declare.
             groups.add("power")
+        # Speaker wording. The speaker skill declares the ring's actions and the
+        # speaker's in one tool, so a request that names one of them is narrowed
+        # to that action: without this the planner is handed the whole toolset,
+        # which is larger than its bounded tool limit and fails closed.
+        if re.search(r"\b(?:volume|loudness|louder|quieter|sound\s+level|speaker\s+level)\b", text):
+            groups.add("volume")
+        if re.search(r"\bun-?mute\b", text):
+            groups.add("unmute")
+        elif re.search(r"\bmute\b", text):
+            groups.add("mute")
+        if re.search(r"\b(?:stop\s+speaking|stop\s+talking|be\s+quiet|shut\s+up)\b", text):
+            groups.add("stop_speaking")
+        elif re.search(r"\b(?:say|speak|announce|read\s+aloud)\b", text):
+            groups.add("say")
+        if re.search(r"\b(?:pause|unpause|resume)\b", text):
+            groups.add("resume" if re.search(r"\b(?:unpause|resume)\b", text) else "pause")
+        # Music provider wording (OpenDeck). A music request is narrowed to the
+        # one provider action the words name, which is also what keeps the
+        # planner's confidence up: the whole provider toolset is offered only
+        # when the request names none of them.
+        # A question about the current track ("what's playing", "what song is
+        # playing") is a read of the provider's now-playing state, not a "play"
+        # command: the "playing" in it would otherwise narrow the planner to the
+        # play action, which has no valid call for a question and fails closed.
+        if re.search(
+            r"\b(?:what(?:'s|\s+song\s+is|\s+tune\s+is|\s+is)?\s+playing|"
+            r"what\s+(?:song|tune)\s+is\s+this|now\s+playing|currently\s+playing|"
+            r"what\s+am\s+i\s+listening\s+to)\b",
+            text,
+        ):
+            groups.add("now_playing")
+        elif re.search(r"\b(?:play|put\s+on)\b[^,;]{0,80}\b(?:next|first)\b", text):
+            # "play <song> next/first" prioritises that track in the queue; the
+            # track itself comes from the request wording, so Core owns the call.
+            groups.add("queue")
+        elif re.search(
+            r"\bmove\b[^,;]{0,60}\b(?:track|song|tune|position|front)\b", text
+        ):
+            # "move track 3 to position 1" is an explicit queue reorder.
+            groups.add("queue")
+        elif _music_queue_preference(text) is not None:
+            # "shuffle the queue", "repeat this song": the queue's own listening
+            # preferences, which the provider drives by op. Read as a preference
+            # instead of a play, and only when the wording is all preference
+            # words, so a request that names a track is left to the planner.
+            groups.add("queue")
+        elif re.search(r"\b(?:queue|queued|up\s+next)\b", text):
+            groups.add("queue")
+        elif re.search(r"\b(?:play|playing|put\s+on|start\s+playing)\b", text):
+            groups.add("play")
+        elif re.search(r"\b(?:search|find|look\s+for)\b", text):
+            # "search for X" / "find X": a catalog search, never a play. Naming
+            # the provider's search action keeps the model from choosing play.
+            groups.add("search")
+        if re.search(
+            r"\b(?:playlists?|liked|loved|favorites?|favourites?|history|library|"
+            r"listened\s+to|been\s+listening|did\s+i\s+listen)\b",
+            text,
+        ):
+            groups.add("library")
+        if re.search(r"\blyrics?\b", text):
+            groups.add("lyrics")
         if not groups:
             return None
         declared, aliases = SkillPlanner._tool_definitions(capabilities)
@@ -295,18 +454,176 @@ class SkillPlanner:
             )
         missing = groups - available_groups
         if missing:
+            # "read" is this vocabulary's word for a state/catalog read on a
+            # device whose tool declares one. A provider whose read action is
+            # named something else (OpenDeck answers a library listing) is not
+            # an unsupported request: narrowing by that hint would hand the
+            # planner an action the schema does not have, so the hint is
+            # dropped and the skill's own toolset is offered instead.
+            if missing == {"read"}:
+                groups.discard("read")
+                if not groups:
+                    return None
+                missing = groups - available_groups
+        if missing:
             raise SkillPlannerError(
                 "Requested action is unavailable in the installed schema: " + ", ".join(sorted(missing))
             )
         return groups
 
+    @classmethod
+    def _grounded_music_call(
+        cls,
+        capabilities: list[dict[str, Any]],
+        groups: set[str],
+        user_text: str,
+    ) -> dict[str, Any] | None:
+        """Build the music call the request names, or None when it is ambiguous."""
+        if not groups:
+            return None
+        text = " ".join(str(user_text).casefold().split())
+        action: str | None = None
+        arguments: dict[str, Any] | None = None
+        if "now_playing" in groups:
+            # "what's playing" names no argument at all, so Core owns the call.
+            action = "now_playing"
+            arguments = {"action": "now_playing"}
+        elif "search" in groups:
+            # "search for X" / "find X" / "look for X": the search text is the
+            # user's own words after the verb, never a model-chosen title.
+            query = re.sub(
+                r"^\s*(?:please\s+)?(?:can\s+you\s+|could\s+you\s+)?(?:search|find|look)\s*(?:for|up)?\s+",
+                "",
+                text,
+            )
+            query = re.sub(r"\b(?:on|in)\s+opendeck\b", " ", query)
+            query = re.sub(r"\b(?:please|thanks|thank\s+you)\b", " ", query)
+            query = " ".join(query.split()).strip(" ,.!?")
+            if query:
+                action = "search"
+                arguments = {"action": "search", "query": query[:200]}
+        elif "queue" in groups:
+            action = "queue"
+            # "shuffle the queue", "repeat this song", "stop repeating": the
+            # queue's own preferences, which the page drives by op.
+            preference = _music_queue_preference(text)
+            # "play <song> next/first" prioritises that track in the queue.
+            priority = re.search(r"\b(?:play|put\s+on)\s+(?:the\s+)?(.+?)\s+(?:next|first)\b", text)
+            # "move track 3 to position 1" / "move <song> to the front".
+            move = re.search(
+                r"\bmove\s+(?:track\s+|song\s+)?(\d+)\s+(?:to\s+)?(?:position\s+)?(\d+)\b",
+                text,
+            )
+            move_front = re.search(r"\bmove\s+(?:track\s+|song\s+)?(.+?)\s+to\s+(?:the\s+)?front\b", text)
+            # "play the next track"/"skip"/"next song": advance the queue. This
+            # is checked before the priority wording so "play the next queued
+            # track" is not read as "play <song> next".
+            advance = re.search(
+                r"\b(?:play\s+(?:the\s+)?next|next\s+(?:track|song|tune|one)|"
+                r"skip|following)\b",
+                text,
+            )
+            if preference is not None:
+                arguments = preference
+            elif (
+                _MUSIC_PREFERENCE_WORD.search(text) is not None
+                and _MUSIC_QUEUE_ADD_WORD.search(text) is None
+            ):
+                # A shuffle/repeat word Core cannot read exactly (a track is
+                # named, or the wording is unusual): the call needs a lookup or a
+                # judgement, so it is left to the planner rather than guessed at
+                # as an add of the literal words.
+                return None
+            elif advance is not None:
+                arguments = {"action": "queue", "op": "next"}
+            elif priority is not None:
+                track = " ".join(priority.group(1).split()).strip(" ,.!?")
+                op = "next_up" if re.search(r"\bnext\b", priority.group(0)) else "front"
+                if not track or re.fullmatch(
+                    r"(?:this|that|it|the\s+one|(?:this|that|the|a|my)?\s*(?:current\s+)?"
+                    r"(?:song|track|tune|one|music))",
+                    track,
+                ):
+                    # "play this next": the track is the current one.
+                    arguments = {"action": "queue", "op": op}
+                else:
+                    arguments = {"action": "queue", "op": op, "query": track[:200]}
+            elif move_front is not None:
+                track = " ".join(move_front.group(1).split()).strip(" ,.!?")
+                if re.fullmatch(r"(?:\d+\s+)?(?:track|song|tune)", track):
+                    index = int(re.match(r"(\d+)", track).group(1)) - 1
+                    arguments = {"action": "queue", "op": "front", "index": max(0, index)}
+                elif track:
+                    arguments = {"action": "queue", "op": "front", "query": track[:200]}
+            elif move is not None:
+                arguments = {
+                    "action": "queue",
+                    "op": "move",
+                    "index": max(0, int(move.group(1)) - 1),
+                    "to": max(0, int(move.group(2)) - 1),
+                }
+            elif re.search(r"\b(?:clear|empty|wipe)\b", text):
+                arguments = {"action": "queue", "op": "clear"}
+            elif re.search(r"\b(?:what|show|list|read|see|any|remaining)\b", text):
+                arguments = {"action": "queue", "op": "list"}
+            else:
+                # "queue up X", "add X to the queue", "queue X": the track is the
+                # user's own words between the verb and the queue itself.
+                track = re.sub(
+                    r"^\s*(?:please\s+)?(?:can\s+you\s+)?(?:queue|add|put)\s+(?:up\s+)?",
+                    "",
+                    text,
+                )
+                track = re.sub(r"\s*(?:,?\s*)?(?:to|onto|into)\s+(?:the|my)\s+queue\b.*$", "", track)
+                track = track.strip(" ,.!?")
+                if track:
+                    arguments = {"action": "queue", "op": "add", "query": track[:200]}
+        elif "library" in groups:
+            if re.search(r"\b(?:liked|loved|favorite|favourite)s?\b", text):
+                arguments = {"action": "library", "kind": "likes"}
+                action = "library"
+            elif re.search(
+                r"\b(?:history|recently\s+played|recent\s+plays?|listened\s+to|been\s+listening|"
+                r"did\s+i\s+listen)\b",
+                text,
+            ):
+                arguments = {"action": "library", "kind": "history"}
+                action = "library"
+            elif re.search(r"\b(?:stats?|statistics)\b", text):
+                arguments = {"action": "library", "kind": "stats"}
+                action = "library"
+            # A singular "playlist" usually names one to open, which the planner
+            # resolves from the request; only a listing is Core-owned.
+            elif re.search(r"\bplaylists\b|\bmusic\s+library\b", text):
+                arguments = {"action": "library", "kind": "playlists"}
+                action = "library"
+        elif "lyrics" in groups:
+            # Lyrics for a track the user names go to the planner, which fills the
+            # title/artist fields; Core only owns the no-argument case.
+            if not re.search(r"\b(?:for|of|to)\s+\S", text):
+                action = "lyrics"
+                arguments = {"action": "lyrics"}
+        if action is None or arguments is None:
+            return None
+        _tools, bindings = cls._needle_tool_definitions(capabilities, {action}, {action})
+        for _name, (skill_id, declared_tool, action_map) in bindings.items():
+            if action_map.get("__call__") == action:
+                return {
+                    "type": "skill_tool_call",
+                    "skill_id": skill_id,
+                    "tool": declared_tool,
+                    "arguments": arguments,
+                }
+        return None
+
     _STEP_SPLIT_PATTERN = re.compile(
-        r"\s*(?:\band\s+then\b|\bthen\b|\bafter\s+that\b|\band\b|;|,)\s*",
+        r"\s*(?:\band\s+then\b|\bthen\b|\bafter\s+that\b|\bwhile\b|\balso\b|"
+        r"\bplus\b|\band\b|;|,)\s*",
         re.IGNORECASE,
     )
     _STEP_ACTION_PATTERN = re.compile(
         r"\b(?:turn|switch|power|set|make|change|apply|enable|disable|start|stop|"
-        r"brighten|dim|run|play|animate|activate|on|off)\b",
+        r"brighten|dim|run|play|animate|activate|show|showing|on|off)\b",
         re.IGNORECASE,
     )
 
@@ -320,7 +637,16 @@ class SkillPlanner:
         Planning step-by-step keeps every call in the calibrated regime; Core's
         multi-action count gate still requires the complete step set.
         """
-        if not re.search(r"\band\b|\bthen\b|\bafter\s+that\b|;|,", user_text, re.IGNORECASE):
+        # The connector gate must list every split connector: a compound
+        # request phrased with "while"/"also" ("switch the color to green
+        # while showing the rainbow twinkle effect") previously reached one
+        # multi-call inference, where Needle3's confidence collapses and the
+        # whole plan is withheld.
+        if not re.search(
+            r"\band\b|\bthen\b|\bafter\s+that\b|\bwhile\b|\balso\b|\bplus\b|;|,",
+            user_text,
+            re.IGNORECASE,
+        ):
             return None
         fragments = [
             fragment.strip(" .!?")
@@ -343,6 +669,7 @@ class SkillPlanner:
         capabilities: list[dict[str, Any]],
         color_grounding: dict[str, Any] | None = None,
         brightness_grounding: dict[str, Any] | None = None,
+        volume_grounding: dict[str, Any] | None = None,
         effect_grounding: dict[str, Any] | None = None,
         force_grounded: bool = False,
     ) -> list[dict[str, Any]]:
@@ -364,6 +691,7 @@ class SkillPlanner:
                         capabilities=capabilities,
                         color_grounding=color_grounding,
                         brightness_grounding=brightness_grounding,
+                        volume_grounding=volume_grounding,
                         effect_grounding=effect_grounding,
                         force_grounded=force_grounded,
                     )
@@ -375,6 +703,7 @@ class SkillPlanner:
             capabilities=capabilities,
             color_grounding=color_grounding,
             brightness_grounding=brightness_grounding,
+            volume_grounding=volume_grounding,
             effect_grounding=effect_grounding,
             force_grounded=force_grounded,
         )
@@ -387,6 +716,7 @@ class SkillPlanner:
         capabilities: list[dict[str, Any]],
         color_grounding: dict[str, Any] | None = None,
         brightness_grounding: dict[str, Any] | None = None,
+        volume_grounding: dict[str, Any] | None = None,
         effect_grounding: dict[str, Any] | None = None,
         force_grounded: bool = False,
     ) -> list[dict[str, Any]]:
@@ -400,11 +730,19 @@ class SkillPlanner:
             grounded_groups = {
                 "color" if color_grounding is not None else None,
                 "brightness" if brightness_grounding is not None else None,
+                "volume" if volume_grounding is not None else None,
                 "effect" if effect_grounding is not None else None,
             }
             grounded_groups.discard(None)
             if grounded_groups and (selected_groups is None or selected_groups <= grounded_groups):
-                selected_groups = grounded_groups
+                # Fill lexical gaps only. In step-by-step planning every step
+                # receives the full request's groundings; widening a step's
+                # own evidence to the full grounded set ("change to rainbow
+                # twinkle effect" gaining "color" from step 1) re-creates
+                # exactly the multi-call inference this split exists to
+                # avoid, and Needle3 truncates on it (measured live).
+                if selected_groups is None:
+                    selected_groups = grounded_groups
         # Core-resolved canonical colors never pass through the model: Needle3
         # garbles 3-digit numbers ([255, 0, 0] -> [2, 55, 0]), so a named-color
         # step is emitted deterministically and still passes schema validation
@@ -451,6 +789,28 @@ class SkillPlanner:
                         },
                     }]
             raise SkillPlannerError("No declared brightness function was available for the grounded brightness step.")
+        # The speaker's volume is the same Core-owned fraction as brightness and
+        # lives on the same device, so it bypasses the model for the same reason
+        # (Needle3 suppresses a correctly computed 0.3 level).
+        if (
+            force_grounded
+            and volume_grounding is not None
+            and selected_groups == {"volume"}
+            and isinstance(volume_grounding.get("volume"), (int, float))
+        ):
+            _tools, bindings = self._needle_tool_definitions(capabilities, {"volume"}, None)
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == "volume":
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {
+                            "action": "volume",
+                            "volume": float(volume_grounding["volume"]),
+                        },
+                    }]
+            raise SkillPlannerError("No declared volume function was available for the grounded volume step.")
         # Effects: the exact firmware name from the live catalog is Core-owned
         # data; case-matching it here removes the last ungrounded argument
         # class from the model's hands.
@@ -474,6 +834,105 @@ class SkillPlanner:
                         },
                     }]
             raise SkillPlannerError("No declared effect function was available for the grounded effect step.")
+        # Power: an explicitly worded on/off step is Core-owned wording (the
+        # cleanser normalizes it to "turn on/off the <device>"), so under the
+        # grounded retry it is emitted deterministically — mirrored on the
+        # color/brightness/effect bypasses. Needle3 measurably withholds the
+        # zero-argument power call when it is planned as a second step
+        # ("set the color to red and turn on the light"), which failed the
+        # whole compound plan closed. The confirmation and readback gates
+        # still apply to the executed result.
+        if force_grounded and selected_groups == {"power"}:
+            direction = None
+            if re.search(
+                r"\b(?:turn|switch|power)\b.{0,60}\boff\b"
+                r"|\boff\b.{0,40}\b(?:light|ring|lamp|device)\b",
+                user_text,
+                re.IGNORECASE,
+            ):
+                direction = "off"
+            elif re.search(
+                r"\b(?:turn|switch|power)\b.{0,60}\bon\b"
+                r"|\bon\b.{0,40}\b(?:light|ring|lamp|device)\b",
+                user_text,
+                re.IGNORECASE,
+            ):
+                direction = "on"
+            if direction is not None:
+                _tools, bindings = self._needle_tool_definitions(
+                    capabilities, {"power"}, None
+                )
+                for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                    if action_map.get("__call__") == direction:
+                        return [{
+                            "type": "skill_tool_call",
+                            "skill_id": skill_id,
+                            "tool": declared_tool,
+                            "arguments": {"action": direction},
+                        }]
+                raise SkillPlannerError(
+                    "No declared power function was available for the grounded power step."
+                )
+        # Zero-argument speaker actions (mute/unmute, stop speaking, pause/resume)
+        # carry no model-chosen argument at all, so under the grounded retry they
+        # are emitted deterministically like power — the validation and readback
+        # gates still apply to the executed result.
+        if (
+            force_grounded
+            and selected_groups is not None
+            and len(selected_groups) == 1
+            and next(iter(selected_groups)) in {"mute", "unmute", "stop_speaking", "pause", "resume"}
+        ):
+            action = next(iter(selected_groups))
+            _tools, bindings = self._needle_tool_definitions(capabilities, {action}, None)
+            for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                if action_map.get("__call__") == action:
+                    return [{
+                        "type": "skill_tool_call",
+                        "skill_id": skill_id,
+                        "tool": declared_tool,
+                        "arguments": {"action": action},
+                    }]
+            raise SkillPlannerError(
+                f"No declared {action} function was available for the grounded speaker step."
+            )
+        # Speech: the words to speak are the user's own, taken from after the
+        # verb, so Core owns the argument instead of the model paraphrasing it.
+        if force_grounded and selected_groups == {"say"}:
+            speech = re.search(
+                r"\b(?:say|speak|announce|read\s+aloud)\b[:,]?\s+(.+)$",
+                user_text,
+                re.IGNORECASE,
+            )
+            if speech is not None:
+                text = speech.group(1).strip().strip("\"'").rstrip(".!? ").strip()
+                if text:
+                    _tools, bindings = self._needle_tool_definitions(capabilities, {"say"}, None)
+                    for _name, (skill_id, declared_tool, action_map) in bindings.items():
+                        if action_map.get("__call__") == "say":
+                            return [{
+                                "type": "skill_tool_call",
+                                "skill_id": skill_id,
+                                "tool": declared_tool,
+                                "arguments": {"action": "say", "text": text[:500]},
+                            }]
+                    raise SkillPlannerError(
+                        "No declared say function was available for the grounded speech step."
+                    )
+        # Music provider (OpenDeck) requests. Its actions are named after the
+        # operations they perform and the arguments come from the request itself
+        # (a track to queue, a kind of listing), so the whole call is Core-owned
+        # for the same reason a brightness level is: the model is not asked to
+        # choose between two plausible actions (Measured: "queue up <song>" was
+        # planned as a search) and cannot lose the call to a confidence floor.
+        # Anything Core cannot read (opening a named playlist, saving a like) is
+        # left to the planner below.
+        if selected_groups is not None and selected_groups <= {
+            "queue", "library", "lyrics", "now_playing", "search"
+        }:
+            grounded_music = self._grounded_music_call(capabilities, selected_groups, user_text)
+            if grounded_music is not None:
+                return [grounded_music]
         selected_actions = None
         normalized_text = user_text.casefold()
         if selected_groups is not None and "read" in selected_groups:
@@ -498,7 +957,7 @@ class SkillPlanner:
         if (
             force_grounded
             and selected_groups == {"read"}
-            and not (color_grounding or brightness_grounding or effect_grounding)
+            and not (color_grounding or brightness_grounding or effect_grounding or volume_grounding)
         ):
             read_action = next(iter(selected_actions)) if selected_actions else "state"
             _tools, bindings = self._needle_tool_definitions(capabilities, {"read"}, {read_action})
@@ -533,7 +992,7 @@ class SkillPlanner:
                     buffer_size=self.MAX_RESPONSE_CHARS,
                 )
                 try:
-                    response = agent.complete(user_text, max_new_tokens=512)
+                    response = agent.complete(user_text, max_new_tokens=1024)
                 finally:
                     close = getattr(agent, "close", None)
                     if callable(close):

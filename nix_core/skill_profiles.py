@@ -74,7 +74,7 @@ def profile_for_spec(spec: dict[str, Any]) -> SkillProfile:
     if not isinstance(spec, dict) or not isinstance(spec.get("skill_id"), str):
         raise SkillProfileError("Skill profile data did not identify a skill.")
     skill_id = spec["skill_id"]
-    if "ring-light" in skill_id or "ring_light" in skill_id:
+    if "ring-light" in skill_id or "ring_light" in skill_id or "echo-connect" in skill_id or "echo_connect" in skill_id:
         return _executor_prompt(
             profile_id="ring-light",
             skill_id=skill_id,

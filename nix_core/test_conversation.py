@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from random import Random
 
 import pytest
@@ -392,10 +393,20 @@ class ProposalSkillRuntime:
             if any(self.spec["device_name"].casefold() in str(turn.get("content") or "").casefold() for turn in history if isinstance(turn, dict)):
                 return [self.spec]
         if any(word in current.split() for word in ("it", "that", "they", "them")):
-            for turn in reversed(history or []):
-                content = str(turn.get("content") or "").casefold()
-                if "ring" in content or "studio ring" in content:
-                    return [self.spec]
+            # Mirror the real runtime: ellipsis resolution requires the
+            # CURRENT turn to be device-directed ("I'm gonna snap them"
+            # after light talk must stay chat).
+            device_directed = bool(re.search(
+                r"\b(?:turn|switch|power|set|make|change|run|start|play|stop|disable|"
+                r"enable|brighten|dim|paint|animate|show|list|apply|status|state|"
+                r"color|colour|hue|shade|brightness|effect|on|off)\b",
+                current,
+            ))
+            if device_directed:
+                for turn in reversed(history or []):
+                    content = str(turn.get("content") or "").casefold()
+                    if "ring" in content or "studio ring" in content:
+                        return [self.spec]
         return []
 
     def trigger_candidate(self, _text):
@@ -597,20 +608,18 @@ def test_brain_executes_only_a_valid_model_proposal_and_sends_targeted_untrusted
 
     assert result["rule"] == "nix_model_skill_tool"
     assert result["details"]["skill_planner_called"] is True
-    assert result["details"]["conversation_model_called"] is True
-    assert result["reply"].startswith("Firmware-reported effects:")
-    assert "Rainbow" in result["reply"]
+    # Catalog reads are answered deterministically from the readback data;
+    # the companion model is not asked to phrase them (it used to collapse
+    # the answer to "The device action was executed successfully.").
+    assert result["details"]["conversation_model_called"] is False
+    assert result["reply"] == "Your light supports 2 effects: Rainbow, Ocean Ripple."
     assert len(skill_runtime.executions) == 1
     planner_call = chat.skill_planner.calls[0]
     assert planner_call["user_text"] == "What animation options are available on the Studio Ring?"
     assert "live_device" not in planner_call["capabilities"][0]
     assert "schema-declared functions" in planner_call["system_prompt"]
-    assert len(chat.calls) == 1
-    companion_payload = json.loads(chat.calls[0]["user_text"])
-    assert set(companion_payload) == {"verified_execution_results"}
-    assert "nix_skill_capabilities_untrusted_data" not in chat.calls[0]["user_text"]
-    assert chat.calls[0]["max_new_tokens"] == 96
-    assert "I turn" not in chat.calls[0]["user_text"]
+    # A pure read never reaches the companion model.
+    assert chat.calls == []
     assert chat is not brain.skill_planner
 
 
@@ -807,9 +816,12 @@ def test_live_device_catalog_is_attached_to_this_turn_capability_data():
     supplied = planner_call["capabilities"][0]
     assert supplied["live_device"] == live
     assert planner_call["user_text"] == "List the Ring Light animations"
-    assert result["reply"] == "Firmware-reported effects: Rainbow, Ocean Ripple."
-    assert len(chat.calls) == 1  # companion phrasing only; the cleanser is a separate client
-    assert set(json.loads(chat.calls[0]["user_text"])) == {"verified_execution_results"}
+    # The companion double would answer with its own catalog phrasing; the
+    # deterministic read answer must win because the companion previously
+    # acknowledged catalog reads without the data (production Oct 5).
+    assert result["reply"] == "Your light supports 2 effects: Rainbow, Ocean Ripple."
+    # Deterministic read answer: no companion phrasing call is made at all.
+    assert chat.calls == []
 
 
 def test_brain_rejects_model_proposals_without_worker_execution():
@@ -2011,6 +2023,47 @@ def test_fact_renderer_combines_multi_step_plans_into_one_sentence():
     )
 
 
+def test_skill_message_reply_uses_the_worker_sentence_for_non_device_results():
+    # Measured live: OpenDeck results were acknowledged with the generic
+    # "The user's request was successfully executed." The worker already writes
+    # the user-facing sentence, so Core ships it instead of paraphrasing.
+    brain = brain_for_test(knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=ProposalChat("unused"), log_requests=False)
+    outcomes = [{
+        "arguments": {"action": "search", "query": "miles davis"},
+        "result": {
+            "ok": True, "action": "search", "count": 2,
+            "message": "OpenDeck returned 2 track(s) for “miles davis”.",
+        },
+    }]
+    assert brain._skill_message_reply(outcomes) == "OpenDeck returned 2 track(s) for “miles davis”."
+    assert brain._compose_verified_skill_reply({"outcomes": outcomes}) == (
+        "OpenDeck returned 2 track(s) for “miles davis”."
+    )
+
+
+def test_skill_message_reply_defers_to_the_device_fact_line_for_ring_outcomes():
+    brain = brain_for_test(knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=ProposalChat("unused"), log_requests=False)
+    outcomes = [{
+        "arguments": {"action": "on"},
+        "result": {
+            "state": {"on": True, "rgb": [0, 0, 0], "brightness": 0.5, "effect": "None"},
+            "message": "The Dot reports power on.",
+        },
+    }]
+    # A ring outcome keeps the deterministic device fact line, never the
+    # worker's machine-facing message.
+    assert brain._skill_message_reply(outcomes) is None
+
+
+def test_skill_message_reply_joins_multiple_worker_messages():
+    brain = brain_for_test(knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=ProposalChat("unused"), log_requests=False)
+    outcomes = [
+        {"arguments": {"action": "queue"}, "result": {"message": "Queue clear."}},
+        {"arguments": {"action": "play"}, "result": {"message": "Playing it now."}},
+    ]
+    assert brain._skill_message_reply(outcomes) == "Queue clear. Playing it now."
+
+
 def test_session_recap_lists_user_turns_without_a_model_call():
     runtime = ProposalSkillRuntime()
     history = [
@@ -2132,3 +2185,184 @@ def test_ungroundable_vague_color_asks_for_clarification_not_planner_prose():
     assert "cucumber" in response["reply"]
     assert "Try a color name" in response["reply"]
     assert runtime.executions == []
+
+
+# ---------------------------------------------------------------------
+# Production-failure regressions from the Oct 5 dashboard transcripts.
+# ---------------------------------------------------------------------
+
+
+def test_compound_descriptive_color_and_effect_grounds_both_steps():
+    # Oct 5: "switch the color to green while showing the rainbow twinkle
+    # effect on the light" (3 phrasings) all failed planning because the
+    # compound never split and Needle's multi-call confidence collapsed.
+    # The grounded retry now emits both steps deterministically.
+    runtime = ProposalSkillRuntime(live_device={
+        "available_effects": ["Rainbow Twinkle"], "device_connected": True,
+    })
+    planner, _captured = _fake_needle_planner({"unexpected": True})
+    chat = ProposalChat(_skill_plan(_call("catalog")))
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        skill_planner=planner, log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+
+    response = brain.handle(
+        text="switch the color to green while showing the rainbow twinkle effect on the ring light"
+    )
+
+    assert response["details"]["skill_execution_confirmed"] is True
+    actions = [outcome["arguments"]["action"] for outcome in
+               response["details"]["skill_execution"]["outcomes"]]
+    assert actions == ["color", "effect"]
+    assert response["details"]["skill_execution"]["outcomes"][0]["arguments"]["rgb"] == [0, 255, 0]
+    assert response["details"]["skill_execution"]["outcomes"][1]["arguments"]["effect"] == "Rainbow Twinkle"
+
+
+def test_color_and_power_compound_grounds_power_step():
+    # Oct 5: "turn the light red please" produced perfect cleanser steps
+    # ("set the bedroom light color to red and turn on the bedroom light")
+    # but Needle withheld the zero-argument power call, failing the plan.
+    class StepListCleanser:
+        def __init__(self, steps):
+            self.steps = steps
+
+        def cleanse(self, *, user_text, device_name, resolved_color=None):
+            return list(self.steps)
+
+    runtime = ProposalSkillRuntime()
+    planner, captured = _fake_needle_planner({"unexpected": True})
+    chat = ProposalChat(_skill_plan(_call("catalog")))
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        skill_planner=planner,
+        skill_cleanser=StepListCleanser([
+            "set the studio ring color to red",
+            "turn on the studio ring",
+        ]),
+        log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+
+    response = brain.handle(text="turn the ring light red please")
+
+    # Confirmed execution, not the Oct 5 planner rejection: Core owns the
+    # grounded color call (which powers the ring on itself, so the explicit
+    # power step is folded away as redundant).
+    assert response["details"]["skill_execution_confirmed"] is True
+    assert response["rule"] != "nix_model_skill_tool_rejected"
+    assert runtime.executions[-1]["arguments"] == {"action": "color", "rgb": [255, 0, 0]}
+    # Needle's first attempt failed; the grounded retry carried the plan
+    # deterministically (Core-owned color, no model-invented RGB).
+    assert response["details"]["skill_planner_grounded_retry"] is True
+
+
+def test_descriptive_sand_color_grounds_instead_of_unmappable_error():
+    # Oct 5: "switch it to the color of sand" answered "I couldn't map
+    # 'sand'..." although the descriptive pattern declares sand descriptive;
+    # the canonical table simply had no entry. Bare "color of sand" worked
+    # through chat, which made the inconsistency user-visible.
+    assert _descriptive_color_name("switch it to the color of sand") == "tan"
+    runtime = ProposalSkillRuntime()
+    planner, _captured = _fake_needle_planner({"unexpected": True})
+    chat = ProposalChat(_skill_plan(_call("catalog")))
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        skill_planner=planner, log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+
+    response = brain.handle(
+        text="switch it to the color of sand",
+        session_context=[{"role": "user", "content": "turn the Studio Ring on"}],
+    )
+
+    assert response["details"]["skill_execution_confirmed"] is True
+    assert runtime.executions[-1]["arguments"]["action"] == "color"
+    rgb = runtime.executions[-1]["arguments"]["rgb"]
+    assert all(type(channel) is int and 0 <= channel <= 255 for channel in rgb)
+
+
+def test_every_descriptive_pattern_word_has_a_canonical_color():
+    # The vague-color error path must never again claim a pattern word is
+    # unmappable: every word the pattern matches resolves to a color.
+    import re as _re
+    from brain import _DESCRIPTIVE_COLOR_PATTERN, _resolve_color_grounding
+    pattern = _DESCRIPTIVE_COLOR_PATTERN
+    words = {m.group(0).casefold() for m in _re.finditer(pattern, " ".join([
+        "sun sunlight sunshine sunset sunrise moonlight ocean sea water sky fire flame",
+        "candlelight lavender mint rose coral peach gold golden silver ice iceberg snow",
+        "forest grass leaves leaf heart hearts blood hair sand sandstone strawberry",
+        "grape plum turquoise indigo magenta",
+    ]))}
+    assert words, "descriptive pattern must still match"
+    for word in words:
+        canonical = _descriptive_color_name(word)
+        assert canonical is not None, f"pattern word {word!r} has no canonical color"
+        assert _resolve_color_grounding(canonical) is not None, (
+            f"canonical color {canonical!r} (from {word!r}) is not resolvable"
+        )
+
+
+def test_catalog_read_answer_carries_the_effect_data():
+    # Oct 5: "what other effects are available on light" executed the
+    # catalog read and confirmed it, then acknowledged "The device action
+    # was executed successfully." — discarding the 38 effects it had read.
+    runtime = ProposalSkillRuntime(live_device={
+        "available_effects": ["Rainbow Twinkle", "Ripple"], "device_connected": True,
+    })
+    chat = ProposalChat(_skill_proposal("catalog"))
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+
+    response = brain.handle(text="what other effects are available on the ring light")
+
+    assert response["details"]["skill_execution_confirmed"] is True
+    assert response["reply"] == (
+        "Your light supports 2 effects: Rainbow, Ocean Ripple."
+    )
+    assert runtime.executions[-1]["arguments"] == {"action": "catalog"}
+
+
+def test_pronoun_only_chat_message_never_targets_the_device():
+    # Oct 5: "I'm gonna snap them" ran a skill plan and answered
+    # "The device is on." — ellipsis targeting pulled the device in from
+    # history with no device-directed language in the current turn.
+    runtime = ProposalSkillRuntime()
+    chat = ProposalChat("unused")
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+    history = [
+        {"role": "user", "content": "turn the Studio Ring on"},
+        {"role": "assistant", "content": "The ring is on."},
+    ]
+
+    assert runtime.targeted_skill_specs("I'm gonna snap them", history) == []
+    assert runtime.targeted_skill_specs("them", history) == []
+    assert runtime.targeted_skill_specs("what do you think I'm gonna do", history) == []
+    # Device-directed ellipsis still resolves.
+    assert runtime.targeted_skill_specs("change it to red", history) != []
+
+
+def test_knowledge_failure_reply_hides_internal_status_codes():
+    # Oct 5: "Knowledge engine could not handle that: no_function_selected"
+    # leaked an internal status code to the user (3 reminder phrasings).
+    from brain import format_knowledge_result
+
+    payload = {"result": {"ok": False, "status": "no_function_selected"}}
+    reply = format_knowledge_result(payload)
+    assert "no_function_selected" not in reply
+    assert "Knowledge engine" not in reply
+    assert reply.startswith("I couldn't complete that request")

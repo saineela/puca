@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 
 import console as base_console
 import mobile_app_api
+import music_api
 
 
 ExtensionCallback = Callable[[BaseHTTPRequestHandler, re.Match[str]], bool]
@@ -68,6 +69,43 @@ def register_route(method: str, expression: str, callback: ExtensionCallback) ->
 
 register_route("GET", r"/api/mobile/v1", mobile_app_api.api_index)
 register_route("GET", r"/api/mobile/v1/home-copy", mobile_app_api.home_copy)
+
+# Official device registration for the NIX Home mobile app.
+register_route("GET", r"/api/mobile/v1/devices", mobile_app_api.devices_index)
+register_route("POST", r"/api/mobile/v1/devices/report", mobile_app_api.devices_report)
+register_route("POST", r"/api/mobile/v1/devices/discover", mobile_app_api.devices_discover)
+register_route("POST", r"/api/mobile/v1/devices/register", mobile_app_api.devices_register)
+register_route("POST", r"/api/mobile/v1/devices/unregister", mobile_app_api.devices_unregister)
+register_route("GET", r"/api/mobile/v1/devices/list", mobile_app_api.devices_list)
+register_route("GET", r"/api/mobile/v1/devices/([0-9A-Fa-f:]{12,17})", mobile_app_api.devices_get)
+register_route("POST", r"/api/mobile/v1/devices/mock/seed", mobile_app_api.devices_mock_seed)
+
+# Music page + control API. The page is filled by an installed skill that
+# declares device_ui.page; the same endpoints back the NIX Home mobile app.
+register_route("GET", r"/api/music", music_api.music_index)
+register_route("GET", r"/api/music/now-playing", music_api.music_now_playing)
+register_route("POST", r"/api/music/control", music_api.music_control)
+register_route("GET", r"/api/music/search", music_api.music_search)
+register_route("POST", r"/api/music/play", music_api.music_play)
+register_route("GET", r"/api/music/library", music_api.music_library)
+register_route("GET", r"/api/music/queue", music_api.music_queue)
+register_route("POST", r"/api/music/queue", music_api.music_queue)
+register_route("POST", r"/api/music/save", music_api.music_save)
+register_route("GET", r"/api/music/lyrics", music_api.music_lyrics)
+register_route("GET", r"/api/skills/([^/]+)/page/([A-Za-z0-9][^?]*)", music_api.music_page_asset)
+
+# Mobile aliases: the NIX Home app mounts the same music page and calls the
+# same operations under the versioned mobile prefix.
+register_route("GET", r"/api/mobile/v1/music", music_api.music_index)
+register_route("GET", r"/api/mobile/v1/music/now-playing", music_api.music_now_playing)
+register_route("POST", r"/api/mobile/v1/music/control", music_api.music_control)
+register_route("GET", r"/api/mobile/v1/music/search", music_api.music_search)
+register_route("POST", r"/api/mobile/v1/music/play", music_api.music_play)
+register_route("GET", r"/api/mobile/v1/music/library", music_api.music_library)
+register_route("GET", r"/api/mobile/v1/music/queue", music_api.music_queue)
+register_route("POST", r"/api/mobile/v1/music/queue", music_api.music_queue)
+register_route("POST", r"/api/mobile/v1/music/save", music_api.music_save)
+register_route("GET", r"/api/mobile/v1/music/lyrics", music_api.music_lyrics)
 
 
 def unregister_route(method: str, expression: str) -> bool:

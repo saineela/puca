@@ -98,7 +98,7 @@ def test_needle_proposes_schema_bound_call_and_never_runs_tools(monkeypatch):
     assert captured["init"]["tools"] == [color]  # explicit request safely narrows choices
     assert captured["init"]["system"] == "Only plan color actions for the requested device."
     assert captured["init"]["generation"] == 3 and captured["init"]["stateless"] is True
-    assert captured["max_new_tokens"] == 512 and captured["closed"]
+    assert captured["max_new_tokens"] == 1024 and captured["closed"]
     assert os.environ["NEEDLE_TELEMETRY"] == "0"
     assert os.environ["DO_NOT_TRACK"] == "1"
     assert "set_color" in bindings
@@ -316,6 +316,246 @@ def test_missing_validation_block_fails_closed_without_attribute_error():
             user_text="what color is the ring light right now",
             capabilities=CAPABILITIES,
         )
+
+
+MUSIC_SKILL_ID = "github:example/opendeck:opendeck"
+MUSIC_CAPABILITIES = [{
+    "skill_id": MUSIC_SKILL_ID,
+    "name": "OpenDeck",
+    "device_name": "OpenDeck",
+    "tools": [{
+        "name": "opendeck_music",
+        "description": "Search and play music, read the library, and fetch lyrics.",
+        "input_schema": {
+            "type": "object",
+            "oneOf": [
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["search"]}, "query": {"type": "string", "minLength": 1, "maxLength": 200}}, "required": ["action", "query"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["library"]}, "kind": {"type": "string", "enum": ["playlists", "likes", "history", "stats"]}}, "required": ["action", "kind"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["play"]}, "query": {"type": "string", "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}}, "required": ["action"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["queue"]}, "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "move", "front", "next_up", "shuffle", "repeat"]}, "query": {"type": "string", "minLength": 1, "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}, "index": {"type": "integer", "minimum": 0, "maximum": 99}, "to": {"type": "integer", "minimum": 0, "maximum": 99}, "on": {"type": "boolean"}, "mode": {"type": "string", "enum": ["off", "all", "one"]}}, "required": ["action", "op"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["lyrics"]}, "title": {"type": "string", "maxLength": 300}}, "required": ["action"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["now_playing"]}}, "required": ["action"]},
+            ],
+            "properties": {
+                "action": {"type": "string", "enum": ["search", "library", "play", "queue", "lyrics", "now_playing"]},
+                "query": {"type": "string", "maxLength": 200},
+                "video_id": {"type": "string", "maxLength": 64},
+                "kind": {"type": "string", "enum": ["playlists", "likes", "history", "stats"]},
+                "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "move", "front", "next_up", "shuffle", "repeat"]},
+                "index": {"type": "integer", "minimum": 0, "maximum": 99},
+                "to": {"type": "integer", "minimum": 0, "maximum": 99},
+                "on": {"type": "boolean"},
+                "mode": {"type": "string", "enum": ["off", "all", "one"]},
+                "title": {"type": "string", "maxLength": 300},
+            },
+            "required": ["action"],
+            "additionalProperties": False,
+        },
+    }],
+}]
+
+SPEAKER_CAPABILITIES = [{
+    "skill_id": "github:example/ring-light:echo-connect",
+    "name": "Echo Connect",
+    "device_name": "Nix Dev",
+    "tools": [{
+        "name": "control_ring",
+        "description": "Control the ring and the speaker.",
+        "input_schema": {
+            "type": "object",
+            "oneOf": [
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["state", "mute", "unmute", "stop_speaking", "pause", "resume"]}}, "required": ["action"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["volume"]}, "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0}}, "required": ["action", "volume"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["say"]}, "text": {"type": "string", "minLength": 1, "maxLength": 500}}, "required": ["action", "text"]},
+            ],
+            "properties": {
+                "action": {"type": "string", "enum": ["state", "mute", "unmute", "stop_speaking", "pause", "resume", "volume", "say"]},
+                "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "text": {"type": "string", "maxLength": 500},
+            },
+            "required": ["action"],
+            "additionalProperties": False,
+        },
+    }],
+}]
+
+
+def test_music_wording_selects_the_provider_action_it_names():
+    assert SkillPlanner._requested_tool_groups("queue up Hotel California", MUSIC_CAPABILITIES) == {"queue"}
+    assert SkillPlanner._requested_tool_groups("what is in my queue?", MUSIC_CAPABILITIES) == {"queue"}
+    assert SkillPlanner._requested_tool_groups("show my liked songs", MUSIC_CAPABILITIES) == {"library"}
+    assert SkillPlanner._requested_tool_groups("show me the lyrics", MUSIC_CAPABILITIES) == {"lyrics"}
+    assert SkillPlanner._requested_tool_groups("play music: Bohemian Rhapsody", MUSIC_CAPABILITIES) == {"play"}
+    # A word the vocabulary does not own leaves the choice to the model rather
+    # than inventing an action the schema does not declare.
+    assert SkillPlanner._requested_tool_groups("good morning Luna", MUSIC_CAPABILITIES) is None
+    # A history question is a listing, not a play.
+    assert SkillPlanner._requested_tool_groups("what did I listen to yesterday", MUSIC_CAPABILITIES) == {"library"}
+    # Opening one named playlist is the planner's job (it needs the name), even
+    # though the wording selects the library action.
+    assert SkillPlanner._requested_tool_groups("open my Ultimate playlist", MUSIC_CAPABILITIES) == {"library"}
+    assert SkillPlanner._grounded_music_call(MUSIC_CAPABILITIES, {"library"}, "open my Ultimate playlist") is None
+
+
+def test_queue_wording_is_planned_by_core_without_calling_the_model():
+    # Measured live: "queue up <song>" was planned as a search, and "what's in my
+    # queue" and "clear the queue" were withheld for confidence. The track and the
+    # operation come from the user's own words, so Core owns the whole call.
+    expected = [
+        ("queue up Hotel California", {"action": "queue", "op": "add", "query": "hotel california"}),
+        ("add Bohemian Rhapsody to the queue", {"action": "queue", "op": "add", "query": "bohemian rhapsody"}),
+        ("what's in my queue?", {"action": "queue", "op": "list"}),
+        ("play the next queued track", {"action": "queue", "op": "next"}),
+        ("clear the queue", {"action": "queue", "op": "clear"}),
+    ]
+    for text, arguments in expected:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls == [{
+            "type": "skill_tool_call", "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music", "arguments": arguments,
+        }], text
+        assert "init" not in captured, text
+
+
+def test_now_playing_and_search_wording_are_planned_by_core():
+    # "what's playing" is a read of the provider's state, and "search for X" is a
+    # catalog search; both are Core-owned so the model cannot plan them as a
+    # play (measured live: a now-playing question failed planning outright).
+    for text, arguments in [
+        ("what's playing?", {"action": "now_playing"}),
+        ("what is playing right now", {"action": "now_playing"}),
+        ("what song is playing", {"action": "now_playing"}),
+        ("what song is this", {"action": "now_playing"}),
+        ("what am I listening to", {"action": "now_playing"}),
+        ("search for Bohemian Rhapsody", {"action": "search", "query": "bohemian rhapsody"}),
+        ("find Miles Davis on OpenDeck", {"action": "search", "query": "miles davis"}),
+    ]:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls[0]["arguments"] == arguments, text
+        assert "init" not in captured, text
+    assert SkillPlanner._requested_tool_groups("what's playing?", MUSIC_CAPABILITIES) == {"now_playing"}
+    assert SkillPlanner._requested_tool_groups("search for Bohemian Rhapsody", MUSIC_CAPABILITIES) == {"search"}
+
+
+def test_queue_reorder_and_priority_wording_are_planned_by_core():
+    # "play <song> next/first" prioritises that track; "move track N to M" is an
+    # explicit reorder. Both are Core-owned so the model cannot mis-plan them.
+    for text, arguments in [
+        ("play Bohemian Rhapsody next", {"action": "queue", "op": "next_up", "query": "bohemian rhapsody"}),
+        ("play Hotel California first", {"action": "queue", "op": "front", "query": "hotel california"}),
+        ("move track 3 to position 1", {"action": "queue", "op": "move", "index": 2, "to": 0}),
+        ("move Hotel California to the front", {"action": "queue", "op": "front", "query": "hotel california"}),
+        # "play this next" names no track: prioritise whatever is playing.
+        ("play this next", {"action": "queue", "op": "next_up"}),
+    ]:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls[0]["arguments"] == arguments, text
+        assert "init" not in captured, text
+    # "play the next queued track" is still the plain advance, not a priority.
+    assert SkillPlanner._requested_tool_groups(
+        "play the next queued track", MUSIC_CAPABILITIES
+    ) == {"queue"}
+
+
+def test_shuffle_and_repeat_wording_are_planned_by_core():
+    # Shuffle and repeat are queue preferences the provider answers by op, so the
+    # whole call is Core-owned: without this, "shuffle the queue" was read as an
+    # add of the literal words "shuffle the queue".
+    for text, arguments in [
+        ("shuffle the queue", {"action": "queue", "op": "shuffle", "on": True}),
+        ("shuffle my music", {"action": "queue", "op": "shuffle", "on": True}),
+        ("turn shuffle off", {"action": "queue", "op": "shuffle", "on": False}),
+        ("stop shuffling", {"action": "queue", "op": "shuffle", "on": False}),
+        ("repeat this song", {"action": "queue", "op": "repeat", "mode": "one"}),
+        ("loop this track", {"action": "queue", "op": "repeat", "mode": "one"}),
+        ("repeat the queue", {"action": "queue", "op": "repeat", "mode": "all"}),
+        # "stop repeating" turns the preference off, so the negation guard has to
+        # read it as an action rather than as a negated request.
+        ("stop repeating", {"action": "queue", "op": "repeat", "mode": "off"}),
+        # No mode named: the provider cycles, which is what one word means.
+        ("repeat", {"action": "queue", "op": "repeat"}),
+    ]:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls == [{
+            "type": "skill_tool_call", "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music", "arguments": arguments,
+        }], text
+        assert "init" not in captured, text
+    assert SkillPlanner._requested_tool_groups("shuffle the queue", MUSIC_CAPABILITIES) == {"queue"}
+    # A request that names a track is not a preference: those words are not all
+    # preference words, so the call is left to the planner instead of being
+    # guessed at as a queue op.
+    assert SkillPlanner._requested_tool_groups("repeat believer", MUSIC_CAPABILITIES) is None
+    assert SkillPlanner._grounded_music_call(
+        MUSIC_CAPABILITIES, {"queue"}, "repeat the song that is playing"
+    ) is None
+    # "queue up shuffle" names a track that happens to be called Shuffle.
+    queued = SkillPlanner._grounded_music_call(MUSIC_CAPABILITIES, {"queue"}, "queue up shuffle")
+    assert queued["arguments"] == {"action": "queue", "op": "add", "query": "shuffle"}
+
+
+def test_library_and_lyrics_wording_are_planned_by_core():
+    for text, arguments in [
+        ("show my liked songs", {"action": "library", "kind": "likes"}),
+        ("show me my playlists", {"action": "library", "kind": "playlists"}),
+        ("what have I been listening to in my history", {"action": "library", "kind": "history"}),
+        ("what did I listen to yesterday", {"action": "library", "kind": "history"}),
+        ("show me the lyrics", {"action": "lyrics"}),
+    ]:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls[0]["arguments"] == arguments, text
+        assert "init" not in captured, text
+    # Lyrics for a named track carry title/artist the model fills, so this one
+    # still goes through the planner.
+    planner, captured = _planner(_success("do_lyrics", {"title": "Yesterday"}))
+    planner.plan(system_prompt="", user_text="show me the lyrics for Yesterday", capabilities=MUSIC_CAPABILITIES)
+    assert "init" in captured
+
+
+def test_speaker_wording_selects_the_speaker_action_it_names():
+    assert SkillPlanner._requested_tool_groups("set the volume to 30 percent", SPEAKER_CAPABILITIES) == {"volume"}
+    assert SkillPlanner._requested_tool_groups("mute", SPEAKER_CAPABILITIES) == {"mute"}
+    assert SkillPlanner._requested_tool_groups("unmute the speaker", SPEAKER_CAPABILITIES) == {"unmute"}
+    assert SkillPlanner._requested_tool_groups("say good morning", SPEAKER_CAPABILITIES) == {"say"}
+    # "stop speaking" is the action, not a negated plan.
+    assert SkillPlanner._requested_tool_groups("stop speaking", SPEAKER_CAPABILITIES) == {"stop_speaking"}
+    # A genuine negation still fails closed.
+    with pytest.raises(SkillPlannerError, match="Negated"):
+        SkillPlanner._requested_tool_groups("don't turn the ring off", SPEAKER_CAPABILITIES)
+
+
+def test_grounded_speaker_retry_emits_zero_argument_and_speech_calls():
+    planner, captured = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="", user_text="stop speaking",
+        capabilities=SPEAKER_CAPABILITIES, force_grounded=True,
+    )
+    assert calls[0]["arguments"] == {"action": "stop_speaking"}
+    assert "init" not in captured
+    planner, captured = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="", user_text="say good morning everyone",
+        capabilities=SPEAKER_CAPABILITIES, force_grounded=True,
+    )
+    # The words are the user's own, taken verbatim after the verb.
+    assert calls[0]["arguments"] == {"action": "say", "text": "good morning everyone"}
+    assert "init" not in captured
+
+
+def test_grounded_volume_retry_emits_the_core_owned_level():
+    planner, captured = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="", user_text="set the volume to 30 percent",
+        capabilities=SPEAKER_CAPABILITIES, force_grounded=True,
+        volume_grounding={"volume": 0.3},
+    )
+    assert calls[0]["arguments"] == {"action": "volume", "volume": 0.3}
+    assert "init" not in captured
 
 
 def test_grounded_read_retry_emits_deterministic_state_read():

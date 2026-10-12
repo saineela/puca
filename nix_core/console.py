@@ -64,9 +64,21 @@ REPO_ROOT = os.path.dirname(CORE_DIR)
 DASHBOARD_PATH = os.path.join(CORE_DIR, "dashboard.html")
 MODELDEV_PATH = os.path.join(REPO_ROOT, "NIX-Modeldev", "index.html")
 DASHBOARD_PAGES = frozenset({
-    "home", "models", "conversations", "memories", "people", "events",
+    "home", "models", "conversations", "memories", "people", "schedules",
     "api", "docs", "settings", "skills", "devices", "skill-settings", "release-notes",
+    # Shell for a page contributed by an installed skill (music today). The
+    # page body and its controls come from the skill's declared device_ui.page.
+    "music",
 })
+
+# Console pages a skill may fill with its own declared page code, with the
+# extensions the console is willing to serve.
+SKILL_PAGE_IDS = frozenset({"music"})
+SKILL_PAGE_ASSET_EXTENSIONS = {".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+# Media provider actions a page skill may declare: reads, playback resolution,
+# the play queue, and library writes (like/unlike, playlist create/add) that the
+# Music page performs on the user's own library through the provider.
+SKILL_MEDIA_PROVIDER_ACTIONS = frozenset({"search", "play", "library", "lyrics", "queue", "save"})
 sys.path.insert(0, CORE_DIR)
 sys.path.insert(0, os.path.join(REPO_ROOT, "nix_knowledge"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "nix_knowledge", "scripts"))
@@ -170,6 +182,58 @@ def _record_pipeline_stage(stage_id: str, *, status: str = "complete", ms: float
         entry["last_status"] = status
         entry["last_ms"] = round(float(ms), 1) if ms is not None else None
         entry["count"] = int(entry.get("count", 0)) + 1
+
+
+def _finalize_send_result(result: dict, request_trace: list[dict], elapsed: float) -> dict:
+    """Attach pipeline diagnostics and timing to a Brain reply.
+
+    Shared by the JSON and streaming /api/send paths so both report
+    identical diagnostics.
+    """
+    try:
+        _record_pipeline_activation(result, request_trace)
+    except Exception:
+        pass
+    trace_by_stage = {}
+    for event in request_trace:
+        stage = event.get("stage")
+        if stage and event.get("ms") is not None:
+            trace_by_stage[stage] = event["ms"]
+    # Only use the routing engine's own measurement. Never estimate
+    # routing by subtracting downstream stages: that remainder is
+    # usually assistant generation and was the source of the misleading
+    # 4049ms "Core routing" display.
+    routing_details = result.get("details", {}).get("routing_engine", {})
+    route_ms = routing_details.get("latency_ms")
+    route_reported = route_ms is not None
+    route_ms = round(float(route_ms), 3) if route_reported else 0.0
+    pipeline = [
+        {"id": "received", "label": "Received user query", "status": "complete", "ms": 0.0},
+        {"id": "route", "label": "Core routing", "status": "complete" if route_reported else "not_reported", "ms": route_ms},
+    ]
+    predictor_ms = trace_by_stage.get("knowledge /classify (model gate)")
+    if predictor_ms is not None:
+        pipeline.append({"id": "predictor", "label": "Nix_predictor · Qwen 2.5 0.5B", "status": "complete", "ms": predictor_ms})
+    else:
+        pipeline.append({"id": "predictor", "label": "Nix_predictor · Qwen 2.5 0.5B", "status": "skipped", "ms": 0.0})
+    knowledge_ms = trace_by_stage.get("knowledge /process")
+    if knowledge_ms is not None:
+        pipeline.append({"id": "knowledge", "label": "Knowledge retrieval and validation", "status": "complete", "ms": knowledge_ms})
+    else:
+        pipeline.append({"id": "knowledge", "label": "Knowledge retrieval and validation", "status": "skipped", "ms": 0.0})
+    formatter_ms = result.get("details", {}).get("formatter_ms")
+    if formatter_ms is not None:
+        formatter_attempted = result.get("details", {}).get("core_formatter", {}).get("attempted", True)
+        pipeline.append({"id": "formatter", "label": f"{result.get('details', {}).get('assistant_name', 'Assistant')} Knowledge formatter", "status": "complete" if formatter_attempted else "skipped", "ms": round(float(formatter_ms), 1)})
+    pipeline.append({"id": "final", "label": f"{result.get('details', {}).get('assistant_name', 'Assistant')} · {result.get('details', {}).get('official_model', 'model unreported')} final response", "status": "complete", "ms": round(elapsed, 1)})
+    result["pipeline"] = pipeline
+    _trace(
+        "brain reply",
+        f"route={result.get('route')} rule={result.get('rule')} "
+        f"reply={str(result.get('reply'))[:120]}",
+        ms=elapsed,
+    )
+    return {"ok": True, "latency_ms": round(elapsed, 1), **result}
 
 
 def _record_pipeline_activation(result: dict, request_trace: list[dict]) -> None:
@@ -752,9 +816,85 @@ def _past_cutoff(now_iso: str) -> str:
         return now_iso
 
 
+def _merge_duplicate_schedule_events(events: list[dict]) -> list[dict]:
+    """Collapse active events that share the exact same title and start time.
+
+    Two active events are treated as the same event when their titles match
+    exactly and their start timestamps are identical. One record survives: the
+    one that already carries a reminder (so no notification is lost), falling
+    back to the earliest record. Each duplicate is retired through the same
+    honest cancellation path as a manual delete — its pending reminder is
+    cancelled and the record is marked cancelled so it can never reappear.
+    The survivor reports ``merged_ids`` and ``merged_count``.
+
+    Best-effort: consolidation failures never break a schedule read.
+    """
+    from datetime import timezone
+    from nix_knowledge.bridge import cancel_event_actions
+
+    groups: dict[tuple[str, str], list[dict]] = {}
+    order: list[tuple[str, str]] = []
+    for event in events:
+        if event.get("status") != "active":
+            continue
+        title = str(event.get("title") or "").strip()
+        start = str(event.get("start") or "")
+        if not title or not start:
+            continue
+        key = (title, start)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(event)
+
+    merged_groups = [groups[key] for key in order if len(groups[key]) > 1]
+    if not merged_groups:
+        return events
+
+    def has_reminder(event: dict) -> bool:
+        return bool((event.get("extra") or {}).get("action_type"))
+
+    removed_ids: set = set()
+    for group in merged_groups:
+        survivor = min(
+            group,
+            key=lambda event: (0 if has_reminder(event) else 1, event.get("id") or 0),
+        )
+        duplicates = [event for event in group if event is not survivor]
+        survivor["merged_ids"] = sorted(
+            event.get("id") for event in group if event.get("id")
+        )
+        survivor["merged_count"] = len(group)
+        duplicate_ids = [event.get("id") for event in duplicates if event.get("id")]
+        if not duplicate_ids:
+            continue
+        removed_ids.update(duplicate_ids)
+        try:
+            engine, actions = _schedule_engine()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for duplicate_id in duplicate_ids:
+                cancel_event_actions(
+                    actions, record_id=duplicate_id, reason="merged duplicate event"
+                )
+            placeholders = ",".join("?" for _ in duplicate_ids)
+            engine.database.execute(
+                f"UPDATE knowledge SET status = 'cancelled', updated_at = ? "
+                f"WHERE id IN ({placeholders}) AND knowledge_type = 'calendar_event'",
+                (now_iso, *duplicate_ids),
+            )
+        except Exception:
+            pass
+
+    return [event for event in events if event.get("id") not in removed_ids]
+
+
 def _schedule_view() -> dict:
     """Upcoming events with every stored parameter, plus the reminder
     alarm/reminder actions attached to each event via source_record_id."""
+    try:
+        _purge_old_schedule_events()
+    except Exception:
+        pass  # purging must never break schedule reads
     events = _rows(
         KNOWLEDGE_DB,
         "SELECT id, knowledge_type, status, data, created_at, updated_at "
@@ -825,6 +965,9 @@ def _schedule_view() -> dict:
             }
         )
     parsed.sort(key=lambda x: x["start"] or "")
+    # Collapse identical events (exact same name + exact same time) into one so
+    # duplicates never show twice and only one reminder can ever fire.
+    parsed = _merge_duplicate_schedule_events(parsed)
     upcoming = [e for e in parsed if not e["is_past"] and e["status"] == "active"]
     past = [e for e in parsed if e["is_past"] or e["status"] != "active"]
     return {
@@ -844,6 +987,247 @@ def _schedule_view() -> dict:
             if a.get("source_record_id") is None
         ],
     }
+
+
+# ----------------------------------------------------------------------
+# Manual schedule editing (Schedules page): create / edit / delete events
+# through the same Knowledge + Actions pipeline the assistant uses, so
+# reminders stay traceable via source_record_id and honest cancellations.
+# ----------------------------------------------------------------------
+
+
+def _schedule_engine():
+    """Knowledge engine + Actions engine for manual schedule edits."""
+    from nix_knowledge.engine import KnowledgeEngine
+    from nix_actions.engine import ActionsEngine
+    from config import TIMEZONE
+
+    engine = KnowledgeEngine(KNOWLEDGE_DB)
+    actions = ActionsEngine(ACTIONS_DB, timezone=TIMEZONE)
+    return engine, actions
+
+
+def _parse_schedule_datetime(value: Any, field: str, *, all_day: bool = False) -> str:
+    """Accept user-entered date/datetime and return an ISO-8601 local string."""
+    from datetime import datetime
+    from config import TIMEZONE
+    from zoneinfo import ZoneInfo
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} is required (e.g. 2026-10-13 or 2026-10-13 19:00).")
+    text = value.strip().replace("T", " ")
+    formats = (
+        ["%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d %B %Y", "%B %d, %Y"]
+        if all_day
+        else [
+            "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %I:%M %p",
+            "%Y/%m/%d %H:%M", "%m/%d/%Y %H:%M", "%m/%d/%Y %I:%M %p",
+            "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y",
+        ]
+    )
+    parsed = None
+    for fmt in formats:
+        try:
+            parsed = datetime.strptime(text, fmt)
+            break
+        except ValueError:
+            continue
+    if parsed is None:
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            raise ValueError(
+                f"{field} must look like 2026-10-13 19:00 (or just a date for all-day)."
+            )
+    if all_day and parsed.hour == 0 and parsed.minute == 0:
+        pass  # date-level event
+    try:
+        local = parsed.replace(tzinfo=ZoneInfo(TIMEZONE))
+    except Exception:
+        local = parsed
+    return local.isoformat()
+
+
+def _schedule_event_data(payload: dict) -> dict:
+    """Validate and build a calendar_event data dict from user input."""
+    title = " ".join(str(payload.get("title") or "").split())
+    if not title:
+        raise ValueError("A title is required.")
+    if len(title) > 120:
+        raise ValueError("Keep the title under 120 characters.")
+    all_day = bool(payload.get("all_day"))
+    start = _parse_schedule_datetime(payload.get("start"), "Start", all_day=all_day)
+    end_raw = payload.get("end")
+    end = _parse_schedule_datetime(end_raw, "End", all_day=all_day) if end_raw else start
+    if end < start:
+        raise ValueError("End must not be before start.")
+    recurrence = payload.get("recurrence") or None
+    if recurrence is not None and recurrence not in {"daily", "weekly"}:
+        raise ValueError("Recurrence must be daily, weekly, or empty.")
+    action_type = payload.get("action_type") or "reminder"
+    if action_type not in {"reminder", "alarm", "none"}:
+        raise ValueError("Notification must be reminder, alarm, or none.")
+    notes = " ".join(str(payload.get("notes") or "").split())[:500]
+    return {
+        "title": title,
+        "start": start,
+        "end": end,
+        "all_day": all_day,
+        "temporal_expression": "manual entry",
+        "recurring": recurrence is not None,
+        "recurrence": recurrence,
+        "action_policy": "every_occurrence" if recurrence else "once",
+        "action_type": None if action_type == "none" else action_type,
+        **({"notes": notes} if notes else {}),
+    }
+
+
+def _purge_old_schedule_events(max_age_days: int = 14) -> dict:
+    """Delete calendar events (and their pending actions) older than 2 weeks.
+
+    A stored event is purgeable when BOTH its start and end (the later
+    falling back to updated_at when absent) are further in the past than
+    the cutoff. Pending reminder actions tied to a purged event are
+    cancelled through the Actions engine so nothing fires for a deleted
+    event. Runs opportunistically whenever the schedule is read, so no
+    separate background job is needed.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    engine, actions = _schedule_engine()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    rows = _rows(
+        KNOWLEDGE_DB,
+        "SELECT id, data, updated_at FROM knowledge "
+        "WHERE knowledge_type = 'calendar_event' AND status = 'active'",
+    )
+    purged_ids: list[int] = []
+    cancelled = 0
+    for row in rows:
+        data = row.get("data")
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                continue
+        if not isinstance(data, dict):
+            continue
+        end_raw = data.get("end") or data.get("start") or row.get("updated_at")
+        try:
+            end_dt = datetime.fromisoformat(str(end_raw))
+        except (TypeError, ValueError):
+            continue
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=timezone.utc)
+        if end_dt >= cutoff:
+            continue
+        record_id = row.get("id")
+        try:
+            cancelled += actions.cancel(
+                source_record_id=record_id,
+                reason="event auto-purged (older than 2 weeks)",
+            )
+        except Exception:
+            pass
+        engine.database.execute(
+            "UPDATE knowledge SET status = 'purged', updated_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), record_id),
+        )
+        purged_ids.append(record_id)
+    return {"purged": len(purged_ids), "record_ids": purged_ids, "cancelled_actions": cancelled}
+
+
+def _schedule_event_create(payload: dict) -> dict:
+    from nix_knowledge.bridge import schedule_event_actions
+
+    data = _schedule_event_data(payload)
+    engine, actions = _schedule_engine()
+    record = engine.create(
+        "calendar_event",
+        data,
+        source="manual_schedule",
+    )
+    scheduled = {"ok": True, "scheduled_action_ids": []}
+    if data.get("action_type"):
+        scheduled = schedule_event_actions(actions, record_id=record.id, data=data)
+    return {
+        "ok": True,
+        "record_id": record.id,
+        "event": {"id": record.id, **data},
+        "actions": scheduled,
+    }
+
+
+def _schedule_event_update(record_id: int, payload: dict) -> dict:
+    from nix_knowledge.bridge import schedule_event_actions, cancel_event_actions
+
+    if not isinstance(record_id, int) or record_id <= 0:
+        raise ValueError("A valid event id is required.")
+    existing = _schedule_event_row(record_id)
+    # Only re-validate fields the user actually changed; stored ISO values
+    # for untouched fields would fail the lenient user-input parser
+    # (e.g. old end 16:00 vs new start 09:30 -> false "end before start").
+    changed = {
+        key: value for key, value in payload.items()
+        if key in {"title", "start", "end", "all_day", "recurrence", "action_type", "notes"}
+        and value is not None
+    }
+    if "start" in changed and "end" not in changed:
+        existing.pop("end", None)  # let end default to the new start
+    data = _schedule_event_data({**existing, **changed})
+    engine, actions = _schedule_engine()
+    row = engine.database.execute(
+        "UPDATE knowledge SET data = ?, updated_at = ? WHERE id = ? AND knowledge_type = 'calendar_event'",
+        (
+            engine.database.encode(data),
+            __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            record_id,
+        ),
+    )
+    if row is None and engine.database.execute(
+        "SELECT id FROM knowledge WHERE id = ? AND knowledge_type = 'calendar_event'", (record_id,)
+    ).fetchone() is None:
+        raise ValueError(f"Event {record_id} not found.")
+    # Rebuild the linked reminder from scratch: cancel old, schedule new.
+    cancel_event_actions(actions, record_id=record_id, reason="event edited")
+    scheduled = {"ok": True, "scheduled_action_ids": []}
+    if data.get("action_type"):
+        scheduled = schedule_event_actions(actions, record_id=record_id, data=data)
+    return {"ok": True, "record_id": record_id, "event": {"id": record_id, **data}, "actions": scheduled}
+
+
+def _schedule_event_row(record_id: int) -> dict:
+    rows = _rows(
+        KNOWLEDGE_DB,
+        "SELECT id, data, status FROM knowledge "
+        "WHERE id = ? AND knowledge_type = 'calendar_event'",
+        (record_id,),
+    )
+    if not rows or rows[0].get("error"):
+        raise ValueError(f"Event {record_id} not found.")
+    raw = rows[0].get("data")
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except Exception:
+        data = {}
+    return data
+
+
+def _schedule_event_delete(record_id: int) -> dict:
+    from nix_knowledge.bridge import cancel_event_actions
+    from datetime import datetime, timezone
+
+    if not isinstance(record_id, int) or record_id <= 0:
+        raise ValueError("A valid event id is required.")
+    _schedule_event_row(record_id)  # raises when unknown
+    engine, actions = _schedule_engine()
+    cancelled = cancel_event_actions(actions, record_id=record_id, reason="event deleted")
+    engine.database.execute(
+        "UPDATE knowledge SET status = 'cancelled', updated_at = ? "
+        "WHERE id = ? AND knowledge_type = 'calendar_event'",
+        (datetime.now(timezone.utc).isoformat(), record_id),
+    )
+    return {"ok": True, "record_id": record_id, "cancelled_actions": cancelled.get("cancelled_actions", 0)}
 
 
 def _kb_view() -> list[dict]:
@@ -1498,10 +1882,19 @@ def _validate_skill_device_ui(device_ui, tools):
     """Validate bounded declarative dashboard metadata against tool schemas."""
     if device_ui is None:
         return None
-    if not isinstance(device_ui, dict) or set(device_ui) - {"status_tool", "status_arguments", "visualization", "fields", "controls"}:
+    if not isinstance(device_ui, dict) or set(device_ui) - {"status_tool", "status_arguments", "visualization", "fields", "controls", "page", "media"}:
         raise SkillRepositoryError("Skill device_ui must use supported declarative fields.")
     tool_map = {tool["name"]: tool for tool in tools if isinstance(tool, dict)}
+    page = _validate_skill_page(device_ui.get("page"))
+    media = _validate_skill_media(device_ui.get("media"), tool_map)
     status_tool_name = device_ui.get("status_tool")
+    if status_tool_name is None:
+        # A page/media-only contribution is not a controllable device: it needs
+        # no status operation and contributes no Devices-page card.
+        if page is None and media is None:
+            raise SkillRepositoryError("Skill device_ui must declare a status tool, a page, or media provider actions.")
+        return {"status_tool": None, "status_arguments": None, "visualization": None,
+                "fields": [], "controls": [], "page": page, "media": media}
     status_tool = tool_map.get(status_tool_name) if isinstance(status_tool_name, str) else None
     status_arguments = device_ui.get("status_arguments")
     if status_tool is None or not isinstance(status_arguments, dict) or not isinstance(status_tool.get("input_schema"), dict) or not isinstance(status_tool.get("result_schema"), dict):
@@ -1643,7 +2036,65 @@ def _validate_skill_device_ui(device_ui, tools):
                 field["max_length"] = prop.get("maxLength", 256)
                 field["min_length"] = prop.get("minLength", 0)
         clean_controls.append({"label": label, "tool": tool_name, "arguments": base, "fields": prepared})
-    return {"status_tool": status_tool_name, "status_arguments": status_arguments, "visualization": visualization, "fields": clean_fields, "controls": clean_controls}
+    return {"status_tool": status_tool_name, "status_arguments": status_arguments,
+            "visualization": visualization, "fields": clean_fields, "controls": clean_controls,
+            "page": page, "media": media}
+
+
+def _validate_skill_page(page):
+    """Validate a skill-contributed console page (declared markup-free assets)."""
+    if page is None:
+        return None
+    if not isinstance(page, dict) or set(page) - {"id", "title", "script", "styles"}:
+        raise SkillRepositoryError("Skill device_ui page must use supported fields.")
+    page_id = page.get("id")
+    if not isinstance(page_id, str) or page_id not in SKILL_PAGE_IDS:
+        raise SkillRepositoryError("Skill device_ui page must fill a console page this build ships.")
+    title = _manifest_text(page.get("title", "Music"), "device_ui.page.title", required=False, limit=80)
+    script = page.get("script")
+    if not isinstance(script, str) or os.path.splitext(script)[1].lower() not in SKILL_PAGE_ASSET_EXTENSIONS:
+        raise SkillRepositoryError("Skill device_ui page needs a declared .js script.")
+    styles = _manifest_string_list(page.get("styles", []), "device_ui.page.styles", max_items=6, max_length=180)
+    for asset in [script, *styles]:
+        _validate_skill_file_path(asset)
+    return {"id": page_id, "title": title, "script": script, "styles": styles}
+
+
+def _validate_skill_media(media, tool_map):
+    """Validate the music actions a skill provides to the console music API."""
+    if media is None:
+        return None
+    if not isinstance(media, dict) or set(media) - {"provider"}:
+        raise SkillRepositoryError("Skill device_ui media must use supported fields.")
+    provider = media.get("provider")
+    if provider is None:
+        return None
+    if not isinstance(provider, dict) or not provider or set(provider) - SKILL_MEDIA_PROVIDER_ACTIONS:
+        raise SkillRepositoryError("Skill device_ui media provider actions are unsupported.")
+    from skill_runtime import SkillRuntimeError, validate_json_schema
+    clean = {}
+    for action, entry in provider.items():
+        if not isinstance(entry, dict) or set(entry) - {"tool", "arguments"}:
+            raise SkillRepositoryError("Skill media provider entries need a tool and arguments.")
+        tool = tool_map.get(entry.get("tool")) if isinstance(entry.get("tool"), str) else None
+        arguments = entry.get("arguments", {})
+        if tool is None or not isinstance(arguments, dict) or not isinstance(tool.get("input_schema"), dict):
+            raise SkillRepositoryError("Skill media provider entry must reference a declared tool and arguments.")
+        # Declared arguments are defaults the music API completes per request
+        # (a search adds the query, a play adds the track), so each declared
+        # value is checked against its own declared property instead of the
+        # tool's full oneOf variant. The final, merged call is still validated
+        # against the tool schema before it reaches the worker.
+        properties = tool["input_schema"].get("properties", {})
+        for key, value in arguments.items():
+            if key not in properties:
+                raise SkillRepositoryError("Skill media provider declares an argument the tool does not define.")
+            try:
+                validate_json_schema(value, properties[key], f"media.{action}.{key}")
+            except SkillRuntimeError as exc:
+                raise SkillRepositoryError("Skill media provider argument does not match the tool schema.") from exc
+        clean[action] = {"tool": entry["tool"], "arguments": arguments}
+    return {"provider": clean}
 
 
 def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publisher: str) -> dict:
@@ -1659,6 +2110,7 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
         manifest.get("files", []), "files", max_items=SKILLS_MAX_PACKAGE_FILES, max_length=180
     )
     files = [_validate_skill_file_path(path) for path in files]
+    declared_files = set(files)
     for index, path in enumerate(files):
         if any(other.startswith(path + "/") or path.startswith(other + "/") for other in files[index + 1:]):
             raise SkillRepositoryError("Skill file paths cannot contain file/directory conflicts.")
@@ -1710,7 +2162,7 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
                 not isinstance(field, dict)
                 or set(field) - {"id", "label", "type", "required", "help"}
                 or not isinstance(field.get("type"), str)
-                or field["type"] not in {"string", "secret", "ipv4"}
+                or field["type"] not in {"string", "secret", "token", "ipv4"}
                 or not isinstance(field.get("id"), str)
                 or not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", field["id"])
                 or field["id"] in setup_ids
@@ -1739,6 +2191,10 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
             _validate_skill_json_schema(tool.get("input_schema"))
             _validate_skill_json_schema(tool.get("result_schema"))
         device_ui = _validate_skill_device_ui(manifest.get("device_ui"), tools)
+        if isinstance(device_ui, dict) and isinstance(device_ui.get("page"), dict):
+            for asset in [device_ui["page"]["script"], *device_ui["page"]["styles"]]:
+                if asset not in declared_files:
+                    raise SkillRepositoryError("A skill page asset must also appear in the files list.")
         runtime = {"protocol": "nix-skill-jsonl-v1", "entrypoint": runtime_entry, "requirements": requirements, "autostart": False}
     elif triggers or manifest.get("device_ui") is not None:
         raise SkillRepositoryError("Runtime, setup fields, tools, device UI, and triggers require an executable runtime.")
@@ -2196,6 +2652,9 @@ def _devices_payload() -> dict:
                 ui = skill["device_ui"]
         except (OSError, json.JSONDecodeError):
             ui = skill["device_ui"]
+        if not isinstance(ui, dict) or not ui.get("status_tool"):
+            # A page/media-only contribution ships no controllable device.
+            continue
         alias = saved["device_names"].get(skill_id, "")
         skill_slug = str(skill.get("slug") or skill_id.split(":")[-1])
         default_device_name = " ".join(part.capitalize() for part in skill_slug.split("-"))
@@ -2217,7 +2676,241 @@ def _devices_payload() -> dict:
             except Exception as exc:
                 item["runtime_error"] = str(exc)[:200]
         devices.append(item)
+    devices.extend(_device_registry_payload())
     return {"ok": True, "devices": devices}
+
+
+# ---------------------------------------------------------------------------
+# Nix Dev registry — durable records for units paired over Bluetooth by the
+# NIX Home Android app (POST /api/devices, upsert on mac; see the server
+# spec in the pairing wizard). Stored inside skills.json under "device_registry".
+
+_DEVICE_REGISTRY_MUTATION_LOCK = threading.Lock()
+
+
+def _registry_records(saved: dict) -> dict:
+    records = saved.get("device_registry", {})
+    return records if isinstance(records, dict) else {}
+
+
+def _registry_secret_digest(api_key: str) -> str:
+    """Keyed digest of the unit's Noise psk; the psk itself is never stored."""
+    return hashlib.sha256(("nix-dev-registry:" + api_key).encode("utf-8")).hexdigest()
+
+
+def _registry_clean_text(value, limit: int, field: str) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be text.")
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValueError(f"{field} cannot contain control characters.")
+    clean = " ".join(value.split())
+    if len(clean) > limit:
+        raise ValueError(f"{field} must be {limit} characters or fewer.")
+    return clean
+
+
+def _registry_mac(value) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError("mac must be text.")
+    compact = value.strip().upper().replace("-", ":")
+    if not compact:
+        return ""
+    if not re.fullmatch(r"(?:[0-9A-F]{2}:){5}[0-9A-F]{2}", compact):
+        raise ValueError("mac must be a MAC address like AA:BB:CC:DD:EE:FF.")
+    return compact
+
+
+def _registry_device_id(mac: str, device_id: str, ip: str) -> str:
+    """Stable id per mac; legacy/blank-mac units fall back to device_id or ip."""
+    if mac:
+        return "echo-connect:" + mac.replace(":", "").lower()
+    return _registry_clean_text(device_id, 80, "device_id") or _registry_clean_text(ip, 64, "ip") or ""
+
+
+def _registry_public_record(record: dict) -> dict:
+    mac = record.get("mac", "")
+    return {
+        "id": record.get("id", ""),
+        "name": record.get("name", "Nix Dev"),
+        "device_alias": record.get("device_alias", ""),
+        "device_label": record.get("device_alias") or record.get("name", "Nix Dev"),
+        "icon": "🔊",
+        "registered": True,
+        "runtime_declared": True,
+        "installed": True,
+        "configured": bool(record.get("configured")),
+        "trusted": bool(record.get("trusted")),
+        "worker_running": bool(record.get("worker_running")),
+        "owner": record.get("owner", ""),
+        "skill_id": record.get("skill_id", "echo-connect"),
+        "mac": mac,
+        "device_id": record.get("device_id", ""),
+        "ip": record.get("ip", ""),
+        "model": record.get("model", ""),
+        "device_status": {
+            "device_connected": bool(record.get("worker_running")),
+            "state": {"online": bool(record.get("worker_running")), "ip": record.get("ip", "")},
+        },
+        "device_ui": {
+            "fields": [
+                {"label": "IP address", "path": "state.ip"},
+                {"label": "Online", "path": "state.online", "format": "boolean"},
+            ],
+            "controls": [
+                {
+                    "tool": "control_ring",
+                    "label": "Ring light",
+                    "arguments": {},
+                    "fields": [
+                        {"name": "action", "label": "Action", "widget": "select",
+                         "options": ["on", "off", "brightness", "color", "effect"]},
+                        {"name": "brightness", "label": "Brightness", "widget": "number",
+                         "minimum": 0, "maximum": 1},
+                        {"name": "color", "label": "Colour", "widget": "color"},
+                        {"name": "effect", "label": "Effect", "widget": "select", "options": []},
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def _registry_resolve(records: dict, identifier: str) -> tuple[str, dict] | tuple[None, None]:
+    wanted = str(identifier or "").strip()
+    if not wanted:
+        return None, None
+    mac = _registry_mac_safe(wanted)
+    if mac and mac in records:
+        return mac, records[mac]
+    if wanted in records:
+        return wanted, records[wanted]
+    for key, record in records.items():
+        if str(record.get("id", "")) == wanted or str(record.get("device_id", "")) == wanted:
+            return key, record
+    return None, None
+
+
+def _registry_mac_safe(value: str) -> str:
+    try:
+        return _registry_mac(value)
+    except ValueError:
+        return ""
+
+
+def _device_registry_upsert(payload: dict) -> dict:
+    """POST /api/devices — register a paired Nix Dev, idempotent on mac."""
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+    mac = _registry_mac(payload.get("mac"))
+    device_id = _registry_clean_text(payload.get("device_id"), 80, "device_id")
+    ip = _registry_clean_text(payload.get("ip"), 64, "ip")
+    if not mac and not device_id and not ip:
+        raise ValueError("Registration needs a mac, device_id, or ip so the unit can be tracked.")
+    api_key = payload.get("api_key")
+    if api_key is not None and (not isinstance(api_key, str) or not api_key.strip()):
+        raise ValueError("api_key must be the unit's base64 Noise psk text.")
+    api_key = api_key.strip() if isinstance(api_key, str) else ""
+    with _DEVICE_REGISTRY_MUTATION_LOCK:
+        with _skills_state_lock:
+            saved = _read_skills_state()
+            records = _registry_records(saved)
+            key = None
+            existing = None
+            if mac and mac in records:
+                key, existing = mac, records[mac]
+            elif device_id or ip:
+                for candidate_key, candidate in records.items():
+                    if (device_id and candidate.get("device_id") == device_id) or (ip and candidate.get("ip") == ip):
+                        key, existing = candidate_key, candidate
+                        break
+            created = existing is None
+            if key is None:
+                key = mac or _registry_device_id("", device_id, ip)
+                records[key] = {
+                    "mac": mac,
+                    "device_id": device_id,
+                    "name": "Nix Dev",
+                    "device_alias": "",
+                    "model": "",
+                    "ip": "",
+                    "owner": "",
+                    "skill_id": "echo-connect",
+                    "configured": False,
+                    "trusted": False,
+                    "worker_running": False,
+                    "api_key_digest": "",
+                }
+            record = records[key]
+            record["mac"] = mac or record.get("mac", "")
+            record["device_id"] = device_id or record.get("device_id", "")
+            record["name"] = _registry_clean_text(payload.get("name"), 64, "name") or record.get("name", "") or "Nix Dev"
+            record["model"] = _registry_clean_text(payload.get("model"), 64, "model") or record.get("model", "")
+            record["ip"] = ip or record.get("ip", "")
+            record["skill_id"] = _registry_clean_text(payload.get("skill_id"), 64, "skill_id") or record.get("skill_id", "") or "echo-connect"
+            owner = _registry_clean_text(payload.get("owner"), 64, "owner")
+            if owner:
+                record["owner"] = owner
+            if api_key:
+                record["api_key_digest"] = _registry_secret_digest(api_key)
+            alias = _registry_clean_text(payload.get("device_alias"), 64, "device_alias")
+            if alias:
+                record["device_alias"] = alias
+            record["id"] = _registry_device_id(record.get("mac", ""), record.get("device_id", ""), record.get("ip", ""))
+            records[key] = record
+            saved["device_registry"] = records
+            _write_skills_state(saved)
+    return {"ok": True, "created": created, "device": _registry_public_record(record)}
+
+
+def _device_registry_update(identifier: str, payload: dict) -> dict:
+    """PATCH /api/devices/{id} — rename/alias without re-registering."""
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+    with _DEVICE_REGISTRY_MUTATION_LOCK:
+        with _skills_state_lock:
+            saved = _read_skills_state()
+            records = _registry_records(saved)
+            key, record = _registry_resolve(records, identifier)
+            if record is None:
+                raise KeyError(identifier)
+            for field in ("device_alias", "name"):
+                if field in payload:
+                    clean = _registry_clean_text(payload.get(field), 64, field)
+                    if clean:
+                        record[field] = clean
+                    elif field == "device_alias":
+                        record[field] = ""
+            ip = _registry_clean_text(payload.get("ip"), 64, "ip") if "ip" in payload else None
+            if ip:
+                record["ip"] = ip
+            records[key] = record
+            saved["device_registry"] = records
+            _write_skills_state(saved)
+    return {"ok": True, "device": _registry_public_record(record)}
+
+
+def _device_registry_delete(identifier: str) -> None:
+    """DELETE /api/devices/{id} — forget a unit (registry entry only)."""
+    with _DEVICE_REGISTRY_MUTATION_LOCK:
+        with _skills_state_lock:
+            saved = _read_skills_state()
+            records = _registry_records(saved)
+            key, _record = _registry_resolve(records, identifier)
+            if _record is None:
+                raise KeyError(identifier)
+            del records[key]
+            saved["device_registry"] = records
+            _write_skills_state(saved)
+
+
+def _device_registry_payload() -> list[dict]:
+    with _skills_state_lock:
+        saved = _read_skills_state()
+    return [_registry_public_record(record) for record in _registry_records(saved).values()]
 
 
 def _public_remote_skill(repository: dict, skill: dict, installed: set[str]) -> dict:
@@ -2230,14 +2923,18 @@ def _public_remote_skill(repository: dict, skill: dict, installed: set[str]) -> 
         runtime = _marketplace_skill_runtime()
         status = runtime.status(skill_id)
         configuration = runtime.public_configuration(skill_id)
-        if skill.get("setup_fields") == []:
-            try:
-                with open(os.path.join(_skill_package_path(skill_id), "skill.json"), "r", encoding="utf-8") as handle:
-                    package_manifest = json.load(handle)
-                if isinstance(package_manifest, dict) and isinstance(package_manifest.get("runtime"), dict):
-                    skill = {**skill, **{key: package_manifest.get(key) for key in ("setup_fields", "tools", "device_ui") if package_manifest.get(key) is not None}}
-            except (OSError, json.JSONDecodeError):
-                pass
+        # The installed package is what actually runs, and the runtime validates
+        # saved setup and every proposed tool call against its manifest. A stale
+        # saved repository record must therefore never hide fields the package
+        # declares (a package update can add provider keys), so the package
+        # manifest wins whenever it declares the executable runtime.
+        try:
+            with open(os.path.join(_skill_package_path(skill_id), "skill.json"), "r", encoding="utf-8") as handle:
+                package_manifest = json.load(handle)
+            if isinstance(package_manifest, dict) and isinstance(package_manifest.get("runtime"), dict):
+                skill = {**skill, **{key: package_manifest.get(key) for key in ("version", "setup_fields", "tools", "device_ui") if package_manifest.get(key) is not None}}
+        except (OSError, json.JSONDecodeError):
+            pass
     upload = repository.get("source_type") == "upload"
     source = {
         "id": skill_id,
@@ -2520,6 +3217,11 @@ class Handler(BaseHTTPRequestHandler):
         body = markup.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        # The dashboard shell is generated per request and gains navigation
+        # entries as skills are installed (the Music page appears when a music
+        # provider is trusted). A browser heuristic-caching this document would
+        # keep the older shell and hide the new page until a hard reload.
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -2546,8 +3248,39 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", OPENAI_API_ALLOW_ORIGIN)
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Conversation-ID")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
         self.end_headers()
+
+    def _registry_device_mutation(self, identifier: str, *, delete: bool) -> None:
+        try:
+            if delete:
+                _device_registry_delete(identifier)
+                self._json({"ok": True})
+            else:
+                payload = self._read_json()
+                self._json(_device_registry_update(identifier, payload))
+        except KeyError:
+            self._json({"ok": False, "error": "No such device."}, 404)
+        except ValueError as exc:
+            self._json({"ok": False, "error": str(exc)}, 400)
+        except SkillRepositoryError as exc:
+            self._json({"ok": False, "error": str(exc)}, 413)
+        except Exception as exc:
+            self._json({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 500)
+
+    def do_PATCH(self):
+        path = _application_route_path(urlparse(self.path).path.rstrip("/") or "/")
+        if path.startswith("/api/devices/"):
+            self._registry_device_mutation(unquote(path[len("/api/devices/"):]), delete=False)
+            return
+        self._json({"ok": False, "error": "Unsupported PATCH endpoint."}, 405)
+
+    def do_DELETE(self):
+        path = _application_route_path(urlparse(self.path).path.rstrip("/") or "/")
+        if path.startswith("/api/devices/"):
+            self._registry_device_mutation(unquote(path[len("/api/devices/"):]), delete=True)
+            return
+        self._json({"ok": False, "error": "Unsupported DELETE endpoint."}, 405)
 
     def _openai_authorized(self) -> bool:
         """Authenticate external OpenAI-compatible requests when configured."""
@@ -2555,6 +3288,96 @@ class Handler(BaseHTTPRequestHandler):
             return True
         supplied = self.headers.get("Authorization", "")
         return supplied == f"Bearer {OPENAI_API_KEY}"
+
+    def _stream_send_result(
+        self,
+        *,
+        brain,
+        text: str,
+        location: str,
+        conversation_id: str | None,
+        trace_before: int,
+        t0: float,
+    ) -> None:
+        """Run the full Brain pipeline and emit SSE token events live.
+
+        Events (data: {"type": ...}):
+          - token     provisional model text as it generates
+          - reset     discard provisional text (retry/internal envelope)
+          - heartbeat keep-alive while non-model stages run
+          - final     authoritative result + first_token_ms diagnostics
+        """
+        import streaming as streaming_mod
+
+        sink = streaming_mod.TokenSink()
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.close_connection = True
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        def emit(payload: dict) -> None:
+            body = f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode()
+            self.wfile.write(body)
+            self.wfile.flush()
+
+        holder: dict[str, object] = {}
+
+        def _run() -> None:
+            # The sink must be attached in THIS thread: Brain.handle and
+            # every model call execute here, and contextvars are thread-local.
+            ctx_token = streaming_mod.attach(sink)
+            try:
+                result = brain.handle(
+                    text=text,
+                    location=location,
+                    conversation_id=conversation_id,
+                )
+                holder["result"] = result
+            except Exception as exc:
+                _trace("brain error", f"{type(exc).__name__}: {exc}", ok=False)
+                holder["error"] = f"{type(exc).__name__}: {exc}"
+            finally:
+                streaming_mod.detach(ctx_token)
+                with _trace_lock:
+                    request_trace = list(TRACE)[trace_before:]
+                if "result" in holder:
+                    elapsed = (time.perf_counter() - t0) * 1000
+                    finalized = _finalize_send_result(
+                        holder["result"], request_trace, elapsed  # type: ignore[arg-type]
+                    )
+                    finalized["first_token_ms"] = sink.first_token_ms
+                    finalized["streamed_chars"] = sink.streamed_chars
+                    sink.push_event({"type": "final", "result": finalized})
+                else:
+                    sink.push_event({
+                        "type": "error",
+                        "error": holder.get("error") or "unknown failure",
+                    })
+                sink.close()
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+
+        try:
+            for event in sink.events():
+                kind = event.get("type")
+                if kind == "heartbeat":
+                    # Invisible to EventSource clients; keeps proxies from
+                    # concluding that long Knowledge stages stalled.
+                    self.wfile.write(b": nix pipeline active\n\n")
+                    self.wfile.flush()
+                    continue
+                emit(event)
+                if kind in {"final", "error"}:
+                    break
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
 
     def _stream_openai_result(
         self,
@@ -2566,13 +3389,13 @@ class Handler(BaseHTTPRequestHandler):
     ) -> None:
         """Run the complete Core pipeline and emit OpenAI SSE chunks.
 
-        Casper's current local Transformers wrapper exposes a complete-response
-        interface, not native token callbacks. We still provide a real SSE
-        transport: comments keep long requests alive, then the final grounded
-        Casper response is emitted in small chunks for Open WebUI's streaming
-        renderer. Knowledge, Actions, session logging, and verification all
-        run in the worker before any assistant content is emitted.
+        Model tokens are forwarded as they generate (real streaming);
+        non-model stages emit SSE comments to keep the connection alive.
+        The final chunk carries the authoritative reply in ``nix.reply``
+        plus ``first_token_ms`` so clients can reconcile provisional text.
         """
+        import streaming as streaming_mod
+
         response_id = f"chatcmpl_nix_{uuid.uuid4().hex[:16]}"
         created = int(time.time())
 
@@ -2590,6 +3413,15 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             self.wfile.flush()
 
+        def content_chunk(delta_text: str) -> None:
+            emit({
+                "id": response_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [{"index": 0, "delta": {"content": delta_text}, "finish_reason": None}],
+            })
+
         emit({
             "id": response_id,
             "object": "chat.completion.chunk",
@@ -2598,54 +3430,99 @@ class Handler(BaseHTTPRequestHandler):
             "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
         })
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                get_brain().handle,
-                text=text,
-                location="openai-api",
-                conversation_id=conversation_id,
-                session_context=history,
-            )
-            while not future.done():
-                # SSE comments are invisible to Open WebUI but prevent a
-                # proxy/browser from deciding that a long model call stalled.
-                self.wfile.write(b": nix pipeline active\n\n")
-                self.wfile.flush()
-                time.sleep(0.35)
-            try:
-                result = future.result()
-            except Exception as exc:
-                emit({
-                    "id": response_id,
-                    "object": "chat.completion.chunk",
-                    "created": created,
-                    "model": model,
-                    "choices": [{"index": 0, "delta": {"content": f"Core request failed: {type(exc).__name}: {exc}"}, "finish_reason": "stop"}],
-                })
-                emit({"error": {"message": f"Core request failed: {type(exc).__name__}: {exc}", "type": "server_error"}})
-                self.wfile.write(b"data: [DONE]\n\n")
-                self.wfile.flush()
-                return
+        sink = streaming_mod.TokenSink()
+        holder: dict[str, object] = {}
 
-        reply = str(result.get("reply") or "")
-        # Chunk the already-grounded final answer so Open WebUI renders it
-        # progressively. Never stream raw Knowledge/tool output to the user.
-        for start in range(0, len(reply), 32):
+        def _run() -> None:
+            ctx_token = streaming_mod.attach(sink)
+            try:
+                holder["result"] = get_brain().handle(
+                    text=text,
+                    location="openai-api",
+                    conversation_id=conversation_id,
+                    session_context=history,
+                )
+            except Exception as exc:
+                holder["error"] = f"{type(exc).__name__}: {exc}"
+            finally:
+                streaming_mod.detach(ctx_token)
+                sink.close()
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+
+        streamed_parts: list[str] = []
+        saw_reset = False
+        try:
+            for event in sink.events():
+                kind = event.get("type")
+                if kind == "heartbeat":
+                    self.wfile.write(b": nix pipeline active\n\n")
+                    self.wfile.flush()
+                elif kind == "token":
+                    piece = str(event.get("text") or "")
+                    if piece:
+                        streamed_parts.append(piece)
+                        content_chunk(piece)
+                elif kind == "reset":
+                    # Provisional text was discarded server-side. OpenAI
+                    # protocol cannot retract; suppress further live tokens
+                    # and let the final chunk carry the authoritative reply.
+                    saw_reset = True
+                    streamed_parts.clear()
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
+        if "error" in holder:
             emit({
                 "id": response_id,
                 "object": "chat.completion.chunk",
                 "created": created,
                 "model": model,
-                "choices": [{"index": 0, "delta": {"content": reply[start:start + 32]}, "finish_reason": None}],
+                "choices": [{"index": 0, "delta": {"content": f"Core request failed: {holder['error']}"}, "finish_reason": "stop"}],
             })
-            time.sleep(0.008)
+            emit({"error": {"message": f"Core request failed: {holder['error']}", "type": "server_error"}})
+            self.wfile.write(b"data: [DONE]\n\n")
+            self.wfile.flush()
+            return
+
+        result = holder.get("result") or {}
+        reply = str(result.get("reply") or "")
+        accumulated = "".join(streamed_parts)
+
+        if saw_reset or not streamed_parts:
+            # No live tokens (reset, or a deterministic reply that never
+            # opened a model window): emit the grounded reply now, chunked.
+            for start in range(0, len(reply), 32):
+                content_chunk(reply[start:start + 32])
+                time.sleep(0.008)
+        elif accumulated.strip() != reply.strip():
+            # Rare drift between provisional tokens and the authoritative
+            # reply; the final text wins for OpenAI consumers.
+            emit({
+                "id": response_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [{"index": 0, "delta": {"content": ""}, "finish_reason": None}],
+            })
+            for start in range(0, len(reply), 32):
+                content_chunk(reply[start:start + 32])
+                time.sleep(0.008)
         emit({
             "id": response_id,
             "object": "chat.completion.chunk",
             "created": created,
             "model": model,
             "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-            "nix": {"route": result.get("route"), "rule": result.get("rule"), "details": result.get("details", {})},
+            "nix": {
+                "route": result.get("route"),
+                "rule": result.get("rule"),
+                "details": result.get("details", {}),
+                "reply": reply,
+                "first_token_ms": sink.first_token_ms,
+                "streamed_chars": sink.streamed_chars,
+            },
         })
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
@@ -2677,6 +3554,32 @@ class Handler(BaseHTTPRequestHandler):
                 "stages": stages,
                 "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
             })
+            return
+
+        if path.startswith("/static/"):
+            # Console static assets (devices page css/js). Path is normalised
+            # and restricted to the static directory — no traversal.
+            static_name = os.path.normpath(path[len("/static/"):]).lstrip("/")
+            if static_name.startswith("..") or "/" in static_name or not static_name:
+                self._json({"ok": False, "error": "not found"}, 404)
+                return
+            static_path = os.path.join(CORE_DIR, "static", static_name)
+            try:
+                with open(static_path, "rb") as handle:
+                    body = handle.read()
+            except OSError:
+                self._json({"ok": False, "error": "not found"}, 404)
+                return
+            content_type = "text/css; charset=utf-8" if static_name.endswith(".css") else (
+                "application/javascript; charset=utf-8" if static_name.endswith(".js")
+                else "application/octet-stream"
+            )
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", "no-cache, max-age=0")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if path.rstrip("/") == "/NIX-Modeldev":
@@ -2746,11 +3649,25 @@ class Handler(BaseHTTPRequestHandler):
             self._json({**_skills_payload(), "auto_update_check": update_check})
             return
 
-        if path == "/api/devices":
+        if path == "/api/devices" or path.startswith("/api/devices/"):
+            if path == "/api/devices":
+                try:
+                    self._json(_devices_payload())
+                except Exception as exc:
+                    self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}", "devices": []}, 500)
+                return
+            identifier = unquote(path[len("/api/devices/"):])
             try:
-                self._json(_devices_payload())
+                with _skills_state_lock:
+                    records = _registry_records(_read_skills_state())
+                _key, record = _registry_resolve(records, identifier)
             except Exception as exc:
-                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}", "devices": []}, 500)
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
+                return
+            if record is None:
+                self._json({"ok": False, "error": "No such device."}, 404)
+                return
+            self._json({"ok": True, "device": _registry_public_record(record)})
             return
 
         if path == "/api/profile":
@@ -2903,6 +3820,48 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json()
         except SkillRepositoryError as exc:
             self._json({"ok": False, "error": str(exc)}, 413)
+            return
+
+        if path == "/api/devices/register":
+            try:
+                self._json(_device_registry_upsert(payload))
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 500)
+            return
+
+        if path == "/api/schedule/event":
+            try:
+                self._json(_schedule_event_create(payload))
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 500)
+            return
+
+        if path == "/api/schedule/event/update":
+            try:
+                record_id = payload.get("record_id")
+                if isinstance(record_id, str) and record_id.isdigit():
+                    record_id = int(record_id)
+                self._json(_schedule_event_update(record_id, payload))
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 500)
+            return
+
+        if path == "/api/schedule/event/delete":
+            try:
+                record_id = payload.get("record_id")
+                if isinstance(record_id, str) and record_id.isdigit():
+                    record_id = int(record_id)
+                self._json(_schedule_event_delete(record_id))
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                self._json({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:160]}"}, 500)
             return
 
         if path == "/api/luna/model":
@@ -3195,6 +4154,16 @@ class Handler(BaseHTTPRequestHandler):
             t0 = time.perf_counter()
             with _trace_lock:
                 trace_before = len(TRACE)
+            if payload.get("stream"):
+                self._stream_send_result(
+                    brain=brain,
+                    text=text,
+                    location=location,
+                    conversation_id=str(payload.get("conversation_id") or "") or None,
+                    trace_before=trace_before,
+                    t0=t0,
+                )
+                return
             try:
                 result = brain.handle(
                     text=text,
@@ -3211,50 +4180,7 @@ class Handler(BaseHTTPRequestHandler):
             elapsed = (time.perf_counter() - t0) * 1000
             with _trace_lock:
                 request_trace = list(TRACE)[trace_before:]
-            try:
-                _record_pipeline_activation(result, request_trace)
-            except Exception:
-                pass
-            trace_by_stage = {}
-            for event in request_trace:
-                stage = event.get("stage")
-                if stage and event.get("ms") is not None:
-                    trace_by_stage[stage] = event["ms"]
-            # Only use the routing engine's own measurement. Never estimate
-            # routing by subtracting downstream stages: that remainder is
-            # usually assistant generation and was the source of the misleading
-            # 4049ms "Core routing" display.
-            routing_details = result.get("details", {}).get("routing_engine", {})
-            route_ms = routing_details.get("latency_ms")
-            route_reported = route_ms is not None
-            route_ms = round(float(route_ms), 3) if route_reported else 0.0
-            pipeline = [
-                {"id": "received", "label": "Received user query", "status": "complete", "ms": 0.0},
-                {"id": "route", "label": "Core routing", "status": "complete" if route_reported else "not_reported", "ms": route_ms},
-            ]
-            predictor_ms = trace_by_stage.get("knowledge /classify (model gate)")
-            if predictor_ms is not None:
-                pipeline.append({"id": "predictor", "label": "Nix_predictor · Qwen 2.5 0.5B", "status": "complete", "ms": predictor_ms})
-            else:
-                pipeline.append({"id": "predictor", "label": "Nix_predictor · Qwen 2.5 0.5B", "status": "skipped", "ms": 0.0})
-            knowledge_ms = trace_by_stage.get("knowledge /process")
-            if knowledge_ms is not None:
-                pipeline.append({"id": "knowledge", "label": "Knowledge retrieval and validation", "status": "complete", "ms": knowledge_ms})
-            else:
-                pipeline.append({"id": "knowledge", "label": "Knowledge retrieval and validation", "status": "skipped", "ms": 0.0})
-            formatter_ms = result.get("details", {}).get("formatter_ms")
-            if formatter_ms is not None:
-                formatter_attempted = result.get("details", {}).get("core_formatter", {}).get("attempted", True)
-                pipeline.append({"id": "formatter", "label": f"{result.get('details', {}).get('assistant_name', 'Assistant')} Knowledge formatter", "status": "complete" if formatter_attempted else "skipped", "ms": round(float(formatter_ms), 1)})
-            pipeline.append({"id": "final", "label": f"{result.get('details', {}).get('assistant_name', 'Assistant')} · {result.get('details', {}).get('official_model', 'model unreported')} final response", "status": "complete", "ms": round(elapsed, 1)})
-            result["pipeline"] = pipeline
-            _trace(
-                "brain reply",
-                f"route={result.get('route')} rule={result.get('rule')} "
-                f"reply={str(result.get('reply'))[:120]}",
-                ms=elapsed,
-            )
-            self._json({"ok": True, "latency_ms": round(elapsed, 1), **result})
+            self._json(_finalize_send_result(result, request_trace, elapsed))
             return
 
         if path == "/api/classify":

@@ -181,17 +181,67 @@ class LunaTransformersClient:
                 max_length=min(8192, CONTEXT_MAX_CHARS // 2),
                 add_special_tokens=False,
             ).to("cuda")
-            output = self.model_instance.generate(
-                **inputs,
-                max_new_tokens=min(max_new_tokens, 1024) if max_new_tokens is not None else LUNA_MAX_NEW_TOKENS,
-                do_sample=False,
-                use_cache=True,
-                eos_token_id=generation_stop_ids(self.tokenizer),
-                pad_token_id=self.tokenizer.eos_token_id,
-                repetition_penalty=1.08,
-                no_repeat_ngram_size=4,
-                renormalize_logits=True,
-            )
+            gen_kwargs = {
+                "max_new_tokens": min(max_new_tokens, 1024) if max_new_tokens is not None else LUNA_MAX_NEW_TOKENS,
+                "do_sample": False,
+                "use_cache": True,
+                "eos_token_id": generation_stop_ids(self.tokenizer),
+                "pad_token_id": self.tokenizer.eos_token_id,
+                "repetition_penalty": 1.08,
+                "no_repeat_ngram_size": 4,
+                "renormalize_logits": True,
+            }
+            # Token streaming: when a request-scoped sink is attached inside
+            # a user-facing window, generate on a worker thread and forward
+            # pieces as they decode. The tensor output is still captured so
+            # the full authoritative decode below is unchanged.
+            import streaming as _streaming
+
+            sink = _streaming.active_sink()
+            output = None
+            if sink is not None:
+                from transformers import TextIteratorStreamer
+
+                streamer = TextIteratorStreamer(
+                    self.tokenizer,
+                    skip_prompt=True,
+                    skip_special_tokens=True,
+                )
+                holder: dict[str, Any] = {}
+
+                def _generate() -> None:
+                    try:
+                        # inference_mode is thread-local: the worker thread
+                        # must establish it itself or autograd tracking
+                        # returns on a CUDA generation pass.
+                        with self._torch.inference_mode():
+                            holder["output"] = self.model_instance.generate(
+                                **inputs,
+                                streamer=streamer,
+                                **gen_kwargs,
+                            )
+                    except BaseException as exc:  # surface to the consumer
+                        holder["error"] = exc
+                        # Unblock the consumer loop if generation died
+                        # before pushing the stop signal.
+                        try:
+                            streamer.end()
+                        except Exception:
+                            pass
+
+                worker = threading.Thread(target=_generate, daemon=True)
+                worker.start()
+                for piece in streamer:
+                    _streaming.emit_token(piece)
+                worker.join()
+                if "error" in holder:
+                    raise holder["error"]
+                output = holder.get("output")
+            if output is None:
+                output = self.model_instance.generate(
+                    **inputs,
+                    **gen_kwargs,
+                )
         generated = output[0][inputs["input_ids"].shape[1]:]
         decoded = self.tokenizer.decode(
             generated,

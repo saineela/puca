@@ -47,8 +47,9 @@ _EMOTION_RE = re.compile(
     re.I,
 )
 _ACTION_RE = re.compile(
-    r"\b(?:remind|reminder|schedule|calendar|appointment|alarm|"
-    r"reschedule|cancel|delete\s+(?:my|the)\s+(?:reminder|event)|"
+    r"\b(?:remind|reminder|schedule|scheduled|calendar|appointment|alarm|"
+    r"reschedule|rescheduled|cancel|cancell?ed|called\s+off|"
+    r"delete\s+(?:my|the)\s+(?:reminder|event)|"
     r"remember|save|store|keep\s+track|make\s+(?:a\s+)?note)\b",
     re.I,
 )

@@ -10,15 +10,17 @@ NIX Home is the planned mobile companion for the NIX PUCA project. This blueprin
 
 ## What is implemented now
 
-Only these endpoints are implemented in `console_extend.py` and `mobile_app_api.py`:
+These endpoints are implemented in `console_extend.py`, `mobile_app_api.py`, `music_api.py`, and the installed-skill manifests they read. The versioned mobile prefix answers the same payloads as the console routes it mirrors.
 
 | Method | Path | Purpose | Authentication |
 | --- | --- | --- | --- |
-| `GET` | `/api/mobile/v1` | Public category/status index, implementation status, and link to this document. | None; contains no user data. |
-| `GET` | `/api/mobile/v1/home-copy` | Return one random home-screen copy bundle chosen from 150 catalog entries. `Cache-Control: no-store`. | None; contains no user data. |
-| `GET` | `/api/mobile/v1/home-copy?catalog=1` | Return all 150 bundles for preview, QA, and copy review. | None; contains no user data. |
+| `GET` | `/api/mobile/v1` | Public category/status index, implementation status, `live_endpoints`, and link to this document. | None; contains no user data. |
+| `GET` | `/api/mobile/v1/home-copy` | Return one random home-screen copy bundle chosen from 500 catalog entries. `Cache-Control: no-store`. | None; contains no user data. |
+| `GET` | `/api/mobile/v1/home-copy?catalog=1` | Return all 500 bundles for preview, QA, and copy review. | None; contains no user data. |
 
-The random endpoint returns `category: "Mobile App"`, `api_version: "1"`, `catalog_size: 150`, `selection: "random-per-request"`, and `data`. The catalog response uses `selection: "caller-selects-by-copy_id"` and a `variants` array. Each variant has `copy_id`, `headline`, `subtitle`, `section_title`, and three suggestion items (`icon`, `title`, `description`, `prompt`). There is no account personalization, persistent preference, RNG seed, server-side rotation state, push service, or mobile-specific authentication in this prototype. The dashboard fetches one bundle on page load and retains its built-in copy if the extension/API is unavailable.
+Music (see *Implemented music page API* below) and device registration (see *Implemented device registration* below) are also live under this prefix: `GET /api/mobile/v1/music`, `GET /api/mobile/v1/music/now-playing`, `POST /api/mobile/v1/music/control`, `GET /api/mobile/v1/music/search`, `POST /api/mobile/v1/music/play`, `GET /api/mobile/v1/music/library`, `POST /api/mobile/v1/music/save`, `GET /api/mobile/v1/music/lyrics`, and `GET|POST /api/mobile/v1/devices…`. `GET /api/mobile/v1` reports the full list as `live_endpoints`.
+
+The random endpoint returns `category: "Mobile App"`, `api_version: "1"`, `catalog_size: 500`, `selection: "random-per-request"`, and `data`. The catalog response uses `selection: "caller-selects-by-copy_id"` and a `variants` array. Each variant has `copy_id`, `headline`, `subtitle`, `section_title`, and three suggestion items (`icon`, `title`, `description`, `prompt`). There is no account personalization, persistent preference, RNG seed, server-side rotation state, push service, or mobile-specific authentication in this prototype. The dashboard fetches one bundle on page load and retains its built-in copy if the extension/API is unavailable.
 
 Example:
 
@@ -27,7 +29,7 @@ Example:
   "ok": true,
   "category": "Mobile App",
   "api_version": "1",
-  "catalog_size": 150,
+  "catalog_size": 500,
   "selection": "random-per-request",
   "data": {
     "copy_id": "home-042",
@@ -198,3 +200,63 @@ Proposed status mapping: `400` malformed request, `401` absent/invalid session, 
 - Future endpoints must be added in a versioned mobile facade, included in an OpenAPI schema, and have auth/scope/error/retention requirements before release.
 - Keep the mobile app read-oriented first. Add message writes next only after auth and user isolation are implemented. Add memory/event writes after idempotency and confirmation behavior. Add device actions last, after skill authorization and explicit confirmations.
 - A path mentioned under *Proposed resource map* or a future screen is not an available feature until implemented, authenticated, tested, and deployment-verified.
+
+
+## Implemented music page API (live)
+
+The console hosts one music page and one music API. The page is filled by an
+installed skill that declares `device_ui.page`, and the NIX Home app mounts the
+same page against the same API under the versioned mobile prefix — identical
+payloads, so the web page and the app show the same track, transport state and
+synchronized lyrics. Full contract: `nix_core/MUSIC_API.md`.
+
+| Method | Path | Purpose | Auth |
+|---|---|---|---|
+| `GET` | `/api/music` | Capabilities: contributed page, its assets, provider skill, available player commands. | None; no secrets. |
+| `GET` | `/api/music/now-playing` | Recorded track, speaker-reported state, estimated position, hand-off result. `?lyrics=1` adds lyrics. | None; no secrets. |
+| `POST` | `/api/music/control` | `play`, `pause`, `resume`, `stop`, `mute`, `unmute`, `volume` (0..1) through the declared device control. | None on LAN; consequential control, so keep behind the authenticated facade in a real deployment. |
+| `GET` | `/api/music/search?q=&limit=` | Provider catalog search. | None; no secrets. |
+| `POST` | `/api/music/play` | `query` or `video_id`; resolves the stream, records the track, hands the URL to the speaker skill when it declares one. | None on LAN. |
+| `GET` | `/api/music/queue` | The play queue the provider holds. | None; the queue is a list of tracks, not a credential. |
+| `POST` | `/api/music/queue` | `add`/`remove`/`clear`/`play`/`next`/`shuffle`/`repeat`; `play` and `next` resolve the entry and hand it to the speaker, and every reply carries `shuffle`/`repeat`. | None on LAN; consequential playback, so keep behind the authenticated facade in a real deployment. |
+| `GET` | `/api/music/library?kind=…` | `playlists`, `playlist`, `likes`, `history`, `stats`. The provider decides what a playlist is: OpenDeck lists the linked account's playlists plus its Liked Music auto playlist (`playlist_id` `LM`), which holds the liked songs. | None; account-scoped data from the configured provider. |
+| `POST` | `/api/music/save` | `like`/`unlike`/`playlist_add`/`playlist_create`; saves the playing track (or a named one) in the user's own library through the provider. | None on LAN, but it writes to the user's account: keep behind the authenticated facade in a real deployment. |
+| `GET` | `/api/music/lyrics` | Synchronized lyrics for the current or named track with the same position estimate. | None. |
+
+The same operations answer under `/api/mobile/v1/music…`. Position is an
+estimate derived from when the console handed the track to the speaker (plus
+paused time), because the speaker's media player reports state, volume and mute
+but no position; clients keep their own clock between polls and use this shared
+value to stay in step.
+
+## Implemented device registration (live)
+
+The NIX Home app discovers devices over BLE by an unfiltered scan and shows
+every advertiser whose advertised Complete Local Name contains `Nix Dev`
+(case-insensitive, with the space). These endpoints are the server-side
+counterpart that registers a discovered device as OFFICIAL, with a mock mode
+for testing without Bluetooth hardware. All responses are
+`Cache-Control: no-store` JSON.
+
+| Method | Path | Purpose | Auth |
+|---|---|---|---|
+| `GET` | `/api/mobile/v1/devices` | Flow documentation index. | None; no user data. |
+| `POST` | `/api/mobile/v1/devices/report` | Report one BLE advertisement (dedup by MAC, RSSI updated). Body: `mac`, `advertised_name`, `rssi`, optional `mock`. | None; local network. |
+| `POST` | `/api/mobile/v1/devices/discover` | Mint a 16-hex claim token for pairing. Body: `mac`. | None; local network. |
+| `POST` | `/api/mobile/v1/devices/register` | Verify claim token + device secret -> `registered` (official). Body: `mac`, `claim_token`, `device_secret`, optional `label`, `kind`, `mock`. | None; local network. |
+| `POST` | `/api/mobile/v1/devices/unregister` | Retire an official device. Body: `mac`. | None; local network. |
+| `GET` | `/api/mobile/v1/devices/list` | All devices, strongest signal first, with `official_count`. | None; no secrets in responses. |
+| `GET` | `/api/mobile/v1/devices/{mac}` | One device's status; 404 when unknown. | None; no secrets in responses. |
+| `POST` | `/api/mobile/v1/devices/mock/seed` | Seed one fake `Nix Dev` advertisement (returns its device secret) for testing without hardware. Body: optional `suffix`, `rssi`. | Mock only; test helper. |
+
+Rules mirrored from the app spec (`PairDeviceScreen.isNixDev`):
+
+- The advertised name must contain `Nix Dev` **with the space**;
+  `NixDev` is refused. Max 26 characters (BLE legacy payload limit).
+- MACs are normalized to `AA:BB:CC:DD:EE:FF`; malformed MACs are refused.
+- RSSI must be -127..0 dBm. Devices are listed strongest-first.
+- The device secret is issued by the hub at first sighting and is NEVER
+  included in any list/status response; registration requires both the
+  one-time claim token and that secret.
+- Mock devices (`"mock": true`) never mix with real ones and are the only
+  entries `POST /devices/mock/seed` can create.

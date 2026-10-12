@@ -29,8 +29,60 @@ MAX_LINE_BYTES = 256 * 1024
 WORKER_TIMEOUT_SECONDS = 20.0
 
 
+# ----------------------------------------------------------------------
+# Worker error translation
+# ----------------------------------------------------------------------
+
+# Raw OS/transport error dumps (e.g. "SocketAPIError: Error connecting to
+# [AddrInfo(family=<AddressFamily.AF_INET: 2>, ... )]: [Errno 113] Connect
+# call failed") are machine detail, not user language. Translate the common
+# network failure classes once, at the runtime boundary.
+_ADDR_RE = re.compile(r"address='([0-9a-fA-F.:]+)', port=(\d+)")
+
+
+def _humanize_worker_error(message: str) -> str:
+    """Turn raw worker exception dumps into one plain-language sentence."""
+    if not message:
+        return message
+    lowered = message.lower()
+    address = _ADDR_RE.search(message)
+    where = f" at {address.group(1)}:{address.group(2)}" if address else ""
+
+    if "errno 113" in lowered or "no route to host" in lowered or "ehostunreach" in lowered:
+        return (
+            f"The device{where} is unreachable on the network (no route to "
+            "host). Check that it is powered on and connected to Wi-Fi, then "
+            "try again."
+        )
+    if "errno 111" in lowered or "connection refused" in lowered or "econnrefused" in lowered:
+        return (
+            f"The device{where} refused the connection. It is online but its "
+            "service is not accepting connections right now."
+        )
+    if "errno 110" in lowered or "connection timed out" in lowered or "etimedout" in lowered or "timed out" in lowered:
+        return (
+            f"The device{where} did not respond in time. It may be offline or "
+            "overloaded; try again."
+        )
+    if "errno -2" in lowered or "name or service not known" in lowered or "enotfound" in lowered:
+        return (
+            f"The device address{where} could not be resolved. Check the "
+            "hostname or IP configured for this skill."
+        )
+    return message
+
+
 class SkillRuntimeError(RuntimeError):
     """Invalid package, configuration, or worker response."""
+
+
+class WorkerOperationError(SkillRuntimeError):
+    """The worker processed a request and reported a failure itself.
+
+    Transport-level problems (timeouts, a dead process, a corrupted or
+    desynchronized stream) leave the JSONL channel unreliable and stop the
+    worker; a worker-reported error leaves it healthy and retryable.
+    """
 
 
 def _load_json(path: Path, default: Any) -> Any:
@@ -162,6 +214,9 @@ class _Worker:
             encoded = json.dumps({**payload, "id": request_id, "op": operation}, ensure_ascii=False, separators=(",", ":"))
             if len(encoded.encode("utf-8")) > MAX_LINE_BYTES:
                 raise SkillRuntimeError("Skill request exceeds the runtime size limit.")
+            # One serialized JSONL client: hold the lock for the whole
+            # request/response exchange so concurrent callers can never steal
+            # each other's correlated responses from the shared queue.
             try:
                 self.process.stdin.write(encoded + "\n")
                 self.process.stdin.flush()
@@ -187,7 +242,9 @@ class _Worker:
                 if not isinstance(response, dict) or response.get("id") != request_id:
                     raise SkillRuntimeError("Skill worker violated response correlation.")
                 if response.get("ok") is not True:
-                    raise SkillRuntimeError(str(response.get("error") or "Skill operation failed")[:240])
+                    raise WorkerOperationError(
+                        _humanize_worker_error(str(response.get("error") or "Skill operation failed"))[:240]
+                    )
                 return response
 
     def stop(self) -> None:
@@ -389,7 +446,7 @@ class SkillRuntime:
         clean = {}
         for field_id, field in allowed.items():
             value = values.get(field_id)
-            if field.get("type") == "secret" and value in (None, ""):
+            if field.get("type") in {"secret", "token"} and value in (None, ""):
                 value = old.get(field_id)
             if value in (None, ""):
                 if field.get("required"):
@@ -411,6 +468,12 @@ class SkillRuntime:
                     raise SkillRuntimeError("API key must be base64.") from exc
                 if len(decoded) != 32:
                     raise SkillRuntimeError("API key must encode exactly 32 bytes.")
+            if field.get("type") == "token":
+                # Tokens (provider API keys) are opaque text that is masked like a
+                # secret but has no fixed encoding: only shape is checked.
+                value = value.strip()
+                if not value or any(ord(character) < 32 for character in value):
+                    raise SkillRuntimeError("Token values must be non-empty text without control characters.")
             clean[field_id] = value
         self.config_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.config_dir, 0o700)
@@ -445,7 +508,7 @@ class SkillRuntime:
         values = _load_json(self._config_path(skill_id), {})
         if not isinstance(values, dict):
             return {}
-        return {field["id"]: ({"configured": bool(values.get(field["id"]))} if field.get("type") == "secret" else values[field["id"]]) for field in manifest.get("setup_fields", []) if isinstance(field, dict) and field.get("id") and (field.get("type") == "secret" or field["id"] in values)}
+        return {field["id"]: ({"configured": bool(values.get(field["id"]))} if field.get("type") in {"secret", "token"} else values[field["id"]]) for field in manifest.get("setup_fields", []) if isinstance(field, dict) and field.get("id") and (field.get("type") in {"secret", "token"} or field["id"] in values)}
 
     def _write_state(self, saved: dict[str, Any]) -> None:
         self.state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -590,6 +653,8 @@ class SkillRuntime:
             result = worker.request("execute", {"tool": tool["name"], "arguments": arguments}).get("result")
             validate_json_schema(result, tool["result_schema"])
             return result
+        except WorkerOperationError:
+            raise
         except SkillRuntimeError:
             self.stop(skill_id)
             raise
@@ -676,7 +741,7 @@ class SkillRuntime:
         clean = " ".join(str(text).casefold().split())
         if len(clean) > 4000:
             return None
-        if re.match(r"^(?:can|could|would) you (?:please )?(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|display|show|list)\b", clean):
+        if re.match(r"^(?:can|could|would) you (?:please )?(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|loop|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|display|show|list)\b", clean):
             clean = re.sub(r"^(?:can|could|would) you (?:please )?", "", clean)
         elif re.match(r"^(?:(?:please|hey nix)[, ]+)?(?:can|could|would|will|do|does) you\b", clean):
             return None
@@ -686,7 +751,11 @@ class SkillRuntime:
         if re.search(r"\band (?:then )?(?:turn|switch|power|set|make|run|start|stop|disable|enable|dim|brighten)\b|;", clean):
             return None
         clean = re.sub(r"^(?:(?:please|could you|can you|would you|hey(?: nix)?)[, ]*)+", "", clean)
-        direct = bool(re.match(r"(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|display|show)\b", clean))
+        # "shuffle the queue" and "repeat this song" are direct commands too (they
+        # are queue operations on the music provider), so they address the skill
+        # the way "play"/"queue" do; which skill is still decided by the trigger
+        # terms below.
+        direct = bool(re.match(r"(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|loop|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|display|show)\b", clean))
         state_query = bool(re.match(r"what(?: is|'s)\b", clean) and re.search(r"\b(?:ring|state|status)\b.*\b(?:doing|look|state|status)\b", clean))
         catalog_query = bool(re.match(r"(?:what|which|show|list|tell me|are|can)\b", clean) and re.search(r"\b(?:effects?|animations?|colors?|colours?)\b", clean))
         if catalog_query and re.search(r"\b(?:how do i|how can i|can i|should i|wonder|whether)\b", clean):
@@ -714,7 +783,7 @@ class SkillRuntime:
         # explicit setup/trust boundary without starting a worker.
         specs = self.installed_skill_specs()
         generic_device = bool(re.search(r"\b(?:light|lamp|device|thermostat|lock|camera|speaker|plug)\b", clean))
-        direct_request = bool(re.match(r"(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|display|show)\b", clean))
+        direct_request = bool(re.match(r"(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|loop|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|display|show)\b", clean))
         if generic_device and direct_request and len(specs) == 1:
             skill_id = specs[0]["skill_id"]
             return skill_id, self._package(skill_id)[1]
@@ -781,8 +850,13 @@ class SkillRuntime:
             r"\b(?:story|explain|explanation|how does|how do|how can|what if|wonder|whether)\b",
             current,
         )) and (
+            # "shuffle" and "repeat"/"loop" are direct commands in their own
+            # right (trigger_candidate recognizes them the same way), so a
+            # declared trigger phrase that names one of them - "repeat this
+            # song", "shuffle the queue" - targets the player instead of
+            # falling through to chat, which cannot act on the queue.
             bool(re.search(
-                r"\b(?:turn|switch|power|set|make|change|run|start|play|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
+                r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|repeating|loop|looping|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
                 current,
             ))
             # Direct state questions about a device ("is the light on?")
@@ -820,7 +894,18 @@ class SkillRuntime:
             explicit = actionable and any(contains(current, term) for term in terms)
             if explicit:
                 targeted.append(spec)
-        if refers_back and not targeted and not bool(re.search(
+        # Ellipsis resolution must still be *device-directed* by the CURRENT
+        # turn: a pronoun alone ("I'm gonna snap them" right after light talk)
+        # must not pull the device in from history and run a skill plan on an
+        # ordinary chat message. Require an action verb or a device-setting
+        # noun in this turn before resolving "it/them" against history.
+        device_directed = bool(re.search(
+            r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|mute|unmute|say|stop|disable|"
+            r"enable|brighten|dim|paint|animate|show|list|apply|status|state|"
+            r"color|colour|hue|shade|brightness|effect|volume|on|off)\b",
+            current,
+        ))
+        if refers_back and device_directed and not targeted and not bool(re.search(
             r"\b(?:story|explain|explanation|how does|how do|how can|what if|wonder|whether)\b",
             current,
         )):
@@ -862,6 +947,43 @@ class SkillRuntime:
             runnable = [spec for spec in specs if spec["runnable"]]
             if len(runnable) == 1:
                 targeted = runnable
+
+        # A skill that declares a media surface (a music service) is the natural
+        # target for playback phrasing — "play Bohemian Rhapsody", "next track",
+        # "what's playing", "search for X" — even when the user never names the
+        # service, because chat alone cannot act on the player and instead
+        # hallucinates "now playing". Only when exactly one such runnable skill
+        # is installed and this turn carries a media verb.
+        media_intent = bool(re.search(
+            r"\b(?:play|playing|pause|paused|resume|skip|next|previous|queue|"
+            r"search|find|lyrics|sing|shuffle)\b",
+            current,
+        ))
+        # "repeat this song", "loop the queue": the same media verbs the
+        # provider answers by op. They are ordinary chat words too ("repeat
+        # that"), so the repeat only counts as playback when this turn also
+        # names something to play, which keeps "repeat what you said" in chat.
+        if not media_intent and re.search(
+            r"\b(?:repeat|repeats|repeating|repeated|loop|loops|looping|looped)\b", current
+        ) and re.search(
+            r"\b(?:song|songs|track|tracks|tune|tunes|queue|playlist|playlists|"
+            r"album|albums|artist|artists|music|playing)\b",
+            current,
+        ):
+            media_intent = True
+        if not targeted and media_intent and not bool(re.search(
+            r"\b(?:story|explain|explanation|how does|how do|how can|what if|wonder|whether)\b",
+            current,
+        )):
+            media_skills = [
+                spec for spec in specs
+                if spec.get("runnable")
+                and isinstance(spec.get("device_ui"), dict)
+                and isinstance(spec["device_ui"].get("media"), dict)
+                and spec["device_ui"]["media"]
+            ]
+            if len(media_skills) == 1:
+                targeted = media_skills
 
         # Device-directed but unready single skills receive a bounded setup
         # explanation; their descriptions/schemas are never sent to the model.
@@ -930,6 +1052,8 @@ class SkillRuntime:
             )
         try:
             response = worker.request("match", {"text": match_text})
+        except WorkerOperationError:
+            raise
         except SkillRuntimeError:
             self.stop(skill_id)
             raise
@@ -1024,6 +1148,8 @@ class SkillRuntime:
             validate_json_schema(result, tool["result_schema"])
             if isinstance(result, dict) and "ok" in result and result["ok"] is not True:
                 raise SkillRuntimeError("The skill did not confirm a successful result.")
+        except WorkerOperationError:
+            raise
         except SkillRuntimeError:
             self.stop(skill_id)
             raise

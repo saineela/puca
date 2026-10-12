@@ -6,6 +6,7 @@ in MOBILE_APP_API.md and is not an implemented mobile application or API suite.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from itertools import product
 from urllib.parse import parse_qs, urlparse
@@ -25,6 +26,16 @@ _HEADLINES = (
     "What would you like to focus on?",
     "How can we make today a little easier?",
     "What would you like to take one step at a time?",
+    "What is weighing on you right now?",
+    "What would you like to think through?",
+    "What can I help you carry today?",
+    "What deserves a little attention today?",
+    "What would feel like progress to you?",
+    "Where is your head at today?",
+    "What would you like to put into words?",
+    "What can we untangle together?",
+    "What would make today feel lighter?",
+    "What has been on your heart lately?",
 )
 
 _SUBTITLES = (
@@ -43,6 +54,16 @@ _SUBTITLES = (
     "Tell me what is on your mind, and we can work from there.",
     "We can look for a gentle next step without rushing the rest.",
     "Let us begin with whatever you would most like help carrying today.",
+    "Whatever you bring, we can take it slowly and kindly.",
+    "One thought, one step, one small conversation at a time.",
+    "We can sit with it, sort it, or set it down for later.",
+    "Big things and small things are both welcome here.",
+    "Start anywhere. We will find the thread together.",
+    "There is space here for whatever today has been.",
+    "We can be practical, reflective, or just quiet together.",
+    "Nothing is too small or too tangled to start with.",
+    "Bring the day as it is; we will work from there.",
+    "Your pace, your topic, your space.",
 )
 
 _SECTION_TITLES = (
@@ -52,6 +73,8 @@ _SECTION_TITLES = (
     "Pick a small first step",
     "Some possible starting points",
     "What would help right now?",
+    "Where shall we begin?",
+    "Three gentle options",
 )
 
 _CHECK_INS = (
@@ -130,8 +153,10 @@ def home_copy_catalog() -> tuple[dict, ...]:
 
 
 HOME_COPY_VARIANTS = home_copy_catalog()
-assert len(HOME_COPY_VARIANTS) == 150
-assert len({(item["headline"], item["subtitle"]) for item in HOME_COPY_VARIANTS}) == 150
+# 20 headlines x 25 subtitles = 500 premade home-screen combinations.
+assert len(HOME_COPY_VARIANTS) == 500, len(HOME_COPY_VARIANTS)
+assert len({(item["headline"], item["subtitle"]) for item in HOME_COPY_VARIANTS}) == 500
+assert len({item["copy_id"] for item in HOME_COPY_VARIANTS}) == 500
 
 
 def _json_no_store(handler, payload: dict, status: int = 200) -> None:
@@ -151,10 +176,187 @@ def api_index(handler, _match) -> bool:
         "ok": True,
         "category": CATEGORY,
         "api_version": API_VERSION,
-        "live_endpoints": ["GET /api/mobile/v1", "GET /api/mobile/v1/home-copy"],
+        "live_endpoints": [
+            "GET /api/mobile/v1",
+            "GET /api/mobile/v1/home-copy",
+            "GET /api/mobile/v1/music",
+            "GET /api/mobile/v1/music/now-playing",
+            "POST /api/mobile/v1/music/control",
+            "GET /api/mobile/v1/music/search",
+            "POST /api/mobile/v1/music/play",
+            "GET /api/mobile/v1/music/library",
+            "GET|POST /api/mobile/v1/music/queue",
+            "POST /api/mobile/v1/music/save",
+            "GET /api/mobile/v1/music/lyrics",
+            "POST /api/mobile/v1/devices/report",
+            "POST /api/mobile/v1/devices/discover",
+            "POST /api/mobile/v1/devices/register",
+            "POST /api/mobile/v1/devices/unregister",
+            "GET /api/mobile/v1/devices",
+            "GET /api/mobile/v1/devices/list",
+            "GET /api/mobile/v1/devices/{mac}",
+            "POST /api/mobile/v1/devices/mock/seed",
+        ],
         "documentation": "nix_core/MOBILE_APP_API.md",
         "mobile_application_included": False,
-        "status": "home-copy-prototype; remaining mobile facade is documented, not implemented",
+        "status": "home-copy prototype + official device registration",
+    })
+    return True
+
+
+# ----------------------------------------------------------------------
+# Official device registration (NIX Home BLE pairing counterpart)
+# ----------------------------------------------------------------------
+
+import mobile_device_registry  # noqa: E402  (module-level, imported lazily-safe)
+
+
+def _registry() -> "mobile_device_registry.DeviceRegistry":
+    global _DEVICE_REGISTRY
+    if _DEVICE_REGISTRY is None:
+        _DEVICE_REGISTRY = mobile_device_registry.DeviceRegistry()
+    return _DEVICE_REGISTRY
+
+
+_DEVICE_REGISTRY: "mobile_device_registry.DeviceRegistry | None" = None
+
+
+def _read_body(handler) -> dict:
+    try:
+        length = int(handler.headers.get("Content-Length") or 0)
+    except (TypeError, ValueError):
+        return {}
+    if length <= 0 or length > 64 * 1024:
+        return {}
+    try:
+        payload = json.loads(handler.rfile.read(length) or b"{}")
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _device_error(handler, exc: Exception, status: int = 400) -> None:
+    _json_no_store(handler, {"ok": False, "category": CATEGORY, "error": str(exc)}, status)
+
+
+def devices_index(handler, _match) -> bool:
+    _json_no_store(handler, {
+        "ok": True,
+        "category": CATEGORY,
+        "api_version": API_VERSION,
+        "resource": "devices",
+        "flow": [
+            "1. app scans BLE; names containing 'Nix Dev' are candidates",
+            "2. POST /devices/report per advertisement (dedup by MAC)",
+            "3. POST /devices/discover -> claim token",
+            "4. POST /devices/register with claim token + device secret -> official",
+            "5. GET /devices or GET /devices/{mac} for status",
+            "6. POST /devices/unregister to retire",
+        ],
+        "mock_testing": (
+            "POST /devices/report with \"mock\": true and POST "
+            "/devices/mock/seed exercise the whole lifecycle with fake "
+            "addresses and no Bluetooth hardware."
+        ),
+    })
+    return True
+
+
+def devices_report(handler, _match) -> bool:
+    body = _read_body(handler)
+    try:
+        device = _registry().report(
+            mac=body.get("mac"),
+            advertised_name=body.get("advertised_name"),
+            rssi=body.get("rssi", -60),
+            mock=bool(body.get("mock", False)),
+        )
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc)
+        return True
+    _json_no_store(handler, {"ok": True, "category": CATEGORY, "device": device})
+    return True
+
+
+def devices_discover(handler, _match) -> bool:
+    body = _read_body(handler)
+    try:
+        result = _registry().discover(mac=body.get("mac"))
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc)
+        return True
+    _json_no_store(handler, {"ok": True, "category": CATEGORY, **result})
+    return True
+
+
+def devices_register(handler, _match) -> bool:
+    body = _read_body(handler)
+    try:
+        result = _registry().register(
+            mac=body.get("mac"),
+            claim_token=body.get("claim_token"),
+            device_secret=body.get("device_secret"),
+            label=str(body.get("label") or ""),
+            kind=body.get("kind", "other"),
+            mock=bool(body.get("mock", False)),
+        )
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc)
+        return True
+    _json_no_store(handler, {"ok": True, "category": CATEGORY, **result})
+    return True
+
+
+def devices_unregister(handler, _match) -> bool:
+    body = _read_body(handler)
+    try:
+        result = _registry().unregister(mac=body.get("mac"))
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc)
+        return True
+    _json_no_store(handler, {"ok": True, "category": CATEGORY, **result})
+    return True
+
+
+def devices_list(handler, _match) -> bool:
+    _json_no_store(handler, {"category": CATEGORY, **_registry().status()})
+    return True
+
+
+def devices_get(handler, match) -> bool:
+    try:
+        result = _registry().status(match.group(1))
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc, 404)
+        return True
+    _json_no_store(handler, {"category": CATEGORY, **result})
+    return True
+
+
+def devices_mock_seed(handler, _match) -> bool:
+    """Seed one fake 'Nix Dev' advertisement for mock testing (no hardware)."""
+    body = _read_body(handler)
+    suffix = re.sub(r"[^0-9A-F]", "", str(body.get("suffix") or "4A2F").upper())[:4]
+    suffix = (suffix + "4A2F")[:4]
+    mac = f"04:52:C7:{suffix[0:2]}:{suffix[2:4]}:{secrets.token_hex(1).upper()}"
+    try:
+        device = _registry().report(
+            mac=mac,
+            advertised_name=f"Nix Dev {suffix}",
+            rssi=body.get("rssi", -55),
+            mock=True,
+        )
+        secret = _registry()._devices[device["mac"]]["device_secret"]  # mock only
+    except mobile_device_registry.DeviceRegistryError as exc:
+        _device_error(handler, exc)
+        return True
+    _json_no_store(handler, {
+        "ok": True,
+        "category": CATEGORY,
+        "mock": True,
+        "device": device,
+        "device_secret": secret,
+        "note": "Mock test device with its secret; never exists as real hardware.",
     })
     return True
 

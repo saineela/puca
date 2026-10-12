@@ -73,7 +73,7 @@ def test_retired_pro_id_is_rejected_from_official_model_apis(monkeypatch, luna_c
     "path",
     [
         "/", "/home", "/models", "/conversations", "/memories", "/people",
-        "/events", "/devices", "/api", "/docs", "/settings", "/skills",
+        "/schedules", "/devices", "/api", "/docs", "/settings", "/skills",
         "/release-notes", "/release-notes/", "/workspace/skills/", "/nix/conversations",
     ],
 )
@@ -89,11 +89,14 @@ def test_dashboard_pages_are_directly_routeable(luna_console, path):
             assert 'id="release-notes"' in markup
         if path.rstrip("/") == "/devices":
             assert markup.count('id="devices"') == 1
-            assert 'id="devicesList"' in markup
-            assert "function renderDevices(devices)" in markup
+            # V5.2: the Devices page uses the approved NIX Home design —
+            # three in-page views (grid / dot detail / Nix Dev unit) driven
+            # by ring-effects.js canvas rendering.
+            assert 'id="devGridCards"' in markup
+            assert "function renderDevGrid()" in markup
             assert "function loadDevices()" in markup
-            assert "not visual confirmation of the physical LEDs" in markup or "cannot confirm what the physical LEDs look like" in markup
-            assert ".device-ring" in markup
+            assert "static/ring-effects.js" in markup
+            assert "static/devices-page.css" in markup
 
 
 @pytest.mark.parametrize("path", ["/api/not-a-dashboard-page", "/v1/not-a-dashboard-page"])
@@ -271,6 +274,12 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
         dashboard = handle.read()
 
     assert console._dashboard_markup() == dashboard
+    # Schedules: the Upcoming list is editable (every item is a button wired to
+    # the event editor), and identical events are merged by the server.
+    assert "function renderUpcoming()" in dashboard
+    assert "agenda-item static" not in dashboard
+    assert dashboard.count('class="agenda-item" data-id="${e.id}"') == 2
+    assert "Identical events (same name and time) are merged" in dashboard
     assert "<title>NIX PUCA</title>" in dashboard
     assert 'class="brand-logo"' in dashboard
     assert "Personal User Companion Agent</div>" not in dashboard
@@ -284,8 +293,7 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert "color-scheme:light" in dashboard
     assert 'https://github.com/saineela/puca' in dashboard
     assert 'Star NIX PUCA' in dashboard
-    assert 'input.name=fieldId' in dashboard
-    assert "device-visual:not(.is-active) .device-ring" in dashboard
+    assert "static/devices-page.css" in dashboard
     assert "document.querySelectorAll('[data-page]').forEach(button=>button.onclick=()=>navigate(button.dataset.page))" in dashboard
     assert "document.querySelectorAll('[data-page-link]').forEach(button=>button.onclick=()=>navigate(button.dataset.pageLink))" in dashboard
     assert "$('send').onclick=send;" in dashboard
@@ -296,12 +304,14 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert 'id="selectedColorTheme"' not in dashboard
     assert '<div class="brand-name">Nix</div>' not in dashboard
     assert '<div class="brand-name">nix</div>' not in dashboard
-    assert "Launching our new <span>Luna model lineup</span>" in dashboard
+    # V5.1: the dismissible home "Launching our new Luna model lineup"
+    # banner was removed by product decision; the Models page Luna launch
+    # card remains the announcement surface.
+    assert 'id="lunaIntroBanner"' not in dashboard
+    assert "launch-banner-close" not in dashboard
+    assert "nix-luna-banner-dismissed" not in dashboard
     assert "A new chapter for Nix" not in dashboard
     assert "Introducing Official Luna</div>" not in dashboard
-    assert '<button class="launch-banner-close" id="closeLunaBanner" type="button" aria-label="Close Luna introduction" title="Close banner">×</button>' in dashboard
-    assert "nix-luna-banner-dismissed" in dashboard
-    assert "lunaBanner.hidden=true" in dashboard
     assert "Discover Official Luna" in dashboard
     assert "Official Luna" in dashboard
     assert "checkpoint 60" not in dashboard.lower()
@@ -313,8 +323,6 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert ".brand-mark{width:42px;height:42px" in dashboard
     assert ".brand-logo{display:block;width:100%;max-width:205px;height:58px" in dashboard
     assert ".agent-face{width:42px;height:42px" in dashboard
-    assert "input.id=fieldId;input.name=fieldId" in dashboard
-    assert "aliasInput.name=aliasInput.id" in dashboard
     assert "name=\"${inputId}\"" in dashboard
     assert "id=\"skill-auto-update-${settingsId}\" name=\"skill-auto-update-${settingsId}\"" in dashboard
     assert "/* Editorial refresh: quieter colors, clearer hierarchy, and readable marks. */" in dashboard
@@ -348,22 +356,67 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert "else if(page==='skill-settings')loadSkills()" in dashboard
     assert "if(page==='skills')loadSkills(true)" in dashboard
     assert "if(page==='devices')loadDevices()" in dashboard
-    assert "function renderDevices(devices)" in dashboard
-    assert ".device-ring{border:13px solid var(--device-glow)!important;background:transparent!important" in dashboard
-    assert "@supports ((mask:radial-gradient(farthest-side,transparent 70%,#000 72%)) or (-webkit-mask:radial-gradient(farthest-side,transparent 70%,#000 72%)))" in dashboard
-    assert "device-ring{border:0!important;background:repeating-conic-gradient" in dashboard
-    assert "device-ring.is-animated{background:conic-gradient(from -90deg,#ff3b30" in dashboard
-    assert "animation:device-ring-spectrum 3s linear infinite" in dashboard
-    assert "@media(prefers-reduced-motion:reduce){.device-ring.is-animated{animation:none}}" in dashboard
-    assert "art.classList.toggle('has-ring-effect',hasEffect)" in dashboard
-    assert "Echo Dot ring on${color?`" in dashboard
-    assert "aliasInput.id=`device-name-${deviceKey}`" in dashboard
-    assert "fieldId=`device-control-" in dashboard
-    assert "data.device_status||{}" in dashboard
-    assert "control.tool,arguments:args" in dashboard
-    assert "data.device_name" in dashboard
+    # Devices page: the approved standalone design (3-view grid/detail/unit,
+    # canvas ring effects) replaced the old in-dashboard device-card renderer.
+    assert "function renderDevices(devices)" not in dashboard
+    assert "device-ring" not in dashboard
+    assert "device-card" not in dashboard
+    assert "static/ring-effects.js" in dashboard
+    assert "function renderDevGrid()" in dashboard
+    assert "function devOpenDetail(" in dashboard
+    assert "function devOpenUnit(" in dashboard
+    # Setup / Trust badges are intentionally not shown anywhere on the Devices
+    # page (neither the grid tiles nor the detail chips).
+    assert "Setup ✓" not in dashboard
+    assert "Setup needed" not in dashboard
+    assert "'Trusted':'Untrusted'" not in dashboard
+    assert "[['Setup',d.configured" not in dashboard
+    assert "['Trust',d.trusted" not in dashboard
+    # V5.2: inline rename (pencil beside the device name) and the speaker
+    # panel (volume / mute / say / stop) on the device controls view.
+    assert 'id="detailNameEdit"' in dashboard
+    assert 'id="detailNameForm"' in dashboard
+    assert "action:'device_name'" in dashboard
+    assert 'id="volWheel"' in dashboard
+    assert 'id="volArc"' in dashboard
+    # V5.2: the ring is centred with a ▲ / % / ▼ stepper and richer gestures
+    # (angle drag with a centre dead zone, scroll wheel, arrow keys).
+    assert 'id="volUp"' in dashboard
+    assert 'id="volDown"' in dashboard
+    assert 'id="volNum"' in dashboard
+    assert 'role="slider" tabindex="0" aria-label="Volume"' in dashboard
+    assert "function devVolApply(" in dashboard
+    assert "function devVolCommit(" in dashboard
+    # Volume commits are coalesced: every ▲/▼ tap or gesture settle previews
+    # immediately, but only one control request is ever in flight and only the
+    # level the user actually stopped on is sent afterwards.
+    assert "let devVolInFlight=false,devVolPending=false;" in dashboard
+    assert "if(devVolInFlight){devVolPending=true;return}" in dashboard
+    assert "if(devVolPending)devVolCommit();" in dashboard
+    assert "devVolWheel.addEventListener('wheel'" in dashboard
+    assert "devVolWheel.addEventListener('keydown'" in dashboard
+    assert "Math.hypot(dx,dy)<r.width*0.18" in dashboard
+    assert "action:'stop_speaking'" in dashboard
+    assert "function devSyncSpeaker(" in dashboard
+    assert 'id="voiceLab"' in dashboard
+    assert 'id="voiceSel"' in dashboard
+    assert "function devVoiceSettings(" in dashboard
+    assert "function devSayArgs(" in dashboard
+    assert "voice:'amy'" in dashboard
+    # V5.2: the mute/unmute toggle moved beside On/Off in the control header,
+    # and the volume wheel carries literal stroke fallbacks so its ring can
+    # never be invisible against the light card.
+    assert '<button class="obtn spkmute" id="btnMute" type="button">Mute</button>' in dashboard
+    assert 'class="voltrack" cx="75" cy="75" r="56" fill="none" stroke="#c7c7cf"' in dashboard
+    assert 'class="volarc" cx="75" cy="75" r="56" fill="none" stroke="#111111"' in dashboard
+    assert "RingFx.animate(" in dashboard
     assert "device_connected?'ESPHome API connected'" not in dashboard
     assert "Community content is unreviewed." in dashboard
+    # A gateway error page (a Cloudflare 502/503/504, or any HTML body) is
+    # reported as an unreachable console instead of being dumped at the user,
+    # and a browser-level connection failure gets the same plain-language note.
+    assert "a gateway in front of it returned an error page instead" in dashboard
+    assert "The Nix console is unreachable from this browser" in dashboard
     assert "const submittedUrl=new URL(url),submittedParts=submittedUrl.pathname.split('/').filter(Boolean).slice(0,2)" in dashboard
     assert "appUrl(path)" in dashboard
     assert "Search dashboard and API chats" in dashboard
@@ -430,3 +483,83 @@ def test_dashboard_announces_official_luna_and_documents_model_history():
     assert "Saved on this Nix instance and shared with its dashboard/API clients" in dashboard
     assert "loadProfile()" in dashboard
     assert "saveProfile()" in dashboard
+
+
+def test_music_nav_and_page_belong_to_an_installed_music_skill():
+    """The Music entry and page are gated on an installed music skill.
+
+    The nav button ships hidden and the shell re-checks the music API whenever
+    the skills catalog reloads. A `hidden` attribute only hides a button if it
+    wins over the class that sets its display, which neither the nav item nor
+    the device name form did before the shared rule.
+    """
+    import os
+
+    with open(console.DASHBOARD_PATH, encoding="utf-8") as handle:
+        dashboard = handle.read()
+    assert 'data-page="music" id="navMusicItem" hidden' in dashboard
+    assert ".hidden,[hidden]{display:none!important}" in dashboard
+    # The Music API is only reachable through the shared reader, so a gateway
+    # error page can never be parsed as JSON or shown to the user.
+    assert "async function readJson(response,path)" in dashboard
+    assert "const data=await readJson(response,'/api/skills');" in dashboard
+    # Installing or removing a music package shows or hides the entry without a
+    # reload: the shell exposes the re-check and the skills loader calls it.
+    assert "renderSkills();renderSkillSettings();if(window.refreshMusicNav)window.refreshMusicNav();" in dashboard
+
+    with open(os.path.join(console.CORE_DIR, "static", "music-page.js"), encoding="utf-8") as handle:
+        shell = handle.read()
+    assert "window.refreshMusicNav = refreshMusicNav;" in shell
+    assert "setMusicNav(Boolean(capabilities.page && capabilities.provider));" in shell
+    assert "setMusicNav(true);" in shell
+    assert "setMusicNav(false);" in shell
+
+
+def test_music_shell_polls_fast_and_the_page_layout_is_css_only():
+    """The music page must feel instant and adapt to the screen without JS.
+
+    Reads share one in-flight request, the poll speeds up while the speaker is
+    playing, backs off when idle, stops while another page or hidden tab is in
+    front, refreshes the moment the page is opened or the tab returns, and every
+    read accepts fetch options so a page can abort a superseded search. The shell
+    stylesheet carries the responsive breakpoints for the page it wraps.
+    """
+    import os
+
+    with open(os.path.join(console.CORE_DIR, "static", "music-page.js"), encoding="utf-8") as handle:
+        shell = handle.read()
+    assert "const POLL_PLAYING_MS = 1500;" in shell
+    assert "const POLL_IDLE_MS = 5000;" in shell
+    assert "let snapshotInFlight = null;" in shell
+    assert "if (snapshotInFlight) return snapshotInFlight;" in shell
+    assert "function musicViewVisible()" in shell
+    assert "NixMusic.refresh = function refresh()" in shell
+    assert "function showMusic(force)" in shell
+    assert "if (state.mounted) NixMusic.refresh().catch(() => {});" in shell
+    assert "function get(path, options) { return request(path, options); }" in shell
+    assert "search: (query, limit, options) =>" in shell
+    # Polling is a self-rescheduling timeout with a visibility gate, not a fixed
+    # interval that keeps hitting the speaker from a background tab.
+    assert "state.pollTimer = setInterval" not in shell
+    assert "state.pollTimer = setTimeout(" in shell
+    assert "if (!document.hidden && musicViewVisible()) NixMusic.refresh().catch(() => {});" in shell
+    # A URL-handoff player declares play_url, not a bare `play` control, and the
+    # console never calls it as one: the header must not read as a broken player.
+    assert "function playerStateLabel(capabilities)" in shell
+    assert '!commands[name] && name !== "play"' in shell
+    assert "This speaker skill declares no player control" in shell
+    assert "No speaker skill is installed; OpenDeck can still serve a stream" in shell
+
+    with open(os.path.join(console.CORE_DIR, "static", "music-page.css"), encoding="utf-8") as handle:
+        styles = handle.read()
+    assert "@media(max-width:1080px)" in styles
+    assert "@media(max-width:760px)" in styles
+    assert "@media(max-width:520px)" in styles
+    assert "aspect-ratio:1/1" in styles
+    assert ".music-app .music-list{max-height:none;overflow-y:visible}" in styles
+    assert ".music-heading-actions{width:100%;justify-content:space-between}" in styles
+
+    with open(console.DASHBOARD_PATH, encoding="utf-8") as handle:
+        dashboard = handle.read()
+    # Opening the Music page refreshes the snapshot instead of waiting for a tick.
+    assert "if(page==='music')showMusic()}" in dashboard
