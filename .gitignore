@@ -176,3 +176,9 @@ Thumbs.db
 # Local hardware/vendor installers
 *.run
 nix_core/ring_light_package/
+
+# Sibling open-source projects checked out next to PUCA (own repositories)
+/opendeck/
+
+# Local NIX skill packages under development (own repositories)
+/opendeck-skill/

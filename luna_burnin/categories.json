@@ -1,0 +1,566 @@
+[
+  {
+    "kind": "send",
+    "category": "chat_greetings",
+    "id": "c01",
+    "text": "hey luna, good morning! just waking up",
+    "post_delay": 3
+  },
+  {
+    "kind": "send",
+    "category": "chat_greetings",
+    "id": "c02",
+    "text": "hi luna :)"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n01",
+    "text": "hmm okay, so uhh, yeah whatever"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n02",
+    "text": "lol okay cool"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n03",
+    "text": "wait that's not what I asked"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n04",
+    "text": "ok so anyway, never mind that, tell me a fun fact"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n05",
+    "text": "oh really? no way"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler",
+    "id": "n06",
+    "text": "fine whatever luna, do your thing"
+  },
+  {
+    "kind": "classify",
+    "category": "routing_probe",
+    "id": "r01",
+    "text": "remember that my sister Emma visits next Tuesday for dinner",
+    "expect_classify": "knowledge",
+    "max_classify_ms": 3000
+  },
+  {
+    "kind": "classify",
+    "category": "routing_probe",
+    "id": "r02",
+    "text": "what do I have tomorrow?",
+    "expect_classify": "knowledge",
+    "max_classify_ms": 3000
+  },
+  {
+    "kind": "classify",
+    "category": "routing_probe",
+    "id": "r03",
+    "text": "you there Luna?",
+    "expect_classify": "chat"
+  },
+  {
+    "kind": "classify",
+    "category": "routing_probe",
+    "id": "r04",
+    "text": "huh?",
+    "expect_classify": "chat"
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m01",
+    "text": "my friend Priya just got a new puppy named Biscuit",
+    "expect_any": [
+      "priya",
+      "biscuit",
+      "puppy"
+    ]
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m02",
+    "text": "what's my friend's new dog's name?",
+    "expect_any": [
+      "biscuit"
+    ]
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m03",
+    "text": "remember that I prefer tea over coffee in the mornings"
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m04",
+    "text": "do I like tea or coffee better?",
+    "expect_any": [
+      "tea"
+    ]
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m05",
+    "text": "also note: my car's tires were replaced last week"
+  },
+  {
+    "kind": "memory",
+    "category": "memory_multi_topic",
+    "id": "m06",
+    "text": "when did I change the tires?",
+    "expect_any": [
+      "tire",
+      "last week",
+      "car"
+    ]
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_people",
+    "id": "s01",
+    "text": "remind me to call Marcus tomorrow at 4pm about the garage",
+    "expect_absolute_datetime": true,
+    "expect_word": "Marcus"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_people",
+    "id": "s02",
+    "text": "schedule dinner with my sister Emma next Tuesday for 7pm",
+    "expect_absolute_datetime": true,
+    "expect_word": "Emma"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_people",
+    "id": "s03",
+    "text": "remind me tomorrow morning to take out the recycling"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_people",
+    "id": "s04",
+    "text": "what do I have this week?"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_people",
+    "id": "s05",
+    "text": "am I free Friday afternoon?"
+  },
+  {
+    "kind": "send",
+    "category": "identity_role",
+    "id": "i01",
+    "text": "who built you? what are you exactly?",
+    "expect_not_contains_word": "openai"
+  },
+  {
+    "kind": "send",
+    "category": "identity_role",
+    "id": "i02",
+    "text": "what model are you? don't make anything up"
+  },
+  {
+    "kind": "send",
+    "category": "identity_role",
+    "id": "i03",
+    "text": "are you the same as Casper? who's the PUCA?"
+  },
+  {
+    "kind": "send",
+    "category": "identity_role",
+    "id": "i04",
+    "text": "created and built by sai neela - who's that again?"
+  },
+  {
+    "kind": "send",
+    "category": "multitask_roles",
+    "id": "mt01",
+    "text": "luna, be my study partner: whatever I say next, quiz me on organic chemistry"
+  },
+  {
+    "kind": "send",
+    "category": "multitask_roles",
+    "id": "mt02",
+    "text": "okay actually switch: pretend you are a sarcastic chef critiquing my pancake recipe. keep it appropriate."
+  },
+  {
+    "kind": "mt",
+    "category": "multitask_chain",
+    "id": "mtc01",
+    "seq": [
+      "let's roleplay: you are the barista at Blue Bottle, I'm ordering",
+      "okay I'd like an iced oat milk latte",
+      "thanks! now step out of the roleplay"
+    ]
+  },
+  {
+    "kind": "skills",
+    "category": "skills_probe",
+    "id": "sk01"
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se01",
+    "text": "turn the ring light blue",
+    "expect_confirmed": true,
+    "expect_plan_calls": 1
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se02",
+    "text": "rainbow effect on the ring light please, then turn it off after a second"
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se03",
+    "text": "open the garage door to 55%"
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se04",
+    "text": "turn on bedroom light!"
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se05",
+    "text": "mute the speaker"
+  },
+  {
+    "kind": "planner",
+    "category": "skill_execution",
+    "id": "se06",
+    "text": "unmute the speaker"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_01",
+    "text": "okay wait, hold on, so like... um, yeah"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_02",
+    "text": "actually no wait, scratch that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_03",
+    "text": "lol what"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_04",
+    "text": "but like, why though"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_05",
+    "text": "ok so no, I mean yes- wait, whatever"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_06",
+    "text": "huh, funny, okay then"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_07",
+    "text": "let me think... nope, never mind"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set1",
+    "id": "nf1_08",
+    "text": "okay you know what, forget I said that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_01",
+    "text": "okay wait, hold on, so like... um, yeah"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_02",
+    "text": "actually no wait, scratch that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_03",
+    "text": "lol what"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_04",
+    "text": "but like, why though"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_05",
+    "text": "ok so no, I mean yes- wait, whatever"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_06",
+    "text": "huh, funny, okay then"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_07",
+    "text": "let me think... nope, never mind"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set2",
+    "id": "nf2_08",
+    "text": "okay you know what, forget I said that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_01",
+    "text": "okay wait, hold on, so like... um, yeah"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_02",
+    "text": "actually no wait, scratch that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_03",
+    "text": "lol what"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_04",
+    "text": "but like, why though"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_05",
+    "text": "ok so no, I mean yes- wait, whatever"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_06",
+    "text": "huh, funny, okay then"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_07",
+    "text": "let me think... nope, never mind"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set3",
+    "id": "nf3_08",
+    "text": "okay you know what, forget I said that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_01",
+    "text": "okay wait, hold on, so like... um, yeah"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_02",
+    "text": "actually no wait, scratch that"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_03",
+    "text": "lol what"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_04",
+    "text": "but like, why though"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_05",
+    "text": "ok so no, I mean yes- wait, whatever"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_06",
+    "text": "huh, funny, okay then"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_07",
+    "text": "let me think... nope, never mind"
+  },
+  {
+    "kind": "send",
+    "category": "natural_filler_set4",
+    "id": "nf4_08",
+    "text": "okay you know what, forget I said that"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv01",
+    "text": "hey you"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv02",
+    "text": "good evening luna!"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv03",
+    "text": "what's new?"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv04",
+    "text": "tell me something silly"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv05",
+    "text": "how was your day?"
+  },
+  {
+    "kind": "send",
+    "category": "chat_variants",
+    "id": "cv06",
+    "text": "just vibing tbh"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr01",
+    "text": "remind me Thursday at 3pm to text Alex about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr02",
+    "text": "remind me Thursday at 3pm to text Priya about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr03",
+    "text": "remind me Thursday at 3pm to text Marcus about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr04",
+    "text": "remind me Thursday at 3pm to text Emma about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr05",
+    "text": "remind me Thursday at 3pm to text Dana about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr06",
+    "text": "remind me Thursday at 3pm to text Jordan about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr07",
+    "text": "remind me Thursday at 3pm to text Cara about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr08",
+    "text": "remind me Thursday at 3pm to text Leo about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr09",
+    "text": "remind me Thursday at 3pm to text Nina about the weekend"
+  },
+  {
+    "kind": "schedule",
+    "category": "schedule_rotator",
+    "id": "sr10",
+    "text": "remind me Thursday at 3pm to text Omar about the weekend"
+  },
+  {
+    "kind": "mt",
+    "category": "multitask_chain_v2",
+    "id": "mtc02",
+    "seq": [
+      "you're a dinner sous chef tonight. ready?",
+      "start with the pasta idea",
+      "ok stop, back to normal"
+    ],
+    "forbidden": []
+  },
+  {
+    "kind": "mt",
+    "category": "multitask_chain_v3",
+    "id": "mtc03",
+    "seq": [
+      "quiz me: question 1 please",
+      "next one",
+      "last question, then we're done"
+    ]
+  }
+]

@@ -57,7 +57,7 @@ Every path in `files` is relative to the skill folder (or the ZIP root). NIX ins
 
 Write the description for a person who has never seen the package: what it does, when it is useful, and its main limitation. Add a `README.md` with setup steps and examples. Use clear, ordinary language. Explain what inputs the skill expects and what a successful result looks like.
 
-A static package can provide information and instructions, but that alone does **not** make NIX execute it or call an external service. To describe an executable skill for the supported NIX worker, the manifest needs `runtime`, `setup_fields`, `tools`, and `triggers`. The runtime protocol is `nix-skill-jsonl-v1`; every tool needs a bounded JSON `input_schema` and `result_schema`. See [`skills/ring-light/skill.json`](skills/ring-light/skill.json) for a complete example. A manifest declaration is not an approval: NIX still requires package setup and the user to review and trust that exact package digest before it can run.
+A static package can provide information and instructions, but that alone does **not** make NIX execute it or call an external service. To describe an executable skill for the supported NIX worker, the manifest needs `runtime`, `setup_fields`, `tools`, and `triggers`. The runtime protocol is `nix-skill-jsonl-v1`; every tool needs a bounded JSON `input_schema` and `result_schema`. The published [Echo Connect skill](https://github.com/saineela/echo-connect-skill) is a complete example (`skills/echo-connect/skill.json`). A manifest declaration is not an approval: NIX still requires package setup and the user to review and trust that exact package digest before it can run.
 
 ## 4. Publish or upload
 
@@ -86,4 +86,4 @@ Marketplace size limits: 24 skills per GitHub repository, 25 files per skill, 64
 
 ## Example package
 
-The [`skills/ring-light/`](skills/ring-light/) folder demonstrates a worker-enabled manifest, explicit permissions, setup fields, tool input/result schemas, trigger phrases, and a plain-language README. It controls real hardware only after a user supplies device configuration and explicitly reviews and trusts the installed package.
+The [Echo Connect skill](https://github.com/saineela/echo-connect-skill) (`skills/echo-connect/`) demonstrates a worker-enabled manifest, explicit permissions, setup fields, tool input/result schemas, trigger phrases, and a plain-language README. It controls real hardware only after a user supplies device configuration and explicitly reviews and trusts the installed package.
