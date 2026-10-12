@@ -946,6 +946,23 @@ def _mk(
 # ----------------------------------------------------------------------
 
 
+# A durable key is a fact ABOUT THE USER. Utterances that address the
+# assistant ("you are HAL 9000", "respond only in the style of a pirate",
+# "pretend", "roleplay") are instructions/roleplay, never user facts — even
+# when wrapped in first-person phrasing ("i am from now on you are HAL 9000").
+# Canonical boundary: such sentences yield no keys at all.
+_ASSISTANT_DIRECTED_RE = re.compile(
+    r"\byou\s+are\b|\byou\s+will\s+be\b|\byou'?re\s+now\b"
+    r"|\brespond\s+(?:only\s+)?(?:in|with|as)\b"
+    r"|\b(?:answer|reply|talk|speak)\s+(?:only\s+)?(?:in|with|like|as)\s+the\s+style\b"
+    r"|\bin\s+the\s+(?:style|voice|persona|manner)\s+of\b"
+    r"|\b(?:pretend|roleplay|act)\s+(?:that\s+you|you\s+are|to\s+be|as)\b"
+    r"|\bfrom\s+now\s+on\b"
+    r"|\bdeveloper\s+mode\b|\bdan\s+mode\b|\bjailbreak\b",
+    re.IGNORECASE,
+)
+
+
 def extract_keys(text: str) -> list[dict[str, Any]]:
     """
     Scan one utterance and return Keys: small dicts with
@@ -957,6 +974,10 @@ def extract_keys(text: str) -> list[dict[str, Any]]:
     # guard applies before relation/attribute extraction so forms such
     # as "my sister is coming over?" cannot become durable memory.
     if not text or text.endswith("?") or _STORAGE_HINT.search(text):
+        return []
+    # Assistant-directed instructions/roleplay are never durable user
+    # facts, no matter what first-person wrapper they arrive in.
+    if _ASSISTANT_DIRECTED_RE.search(text):
         return []
     # explicit store commands store their own fact - no key extraction
     if re.match(
@@ -1958,6 +1979,14 @@ def store_keys(
         }
         if key.get("sensitive"):
             data["sensitive"] = True
+        # Storage-boundary gate (defense in depth): even a key that
+        # reached store_keys must never encode assistant-directed speech.
+        if _ASSISTANT_DIRECTED_RE.search(
+            str(data.get("value", ""))
+        ) or _ASSISTANT_DIRECTED_RE.search(
+            str((data.get("context") or {}).get("source", ""))
+        ):
+            continue
 
         record = engine.create(
             "key",

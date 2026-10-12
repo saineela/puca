@@ -40,6 +40,20 @@ except ImportError:  # nix_actions is an optional sibling package
 # Calendar-domain guard
 # ---------------------------------------------------------------------------
 
+def _event_cancel_label(event: dict[str, Any]) -> str:
+    """Stable disambiguation label for a stored calendar event.
+
+    Used both to render cancellation candidates and to re-resolve the
+    user's chosen candidate back to exactly one record: identical titles
+    are distinguished by their scheduled time.
+    """
+    title = str(event.get("title") or "an unnamed event")
+    start = str(event.get("start") or "")
+    if start:
+        return f"{title} ({start[:16].replace('T', ' ')})"
+    return title
+
+
 _CALENDAR_DOMAIN_RE = re.compile(
     r"\b("
     r"event|events|meeting|appointment|appointments|schedule|scheduled|"
@@ -998,6 +1012,26 @@ class KnowledgeNeedle:
         if not events:
             all_events = find_calendar_events(self.engine).get("events", [])
 
+            # Clarification continuations repeat a labeled candidate
+            # ("piano lesson (2026-10-12 16:00)"). Match that label
+            # exactly before fuzzy matching so the user's choice pins
+            # one specific record.
+            labeled_target = str(title or "").strip().lower()
+            if labeled_target:
+                labeled_hits = [
+                    event
+                    for event in all_events
+                    if event.get("status", "scheduled") != "cancelled"
+                    and labeled_target
+                    == _event_cancel_label(event).strip().lower()
+                ]
+                if len(labeled_hits) == 1:
+                    return {
+                        "ok": True,
+                        "status": "found",
+                        "event": labeled_hits[0],
+                    }
+
             def normalized_words(value: str) -> list[str]:
                 value = str(value or "").lower()
                 value = re.sub(r"\b(?:reminder|remind|alert|notification|for|about|my|the|a|an)\b", " ", value)
@@ -1183,10 +1217,46 @@ class KnowledgeNeedle:
         )
 
         if not lookup["ok"]:
+            events = lookup.get("events") or []
+            if lookup.get("status") == "ambiguous" and len(events) > 1:
+                # More than one stored event matches: asking which one
+                # is safer than guessing. Core re-runs the completed
+                # imperative ("cancel my <chosen title>") after the
+                # answer, via continuation_template. Identical titles
+                # get a time label so the question is answerable.
+                raw_titles = [
+                    str(event.get("title") or "an unnamed event")
+                    for event in events
+                ]
+                if len(set(raw_titles)) < len(raw_titles):
+                    labeled = [_event_cancel_label(event) for event in events]
+                else:
+                    labeled = raw_titles
+                return {
+                    "ok": False,
+                    "operation": "NEEDS_CLARIFICATION",
+                    "record_type": "calendar_event",
+                    "status": "ambiguous_cancel",
+                    "candidates": labeled,
+                    "question": (
+                        "Which one should I cancel: "
+                        + " or ".join(labeled)
+                        + "?"
+                    ),
+                    "continuation_template": "cancel my {selected}",
+                    "lookup": lookup,
+                }
             return {
                 "ok": False,
                 "operation": "CANCEL",
+                "status": "not_found",
                 "lookup": lookup,
+                "question": (
+                    f"I couldn't find a stored event like '{title}'. "
+                    "If it was never saved here, there is nothing to "
+                    "cancel; otherwise tell me its exact name and I'll "
+                    "cancel it."
+                ),
             }
 
         event = lookup["event"]
@@ -1474,6 +1544,26 @@ The pattern for every response is:
                     '{"name": "create_fact", '
                     '"arguments": {"value": '
                     '"I hate robotics, but love programming"}}\n'
+                    '</tool_call>'
+                ),
+            },
+            # Possessive statements about people are durable facts, not
+            # calendar lookups (the selector used to misroute these to
+            # find_calendar_events). Parallel example on purpose: teach
+            # the pattern, never a specific evaluation prompt.
+            {
+                "role": "user",
+                "content": (
+                    "my mom makes the best lasagna"
+                ),
+            },
+            {
+                "role": "assistant",
+                "content": (
+                    '<tool_call>\n'
+                    '{"name": "create_fact", '
+                    '"arguments": {"value": '
+                    '"my mom makes the best lasagna"}}\n'
                     '</tool_call>'
                 ),
             },
@@ -1930,6 +2020,18 @@ The pattern for every response is:
         the response under result["keys_found"] - even when the
         routed operation itself fails or finds nothing.
         """
+        # ---- -1. spell-correction preprocessing: fix ASR typos BEFORE
+        # anything downstream sees them -- the deterministic route()
+        # rules, the injection guard, key extraction, and the selector
+        # model all work on the same corrected transcript. Conservative
+        # by design: clean text passes through byte-identical.
+        try:
+            from .spelling import correct_spelling
+
+            user_request = correct_spelling(user_request)
+        except Exception:  # noqa: BLE001 - spell layer must never break replies
+            pass
+
         # ---- 0. injection guard (defense in depth): never store,
         # never read, never route injection text. nix_core/router.py
         # normally filters these before they get here; this mirrors it

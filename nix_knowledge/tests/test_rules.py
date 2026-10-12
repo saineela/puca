@@ -362,3 +362,102 @@ def test_empty_request_is_deferred(resolver):
 
 def test_gibberish_is_deferred_to_model(resolver):
     assert route("the sky is quite blue today", resolver) is None
+
+
+# ---------------------------------------------------------------------
+# Past-tense cancellation news -> cancel_calendar_event
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "my robotics practice has been cancelled",
+        "my robotics practice is cancelled",
+        "robotics practice got cancelled",
+        "my tsa meeting was called off",
+        "i cancelled my robotics practice",
+        "i just deleted my dentist appointment",
+    ],
+)
+def test_cancel_news_routes_to_cancel(resolver, text):
+    routed = route(text, resolver)
+    assert routed is not None, text
+    name, arguments = routed
+    assert name == "cancel_calendar_event", text
+    assert arguments["title"], text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "was my robotics practice cancelled?",
+        "is my appointment cancelled",
+        "my alarm code is 2009",
+        "my sister is sick",
+        "my day was great",
+    ],
+)
+def test_non_cancel_possessives_unaffected(resolver, text):
+    routed = route(text, resolver)
+    if routed is not None:
+        name, _arguments = routed
+        assert name != "cancel_calendar_event", text
+
+
+# ---------------------------------------------------------------------
+# Postponement news -> update_calendar_event ("my piano recital is
+# postponed to december 5th" moves the stored event, it does not
+# create a duplicate one)
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_title"),
+    [
+        ("my piano recital is postponed to december 5th",
+         "piano recital"),
+        ("my saturday class got moved to sunday", "saturday class"),
+        ("my meeting was pushed to 4pm", "meeting"),
+        ("my tutoring got rescheduled to friday at 6",
+         "tutoring"),
+    ],
+)
+def test_postponement_news_routes_to_update(resolver, text, expected_title):
+    routed = route(text, resolver)
+    assert routed is not None, text
+    name, arguments = routed
+    assert name == "update_calendar_event", text
+    assert arguments["title"] == expected_title, text
+    assert arguments.get("new_temporal_expression"), text
+
+
+# ---------------------------------------------------------------------
+# Membership / quantity statements -> create_fact. These were the
+# phase-2 selector misroutes before the deterministic rules landed
+# ("i am in the robotics club at school" used to become
+# find_calendar_events).
+# ---------------------------------------------------------------------
+
+
+def test_membership_statement_routes_to_fact(resolver):
+    routed = route("i am in the robotics club at school", resolver)
+    assert routed is not None
+    name, arguments = routed
+    assert name == "create_fact"
+    assert "robotics club" in arguments["value"]
+
+
+@pytest.mark.parametrize(
+    ("text", "fragment"),
+    [
+        ("i have two siblings", "two siblings"),
+        ("i have two sisters and one brother", "two sisters"),
+    ],
+)
+def test_quantity_possession_routes_to_fact(resolver, text, fragment):
+    routed = route(text, resolver)
+    assert routed is not None, text
+    name, arguments = routed
+    assert name == "create_fact", text
+    assert fragment in arguments["value"], text

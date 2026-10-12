@@ -16,6 +16,8 @@ matches - the caller then falls back to the model.
 import re
 from typing import Any
 
+from nix_knowledge.spelling import correct_spelling
+
 
 # ----------------------------------------------------------------------
 # Temporal suffix / prefix resolution
@@ -215,7 +217,7 @@ _CALENDAR_WINDOWED = re.compile(
     r"what(?:'s| is| do i have)(?: on)? (?:my|the)?\s*(?:calendar|schedule|events)"
     r"|what events do i have"
     r"|what do i have"
-    r"|show (?:me|my) (?:calendar|schedule|events)"
+    r"|show (?:me\s+)?(?:my\s+|the\s+)?(?:calendar|schedule|events)"
     r")"
     rf"\s+(?:for\s+|on\s+|in\s+)?(?P<window>{_WINDOW_ALT})"
     r"\s*\??$",
@@ -283,15 +285,68 @@ _CANCEL = re.compile(
     re.IGNORECASE,
 )
 
+# Past-tense cancellation NEWS: "my robotics practice has been cancelled",
+# "robotics practice got cancelled", "my dentist appointment was called
+# off". The user reports a cancellation that already happened elsewhere;
+# pragmatically they are asking Nix to drop the stored event and its
+# reminder, so this routes to cancel_calendar_event exactly like an
+# imperative "cancel my ...". Interrogatives ("was my appointment
+# cancelled?") do not match: the auxiliary starts the sentence there, so
+# no (auxiliary, cancelled) pair follows a title.
+_CANCELLED_STATEMENT = re.compile(
+    r"^(?:my\s+|our\s+|the\s+)?"
+    r"(?P<title>[a-z][\w'\- ]{1,60}?)"
+    r"\s+(?:has\s+been|have\s+been|was|got|is|are|were)\s+"
+    r"(?:cancell?ed|called\s+off)"
+    r"(?:\s+.*)?$",
+    re.IGNORECASE,
+)
+
+# First-person past-tense disposal: "i cancelled my robotics practice",
+# "i deleted my dentist appointment". Treated as a cancel request for
+# the stored event.
+_I_CANCELLED = re.compile(
+    r"^i\s+(?:just\s+)?(?:cancell?ed|deleted|removed|scrapped)\s+"
+    r"(?:my\s+|our\s+|the\s+)?(?P<title>[\w'\- ].{1,60}?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+# Postponement/move news about an existing event: "my piano recital is
+# postponed to december 5th", "my saturday class got moved to sunday",
+# "my meeting was pushed to 4pm".
+_POSTPONED_STATEMENT = re.compile(
+    r"^(?:my\s+|our\s+|the\s+)?"
+    r"(?P<title>[a-z][\w'\- ]{1,60}?)"
+    r"\s+(?:has\s+been|have\s+been|was|got|is|are|were)\s+"
+    r"(?:postponed|moved|rescheduled|pushed\s+back|pushed|bumped|shifted)\s+"
+    r"(?:to|until|till)\s+"
+    r"(?P<expr>[\w\- :/]+?)"
+    r"(?:\s+.*)?$",
+    re.IGNORECASE,
+)
+
+# Auxiliaries at the start of a sentence signal a question, not a
+# cancellation statement ("is my robotics practice cancelled?").
+_QUESTION_OPENER_RE = re.compile(
+    r"^(?:is|are|was|were|has|have|did|do|does|what|when|where|why|who|how)\b",
+    re.IGNORECASE,
+)
+
 _MOVE = re.compile(
     r"^(?:move|reschedule|change|push)\s+(?:my|the|a|an)?\s*(?P<title>.+?)\s+to\s+(?P<expr>.+?)\s*\.?$",
     re.IGNORECASE,
 )
 
 _CREATE = re.compile(
-    r"^(?:i have|i've got|i got|schedule|add|create)(?:\s+(?:a|an|my))?\s+(?P<rest>.+?)\s*\.?$",
+    r"^(?:i have|i've got|i got|we have|we've got|schedule|add|create)(?:\s+(?:a|an|my|our))?\s+(?P<rest>.+?)\s*\.?$",
     re.IGNORECASE,
 )
+
+# Open-ended ASR/speech-to-text misspellings are handled by the
+# general spell-correction preprocessing layer (nix_knowledge.spelling)
+# instead of a hand-maintained typo map: the typo space is effectively
+# infinite, but unknown words with a confident dictionary candidate
+# within edit distance are corrected cheaply and deterministically.
 
 
 # ----------------------------------------------------------------------
@@ -560,6 +615,9 @@ def route(
     # Common speech-to-text spelling; keep the symbolic calendar rules
     # deterministic instead of delegating a simple window to the selector.
     lowered = re.sub(r"\bcalender\b", "calendar", lowered)
+    # General spell correction (pyspellchecker edit-distance layer);
+    # replaces the former manual typo map. Healthy text is unchanged.
+    lowered = correct_spelling(lowered)
 
     # Spoken address ("nix remember my ...", "nic what was my ...").
     address_match = _ADDRESS_RE.match(lowered)
@@ -638,6 +696,18 @@ def route(
         if intro_keys:
             return "store_profile_keys", {"keys": intro_keys}
 
+    # ---- "who is sick at home" / "who is stressed" asks about
+    # current STATES, not a person recall - route to the state finder
+    # before the generic who-is rule.
+    match = _WHO_IS.match(lowered)
+    if match:
+        name = match.group("name").strip()
+        from .states import STATE_VOCAB
+
+        first_word = name.split()[0].lower() if name else ""
+        if first_word and (first_word in STATE_VOCAB or name.lower() in STATE_VOCAB):
+            return "find_states", {"query": name}
+
     # ---- "who is Maanvi" - person recall. Must run BEFORE the
     # what/who world-question fallthrough.
     match = _WHO_IS.match(lowered)
@@ -671,6 +741,67 @@ def route(
         match.group(1),
     ):
         return "find_states", {"query": match.group(1).strip()}
+
+    # ---- past-tense cancellation news ("my robotics practice has
+    # been cancelled") must run BEFORE the fact/state rules: it is an
+    # event mutation, not a fact to remember. Questions ("was my
+    # appointment cancelled?") fall through to the lookup rules.
+    if not _QUESTION_OPENER_RE.match(lowered):
+        cancelled = _CANCELLED_STATEMENT.match(lowered)
+        if cancelled:
+            title = cancelled.group("title").strip()
+            if title and len(title.split()) >= 1 and title.lower() not in (
+                "it", "that", "this", "everything", "all",
+            ):
+                return "cancel_calendar_event", {"title": title}
+        i_cancelled = _I_CANCELLED.match(lowered)
+        if i_cancelled:
+            title = i_cancelled.group("title").strip()
+            if title:
+                return "cancel_calendar_event", {"title": title}
+
+        # Postponement/move news: "my piano recital is postponed to
+        # december 5th", "my saturday class got moved to sunday". Like
+        # cancellation news this is a mutation of an EXISTING event,
+        # never a new fact.
+        moved = _POSTPONED_STATEMENT.match(lowered)
+        if moved:
+            title = moved.group("title").strip()
+            expression = moved.group("expr").strip()
+            # Bare clock targets ("pushed to 4pm") lack the "at" anchor
+            # the temporal resolver needs; same-day move is the natural
+            # reading, so anchor them.
+            if (
+                title
+                and expression
+                and resolver.resolve(expression) is None
+                and re.fullmatch(
+                    r"\d{1,2}(?::\d{2})?\s*(?:am|pm)",
+                    expression,
+                    re.IGNORECASE,
+                )
+            ):
+                expression = f"at {expression}"
+            if title and expression and resolver.resolve(expression) is not None:
+                return (
+                    "update_calendar_event",
+                    {
+                        "title": title,
+                        "new_temporal_expression": expression,
+                    },
+                )
+
+    # ---- membership statements: "i am in the robotics club",
+    # "i'm in TSA". Durable facts about the user; must come before the
+    # generic fact rule so the selector never guesses a calendar call.
+    match = re.match(
+        r"^(?:i\s+am|i'm|im|we\s+are)\s+in\s+(?:the\s+|a\s+|an\s+)?(?P<value>.+)$",
+        lowered,
+    )
+    if match and not lowered.endswith("?"):
+        value = match.group("value").strip()
+        if value and not resolver.resolve(value):
+            return "create_fact", {"value": text.strip()}
 
     # ---- store fact
     match = _FACT.match(lowered)
@@ -813,6 +944,24 @@ def route(
                     },
                 )
 
+            # Leading-time reminders: "remind me on 11/15 to file the
+            # fafsa", "remind me in 2 hours to check the oven",
+            # "remind me tomorrow at 7 to call grandma". The time comes
+            # FIRST; the task phrase is what remains.
+            prefix_split = extract_temporal_prefix(rest, resolver)
+            if prefix_split is not None:
+                expression, remainder = prefix_split
+                title = re.sub(r"^(?:to|about|that)\s+", "", remainder, flags=re.IGNORECASE).strip()
+                if title and resolver.resolve(expression) is not None:
+                    title = _preserve_title_acronyms(title, text)
+                    return (
+                        "create_calendar_event",
+                        {
+                            "title": title,
+                            "temporal_expression": expression,
+                        },
+                    )
+
             return None
 
     # ---- event lookup by title
@@ -841,6 +990,16 @@ def route(
                         "temporal_expression": expression,
                     },
                 )
+
+        # Quantity possession with no time ("i have two siblings",
+        # "i have 3 cats"): a durable count fact, not an event.
+        quantity = re.match(
+            r"^(?:\d+|two|three|four|five|six|seven|eight|nine|ten)\s+"
+            r"[\w'\-]+(?:\s+[\w'\-]+){0,3}$",
+            rest,
+        )
+        if quantity and resolver.resolve(rest) is None:
+            return "create_fact", {"value": text.strip()}
 
     # ---- create with a leading temporal clause:
     # "this weekend i have pizza party with friends",

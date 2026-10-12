@@ -290,6 +290,17 @@ class TemporalResolver:
             text,
         )
         text = re.sub(r"\baround\s+(?=\d|noon|midnight)", "at ", text)
+        # Spoken clock connector: "dinner next Tuesday FOR 7pm",
+        # "appointment FOR 3:30". "for" before a clock always means the
+        # time in scheduling speech; the grammar only knows "at <clock>".
+        # Normalizing here (single boundary) lets every caller - rules,
+        # event intent, the hybrid gate - accept the wording unchanged.
+        text = re.sub(
+            r"\bfor\s+(?=(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight)\b)",
+            "at ",
+            text,
+            flags=re.IGNORECASE,
+        )
         # Normalize spoken day offsets before the strict grammar and before
         # candidate-span extraction, so a title cannot swallow "day after".
         text = re.sub(
@@ -615,6 +626,7 @@ class TemporalResolver:
         # september 12th
         # september 12 2027
         # september 12th at 3pm
+        # october 28th 6:30pm        (spoken time without "at")
         # on september 12th
         # 12 september 2027
         # the 12th of september
@@ -626,7 +638,11 @@ class TemporalResolver:
             rf"(?:\s*,?\s*(\d{{4}}))?"
             rf"|(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({months})\.?"
             rf"(?:\s*,?\s*(\d{{4}}))?)"
-            rf"(?:\s+at\s+(.+))?",
+            # The trailing clock is optional and the "at" preposition with
+            # it: voice phrasing drops it ("October 28th 6:30pm"). A tail
+            # that does not parse as a clock fails the whole match below,
+            # exactly as an unresolvable "at ..." tail already did.
+            rf"(?:\s+(?:at\s+)?(.+))?",
             text,
         )
 
@@ -877,6 +893,138 @@ class TemporalResolver:
                 end=start,
                 all_day=False,
             )
+
+        # --------------------------------------------------------
+        # Clock-first day references (spoken word order):
+        #   6:30am tomorrow
+        #   at 7 tomorrow
+        #   9pm tonight
+        # --------------------------------------------------------
+
+        match = re.fullmatch(
+            rf"(?:at\s+)?(.+?)\s+(today|tomorrow|tmr|yesterday|tonight)",
+            text,
+        )
+
+        if match:
+            clock = self._parse_clock(match.group(1))
+
+            if clock is not None:
+                day_result = self.resolve(
+                    match.group(2),
+                    now,
+                )
+
+                if day_result is not None:
+                    start = day_result.start.replace(
+                        hour=clock.hour,
+                        minute=clock.minute,
+                        second=0,
+                        microsecond=0,
+                    )
+
+                    return TemporalResult(
+                        expression=original,
+                        start=start,
+                        end=start,
+                        all_day=False,
+                    )
+
+        # --------------------------------------------------------
+        # Weekday + bare clock (no "at"): spoken word order
+        #   sunday 10am
+        #   friday 3:30pm
+        #   next monday 7am
+        # --------------------------------------------------------
+
+        match = re.fullmatch(
+            rf"(?:(on|this(?:\s+week)?|next(?:\s+week)?)\s+)?"
+            rf"({wd})\s+(?P<clock>\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm)?"
+            rf"|\d{{1,2}}:\d{{2}})",
+            text,
+        )
+
+        if match:
+            clock = self._parse_clock(match.group("clock"))
+
+            if clock is not None:
+                qualifier = match.group(1)
+                weekday = self.WEEKDAYS[match.group(2)]
+
+                target = self._weekday_target(
+                    qualifier if qualifier != "on" else None,
+                    weekday,
+                    now,
+                )
+
+                start = datetime.combine(
+                    target,
+                    clock,
+                    tzinfo=self.timezone,
+                )
+
+                return TemporalResult(
+                    expression=original,
+                    start=start,
+                    end=start,
+                    all_day=False,
+                )
+
+        # --------------------------------------------------------
+        # Day reference + day part (no clock):
+        #   tomorrow morning           (already above)
+        #   next friday evening
+        #   this sunday afternoon
+        #   saturday morning
+        # --------------------------------------------------------
+
+        match = re.fullmatch(
+            rf"(?:(next|this|on)\s+)?"
+            rf"({wd}|today|tomorrow|tmr|yesterday)\s+"
+            r"(morning|afternoon|evening|tonight)",
+            text,
+        )
+
+        if match:
+            qualifier = match.group(1)
+            day_expression = match.group(2)
+            period = match.group(3)
+
+            day_result = self.resolve(
+                f"{qualifier} {day_expression}" if qualifier else day_expression,
+                now,
+            )
+
+            if day_result is not None:
+                period_hours = {
+                    "morning": (6, 12),
+                    "afternoon": (12, 17),
+                    "evening": (17, 22),
+                    "tonight": (18, 23),
+                }
+
+                start_hour, end_hour = period_hours[period]
+
+                start = day_result.start.replace(
+                    hour=start_hour,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
+
+                end = day_result.start.replace(
+                    hour=end_hour,
+                    minute=59,
+                    second=59,
+                    microsecond=999999,
+                )
+
+                return TemporalResult(
+                    expression=original,
+                    start=start,
+                    end=end,
+                    all_day=False,
+                )
 
         # --------------------------------------------------------
         # Weekday + explicit time (with week qualifiers)

@@ -133,6 +133,44 @@ _STATE_WORD_RE = re.compile(
     r"\b(" + "|".join(sorted(STATE_VOCAB, key=len, reverse=True)) + r")\b", re.I
 )
 
+# Presence family (whereabouts: "my dad is back from his trip", "my mom
+# is out of town"). The bare words are deliberately registered in
+# STATE_VOCAB *after* _STATE_WORD_RE is compiled, so they never match
+# as standalone state words: "back" and "away" are ordinary adverbs
+# ("give the book back", "my dad's back is sore") and must only read
+# as states through the be-verb-anchored phrase patterns below.
+STATE_VOCAB["back"] = ("good", "presence")
+STATE_VOCAB["away"] = ("neutral", "presence")
+
+_PRESENCE_BACK_RE = re.compile(
+    r"\b(?:is|are|was|were|'s|\u2019s)\s+"
+    r"(?:(?:now|already|finally|just|officially)\s+)?"
+    r"back\s+(?:from|home|in\s+town)\b",
+    re.I,
+)
+_PRESENCE_AWAY_RE = re.compile(
+    r"\b(?:is|are|was|were|'s|\u2019s)\s+"
+    r"(?:(?:still|currently|gonna\s+be|going\s+to\s+be)\s+)?"
+    r"(?:away|out\s+of\s+town)\b",
+    re.I,
+)
+
+
+def _match_presence(text: str) -> tuple[str, str, str] | None:
+    """Be-verb-anchored whereabouts detection on the full sentence.
+
+    Like _RECOVERY_RE, this searches the whole utterance rather than
+    the parsed `rest` fragment: the optional name slot in the person
+    patterns can steal tokens such as "back" ("my dad is back from
+    his trip" parses with name="back", rest="from his trip"), so the
+    reliable cue lives in the sentence as a whole.
+    """
+    if _PRESENCE_BACK_RE.search(text):
+        return "back", "good", "presence"
+    if _PRESENCE_AWAY_RE.search(text):
+        return "away", "neutral", "presence"
+    return None
+
 # Common speech-to-text/transcription swaps for relationship words. These
 # are deliberately limited to close-role vocabulary and only normalize the
 # role after "my", so ordinary names and facts are never silently rewritten.
@@ -206,6 +244,11 @@ _NAME_STOPWORDS = {
     "okay", "ok", "sorry", "hmm", "huh", "wow", "yeah", "yes",
     "no", "wait", "look", "listen", "guys", "someone", "somebody",
     "anyone", "anybody", "everyone", "everybody", "people", "person",
+    # whereabouts adverbs/prepositions: the optional name slot in the
+    # person patterns would otherwise swallow them ("my mom is out of
+    # town" -> name="out", "my dad is back from his trip" ->
+    # name="back") and poison the entity registry.
+    "back", "away", "out", "home", "in", "from", "town", "trip",
     # negation/do-family: a sentence-initial "dont ..." ("dont ask me
     # questions like in the start alright") is an instruction to the
     # assistant, never a person's name. Left as a name it became a
@@ -214,6 +257,17 @@ _NAME_STOPWORDS = {
     "do", "does", "did", "dont", "don't", "didnt", "didn't",
     "doesnt", "doesn't", "not", "never", "nope",
     "cant", "can't", "wont", "won't",
+    # command/politeness verbs and fillers: an utterance opener like
+    # "remind me to call my mom" or "please check on my sister" is an
+    # instruction, so its leading verb must never sit in the optional
+    # name slot of the person patterns (state_person_name rejects the
+    # whole candidate so "dont ask"-style multiword junk dies too).
+    "remind", "reminder", "call", "tell", "ask", "text", "say",
+    "please", "thanks", "thank", "welcome", "excuse", "hey",
+    # state verbs: "feels tired" attributes the feeling to a subject,
+    # "feels" is not the subject itself.
+    "feels", "feel", "felt", "feeling", "gets", "got", "getting",
+    "goes", "went", "gone", "going", "acts", "sounds", "looks_like",
 }
 
 
@@ -224,6 +278,71 @@ def _clean_name(candidate: str | None) -> str | None:
     return re.sub(r"'s$", "", candidate).strip() or None
 
 
+def _fuzzy_state_word(token: str) -> str | None:
+    """Map a near-miss state word to its canonical form.
+
+    Typed and ASR-mangled input produces typos the generic spell
+    corrector cannot safely fix ('sik' snaps to 'sit' there, which
+    would erase the illness meaning). Here the candidate is compared
+    ONLY against the small closed state vocabulary.
+
+    Safety rules derived from collision analysis against a full
+    English dictionary (tests/test_hard_person_prompts.py locks the
+    dangerous cases):
+
+    - Substitution-only at distance 1: transpositions/deletions turn
+      real words into state words ('tested'->rested, 'headed'->healed,
+      'butter'->better), so only tokens the same length as the state
+      word with exactly one swapped letter qualify.
+    - Length >= 5: at 4 letters the 1-edit neighborhood is a minefield
+      ('call'->calm, 'wine'->fine, 'kick'->sick); at 5 it is already
+      sparse ('fired'/'hired'->tired are the notable real collisions,
+      which the context sentence must decide).
+    - Single candidate: if two state words are both 1 edit away the
+      token is genuinely ambiguous and is left alone.
+    """
+    if len(token) < 5 or token in STATE_VOCAB:
+        return None
+    best: str | None = None
+    matches = 0
+    for word in STATE_VOCAB:
+        if abs(len(word) - len(token)) > 1:
+            continue
+        distance = _levenshtein(token, word)
+        # same-length 1-edit = one swapped letter ('stresed'->stressed).
+        # +/-1-length 1-edit = one dropped or doubled letter ('tird' is
+        # handled by the >=5 rule; 'exhasted'->exhausted is a doubled
+        # letter and IS accepted, but only for tokens >= 6 where the
+        # neighborhood is sparse).
+        deletions_allowed = len(token) >= 6
+        if distance == 1 and (len(word) == len(token) or deletions_allowed):
+            matches += 1
+            best = word
+            if matches > 1:
+                return None
+    if matches == 1:
+        return best
+    return None
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if abs(len(a) - len(b)) > 1:
+        return 2
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        current = [i]
+        for j, cb in enumerate(b, 1):
+            current.append(min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + (ca != cb),
+            ))
+        previous = current
+    return previous[-1]
+
+
 def state_person_name(candidate: Any) -> str | None:
     """Reject state words and conversational fillers captured as names."""
     if not isinstance(candidate, str):
@@ -232,6 +351,10 @@ def state_person_name(candidate: Any) -> str | None:
     if not name:
         return None
     normalized = name.casefold()
+    # multiword junk ('dont ask', 'remind me') can never be a person:
+    # real names in this pipeline are single tokens.
+    if " " in name.strip():
+        return None
     if normalized in _NAME_STOPWORDS or normalized in STATE_VOCAB:
         return None
     return name
@@ -298,6 +421,14 @@ def _match_state(rest: str) -> tuple[str, str, str] | None:
         word = match.group(1).lower()
         valence, group = STATE_VOCAB[word]
         return word, valence, group
+    # conservative fuzzy pass for near-miss state words ('sik'->sick,
+    # 'tird'->tired): only exact 1-edit matches against the closed
+    # state vocabulary qualify, so ordinary words and names survive.
+    for token in re.findall(r"[a-z']+", rest):
+        canonical = _fuzzy_state_word(token.lower())
+        if canonical is not None:
+            valence, group = STATE_VOCAB[canonical]
+            return canonical, valence, group
     return None
 
 
@@ -315,6 +446,38 @@ def _recover_state(text: str) -> tuple[str, str, str] | None:
         return matched  # explicit positive word wins
     # a negated bad-family word ("isnt sick anymore") is a recovery
     return "better", "good", "well"
+
+
+_MODAL_CONDITIONAL_RE = re.compile(
+    r"\b(?:would|should|could|might|may|must)\b\s+(?:be|have|get|feel|like|love|hate|want)\b|"
+    r"\b(?:would|might)\s+\w+\s+if\b",
+    re.I,
+)
+
+
+def _is_hypothetical(lowered: str) -> bool:
+    """'my mom would be happy if you called' is a hypothetical, not a
+    report of her current state. Modal + be/feel (or an explicit 'if'
+    clause attached to a modal) marks the whole utterance as
+    conditional; storing it would fabricate a present-tense state."""
+    return bool(_MODAL_CONDITIONAL_RE.search(lowered)) or bool(
+        re.search(r"\b(?:would|should|could|might|may)\b.*\bif\b", lowered)
+    )
+
+
+def _first_clause(text: str) -> str:
+    """Cut a multi-person sentence at the clause boundary.
+
+    'my sister is fine but my brother is stressed' must attribute
+    'fine' to the sister, never scrape 'stressed' across the 'but' into
+    her record. The same guard covers 'and', semicolons, and 'while' —
+    each boundary starts a new subject whose state belongs to it alone.
+    """
+    return re.split(
+        r"\b(?:but|however|though|although|while|whereas|meanwhile|and then)\b|;",
+        text,
+        maxsplit=1,
+    )[0].strip()
 
 
 def parse_state_statement(text: str) -> dict[str, Any] | None:
@@ -353,7 +516,18 @@ def parse_state_statement(text: str) -> dict[str, Any] | None:
             candidate, rest = match.groups()
             name = state_person_name(candidate)
 
+    if rest is not None and role is not None or name is not None:
+        # Multi-person sentences: this clause's state ends at the next
+        # subject boundary. Without the cut, "my sister is fine but my
+        # brother is stressed" stores 'stressed' on the sister's record.
+        cut = _first_clause(rest)
+        if cut and cut != rest:
+            rest = cut
+
     if rest is None or (role is None and name is None):
+        return None
+
+    if _is_hypothetical(lowered):
         return None
 
     # explicit state word first; negation/recovery cues in the full
@@ -366,8 +540,31 @@ def parse_state_statement(text: str) -> dict[str, Any] | None:
         and _RECOVERY_RE.search(lowered)
     ):
         parsed = ("better", "good", "well")
+    elif (
+        parsed
+        and re.search(rf"\b(?:is|was|are|were|'s|\u2019s)?\s*not\s+{re.escape(parsed[0])}\b", lowered)
+    ):
+        # direct predicate negation ("my brother is not stressed",
+        # "my sister is not happy"): the matched word is explicitly
+        # denied for THIS person, so the opposite side is recorded
+        # instead of the denied word. The _RECOVERY_RE branch above
+        # cannot catch plain 'not X' (no anymore/no-longer cue), and
+        # without this the negated word was stored as if affirmed —
+        # the exact misidentification the hard tests exist to stop.
+        opposites = {"ill": "well", "sad": "happy", "tired": "rested", "stressed": "calm",
+                     "happy": "sad", "excited": "sad", "cheerful": "sad"}
+        flipped = opposites.get(parsed[2])
+        if flipped is None:
+            # good-family word without a listed bad opposite (e.g.
+            # negated "doing well"): record the bad side generically.
+            parsed = ("upset", "bad", "sad")
+        else:
+            group_flipped = {"well": "ill", "happy": "sad", "rested": "tired", "calm": "stressed"}
+            parsed = (flipped, "bad" if parsed[1] == "good" else "good", group_flipped.get(flipped, parsed[2]))
     elif parsed is None:
-        parsed = _recover_state(lowered)
+        # whereabouts phrases ("is back from", "is out of town") are
+        # matched on the full sentence, before recovery repair
+        parsed = _match_presence(original) or _recover_state(lowered)
     if parsed is None:
         return None
 
@@ -397,7 +594,17 @@ def _person_anchor(text: str, *, name: str | None, role: str | None) -> bool:
 
 
 def _old_state_words(text: str) -> set[str]:
-    return {m.group(1).lower() for m in _STATE_WORD_RE.finditer(text)}
+    words = {
+        m.group(1).lower() for m in _STATE_WORD_RE.finditer(text)
+    }
+    # presence words live outside _STATE_WORD_RE by design; their
+    # phrase forms are detected here so away -> back supersedes the
+    # old whereabouts record like any same-family update
+    if _PRESENCE_BACK_RE.search(text):
+        words.add("back")
+    if _PRESENCE_AWAY_RE.search(text):
+        words.add("away")
+    return words
 
 
 def _close_record(

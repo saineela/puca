@@ -32,6 +32,29 @@ def test_every_two_days_is_a_valid_interval_recurrence(resolver):
     assert result.recurrence == "interval_2_days"
 
 
+def test_month_day_spoken_time_without_at_resolves(resolver):
+    # Production failure (Oct 5): "remind me for October 28th 6:30pm" never
+    # reached a calendar function because the spoken clock without "at" made
+    # the whole month-day expression unparseable.
+    result = resolver.resolve("October 28th 6:30pm", now=NOW)
+    assert result is not None
+    assert (result.start.month, result.start.day) == (10, 28)
+    assert (result.start.hour, result.start.minute) == (18, 30)
+
+
+def test_month_day_dotted_spoken_time_resolves(resolver):
+    result = resolver.resolve("October 28th 6:30 p.m.", now=NOW)
+    assert result is not None
+    assert (result.start.month, result.start.day) == (10, 28)
+    assert (result.start.hour, result.start.minute) == (18, 30)
+
+
+def test_month_day_with_non_clock_tail_stays_unresolved(resolver):
+    # The optional tail must still be a clock; free text after the date does
+    # not silently become an event time.
+    assert resolver.resolve("october 28 thing", now=NOW) is None
+
+
 # ---------------------------------------------------------------------
 # Bare weekday: next occurrence, today counts
 # ---------------------------------------------------------------------
