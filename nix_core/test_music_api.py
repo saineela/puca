@@ -6,6 +6,7 @@ pin that contract without any hardware or network access.
 """
 import json
 import time
+import urllib.parse
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -17,6 +18,7 @@ import pytest
 import console
 import console_extend
 import music_api
+import music_cache
 
 
 @pytest.fixture
@@ -281,6 +283,16 @@ def read_raw(server, path):
         return response.status, response.read().decode(), dict(response.headers)
 
 
+def read_bytes(server, path, headers=None):
+    """A binary read: covers are images, and a 304 has no body at all."""
+    request = Request(f"http://127.0.0.1:{server.server_address[1]}{path}", headers=headers or {})
+    try:
+        with urlopen(request, timeout=10) as response:
+            return response.status, response.read(), dict(response.headers)
+    except HTTPError as exc:
+        return exc.code, exc.read(), dict(exc.headers)
+
+
 # ── manifest contract ────────────────────────────────────────────────────
 
 
@@ -494,6 +506,125 @@ def test_search_and_library_forward_to_the_provider(music_env, monkeypatch):
     assert status == 200 and payload["ok"] is True
     call = next(item for item in runtime.calls if item["arguments"].get("action") == "search")
     assert call["arguments"] == {"action": "search", "query": "Miles Davis", "limit": 3}
+
+
+# ── the console's catalog cache ──────────────────────────────────────────
+#
+# Catalog reads are answered from the console's own copy (music_cache) and
+# refreshed behind the reader, so a page, the assistant or the mobile app never
+# waits on the skill worker for a playlist it has already seen.
+
+
+def library_result(**overrides):
+    result = {
+        "ok": True, "action": "library", "message": "", "video_id": "", "title": "", "artist": "",
+        "duration_sec": 0, "artwork_url": "", "mime_type": "", "play_url": "", "tracks": [],
+        "playlists": [{"playlist_id": "LM", "name": "Liked Music", "track_count": 3}],
+        "queue": [], "queue_index": -1, "shuffle": False, "repeat": "off", "count": 1,
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "", "lyrics_source": "",
+    }
+    result.update(overrides)
+    return result
+
+
+def provider_calls(runtime, action):
+    return [item for item in runtime.calls if item["arguments"].get("action") == action]
+
+
+def test_library_reads_are_served_from_the_console_cache(music_env, monkeypatch):
+    """The second read of one library view comes off disk, not the worker.
+
+    The payload is identical either way; only the cache headers say which copy
+    answered, so a reader that ignores them sees exactly what it saw before.
+    """
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: library_result()})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], runtime)
+    server = serve()
+    try:
+        first_status, first, first_headers = read_json(server, "/api/music/library?kind=playlists")
+        second_status, second, second_headers = read_json(server, "/api/music/library?kind=playlists")
+        other_status, other, other_headers = read_json(server, "/api/music/library?kind=likes")
+    finally:
+        server.shutdown()
+    assert first_status == second_status == other_status == 200
+    assert first == second
+    assert first_headers["X-Music-Cache"] == "miss"
+    assert second_headers["X-Music-Cache"] == "hit"
+    assert int(second_headers["X-Music-Cache-Age"]) >= 0
+    assert other_headers["X-Music-Cache"] == "miss"
+    # One provider read per distinct view, not one per request.
+    assert len(provider_calls(runtime, "library")) == 2
+
+
+def test_refresh_bypasses_the_cached_read(music_env, monkeypatch):
+    reads = {"count": 0}
+
+    def answer(_matched):
+        reads["count"] += 1
+        return library_result(count=reads["count"])
+
+    runtime = FakeRuntime(results={"opendeck_music": answer})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        read_json(server, "/api/music/library?kind=playlists")
+        _hit_status, cached, cached_headers = read_json(server, "/api/music/library?kind=playlists")
+        _status, fresh, fresh_headers = read_json(server, "/api/music/library?kind=playlists&refresh=1")
+    finally:
+        server.shutdown()
+    assert cached_headers["X-Music-Cache"] == "hit" and cached["count"] == 1
+    assert fresh_headers["X-Music-Cache"] == "refresh" and fresh["count"] == 2
+    assert reads["count"] == 2
+
+
+def test_search_results_are_cached_per_query(music_env, monkeypatch):
+    runtime = FakeRuntime(results={"opendeck_music": lambda matched: library_result(
+        action="search", query=matched["arguments"].get("query"))})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], runtime)
+    server = serve()
+    try:
+        read_json(server, "/api/music/search?q=Miles")
+        _status, cached, cached_headers = read_json(server, "/api/music/search?q=Miles")
+        read_json(server, "/api/music/search?q=Coltrane")
+    finally:
+        server.shutdown()
+    assert cached_headers["X-Music-Cache"] == "hit" and cached["query"] == "Miles"
+    assert len(provider_calls(runtime, "search")) == 2
+
+
+def test_a_save_drops_the_cached_library_it_changed(music_env, monkeypatch):
+    """Liking a track changes the library the page holds, so it is re-read."""
+    def answer(matched):
+        if matched["arguments"]["action"] == "save":
+            return save_result(count=4)
+        return library_result()
+
+    runtime = FakeRuntime(results={"opendeck_music": answer})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    write_state(track={"video_id": "a1", "title": "First", "artist": "Artist"})
+    server = serve()
+    try:
+        read_json(server, "/api/music/library?kind=likes")
+        _hit_status, _cached, cached_headers = read_json(server, "/api/music/library?kind=likes")
+        read_json(server, "/api/music/save", {"kind": "like"})
+        _status, _payload, after_write = read_json(server, "/api/music/library?kind=likes")
+    finally:
+        server.shutdown()
+    assert cached_headers["X-Music-Cache"] == "hit"
+    assert after_write["X-Music-Cache"] == "miss"
+    assert len(provider_calls(runtime, "library")) == 2
+
+
+def test_music_index_reports_the_cache_and_the_artwork_route(music_env, monkeypatch):
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], FakeRuntime())
+    server = serve()
+    try:
+        _status, payload, _headers = read_json(server, "/api/music")
+    finally:
+        server.shutdown()
+    assert payload["cache"]["enabled"] is True
+    assert payload["cache"]["ttl_sec"] == music_cache.DEFAULT_CATALOG_TTL
+    assert "GET /api/music/artwork?src=" in payload["endpoints"]
 
 
 def test_lyrics_uses_the_recorded_track(music_env, monkeypatch):
@@ -865,3 +996,73 @@ def test_now_playing_does_not_advance_a_paused_queue(music_env, monkeypatch):
     assert payload["track"]["title"] == "First"
     assert payload["position"]["paused"] is True
     assert queue_calls(runtime) == []
+
+
+# ── covers served from the console ───────────────────────────────────────
+
+COVER = b"\x89PNG\r\n\x1a\ncover bytes"
+
+
+def cover_url(original="https://cdn.example/cover.png"):
+    return "/api/music/artwork?src=" + urllib.parse.quote(original, safe="")
+
+
+def test_artwork_route_serves_a_cover_from_the_cache(music_env, monkeypatch):
+    """The first paint fetches a cover; every later paint comes off disk.
+
+    The reply also carries the long-lived cache headers, so the browser keeps
+    the image and a re-request is answered with 304 instead of the bytes.
+    """
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], FakeRuntime())
+    downloads = []
+
+    def fake_download(url, timeout=None):
+        downloads.append(url)
+        return COVER, "image/png"
+
+    monkeypatch.setattr(music_cache, "download_artwork", fake_download)
+    server = serve()
+    try:
+        first_status, first_body, first_headers = read_bytes(server, cover_url())
+        second_status, second_body, second_headers = read_bytes(server, cover_url())
+        not_modified_status, not_modified_body, _headers = read_bytes(
+            server, cover_url(), {"If-None-Match": first_headers["ETag"]}
+        )
+    finally:
+        server.shutdown()
+    assert first_status == second_status == 200
+    assert first_body == second_body == COVER
+    assert first_headers["Content-Type"] == "image/png"
+    assert "max-age=" in first_headers["Cache-Control"] and "immutable" in first_headers["Cache-Control"]
+    assert first_headers["X-Music-Cache"] == "miss"
+    assert second_headers["X-Music-Cache"] == "hit"
+    assert downloads == ["https://cdn.example/cover.png"]
+    assert not_modified_status == 304 and not_modified_body == b""
+
+
+def test_artwork_route_refuses_a_missing_or_unsupported_source(music_env, monkeypatch):
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], FakeRuntime())
+    server = serve()
+    try:
+        missing_status, missing, _headers = read_json(server, "/api/music/artwork")
+        file_status, local_file, _headers = read_json(server, cover_url("file:///etc/passwd"))
+    finally:
+        server.shutdown()
+    assert missing_status == 400 and missing["code"] == "validation_error"
+    assert file_status == 400 and local_file["ok"] is False
+
+
+def test_a_cover_that_cannot_be_fetched_is_reported(music_env, monkeypatch):
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], FakeRuntime())
+
+    def refusing(_url, timeout=None):
+        raise music_cache.ArtworkError("The artwork could not be fetched: offline")
+
+    monkeypatch.setattr(music_cache, "download_artwork", refusing)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, cover_url())
+    finally:
+        server.shutdown()
+    assert status == 502
+    assert payload["code"] == "artwork_unavailable"

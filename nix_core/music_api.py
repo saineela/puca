@@ -19,6 +19,7 @@ import urllib.parse
 from typing import Any
 
 import console
+import music_cache
 
 PAGE_ID = "music"
 PAGE_TITLE = "Music"
@@ -469,12 +470,20 @@ def _body(handler) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
-def _respond(handler, payload: dict, status: int = 200) -> bool:
+def _respond(handler, payload: dict, status: int = 200, cache: tuple[str, float | None] | None = None) -> bool:
     body = json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store, max-age=0")
     handler.send_header("X-Content-Type-Options", "nosniff")
+    # Whether the reply came from the console's own catalog cache and how old that
+    # copy is. The body stays identical either way, so a reader that ignores these
+    # headers sees exactly the same JSON it always did.
+    if cache is not None:
+        cache_status, age = cache
+        handler.send_header("X-Music-Cache", str(cache_status))
+        if isinstance(age, (int, float)):
+            handler.send_header("X-Music-Cache-Age", str(int(age)))
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -546,7 +555,9 @@ def music_index(handler, _match=None) -> bool:
             "GET /api/music/library?kind=&limit=&playlist_id=",
             "POST /api/music/save",
             "GET /api/music/lyrics",
+            "GET /api/music/artwork?src=",
         ],
+        "cache": music_cache.stats(),
         "documentation": "nix_core/MUSIC_API.md",
     })
 
@@ -644,6 +655,36 @@ def music_control(handler, _match=None) -> bool:
     })
 
 
+# ---------------------------------------------------------------------------
+# Catalog cache
+# ---------------------------------------------------------------------------
+
+
+# The page, the mobile app and the assistant all read the same catalog, and a
+# playlist or a search answer does not change second by second. These reads are
+# served from the console's own copy and refreshed in the background, so opening
+# the Music page never waits on the device for data it already has. Writes that
+# change the account invalidate the copy they affect.
+def _cache_key(arguments: dict) -> str:
+    """A stable key for one provider read: its arguments, in a fixed order."""
+    return "|".join(f"{name}={arguments[name]}" for name in sorted(arguments))
+
+
+def _refresh_requested(handler) -> bool:
+    """Whether a reader asked to skip the cached copy (``?refresh=1``)."""
+    return str(_query(handler).get("refresh") or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _cached_provider_read(namespace: str, provider_key: str, arguments: dict, refresh: bool) -> tuple[dict, str, float | None]:
+    """Answer one catalog read from the cache, refreshing it when it goes stale."""
+
+    def fetch() -> dict:
+        skill_id, result = _provider_call(provider_key, arguments)
+        return {"ok": True, "skill_id": skill_id, **result}
+
+    return music_cache.read(namespace, _cache_key(arguments), fetch, refresh=refresh)
+
+
 @_guarded
 def music_search(handler, _match=None) -> bool:
     query = _query(handler)
@@ -655,10 +696,10 @@ def music_search(handler, _match=None) -> bool:
     if limit:
         arguments["limit"] = limit
     try:
-        skill_id, result = _provider_call("search", arguments)
+        payload, cache_status, age = _cached_provider_read("search", "search", arguments, _refresh_requested(handler))
     except MusicApiError as exc:
         return _fail(handler, exc)
-    return _respond(handler, {"ok": True, "skill_id": skill_id, **result})
+    return _respond(handler, payload, cache=(cache_status, age))
 
 
 def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -> dict:
@@ -845,10 +886,10 @@ def music_library(handler, _match=None) -> bool:
     if playlist_id:
         arguments["playlist_id"] = playlist_id
     try:
-        skill_id, result = _provider_call("library", arguments)
+        payload, cache_status, age = _cached_provider_read("library", "library", arguments, _refresh_requested(handler))
     except MusicApiError as exc:
         return _fail(handler, exc)
-    return _respond(handler, {"ok": True, "skill_id": skill_id, **result})
+    return _respond(handler, payload, cache=(cache_status, age))
 
 
 # Library writes the Music page performs on the user's own OpenDeck account:
@@ -898,6 +939,10 @@ def music_save(handler, _match=None) -> bool:
         skill_id, result = _provider_call("save", arguments)
     except MusicApiError as exc:
         return _fail(handler, exc)
+    # Liking a track or putting it in a playlist changes the library the page is
+    # showing, so the cached catalog is dropped rather than replayed as if the
+    # write had not happened. The next read fetches and re-caches it.
+    music_cache.invalidate()
     payload = {
         "ok": True,
         "skill_id": skill_id,
@@ -950,6 +995,40 @@ def music_lyrics(handler, _match=None) -> bool:
         "player": _player_summary(player),
         **result,
     })
+
+
+@_guarded
+def music_artwork(handler, _match=None) -> bool:
+    """Serve a cover from the console's own artwork cache.
+
+    The Music page paints covers through this route, so a cover the console has
+    already seen is served from local disk — and from the browser's own cache
+    after the first paint — instead of a CDN round trip. The key is the image
+    URL itself, so the same key always means the same image and the reply is safe
+    to keep; a caller that already holds it is answered with 304.
+    """
+    source = _text(_query(handler).get("src"), "src", 1000)
+    if not source:
+        return _fail(handler, MusicApiError("Provide src=<image url>.", 400, "validation_error"))
+    try:
+        body, content_type, etag, cache_status = music_cache.artwork(source)
+    except music_cache.ArtworkError as exc:
+        return _fail(handler, MusicApiError(str(exc), exc.status, exc.code))
+    not_modified = handler.headers.get("If-None-Match") == etag
+    handler.send_response(304 if not_modified else 200)
+    handler.send_header("Cache-Control", f"public, max-age={music_cache.ARTWORK_BROWSER_SECONDS}, immutable")
+    if not_modified:
+        handler.send_header("ETag", etag)
+        handler.end_headers()
+        return True
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("ETag", etag)
+    handler.send_header("X-Music-Cache", cache_status)
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+    return True
 
 
 @_guarded

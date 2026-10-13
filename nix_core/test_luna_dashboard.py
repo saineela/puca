@@ -563,3 +563,28 @@ def test_music_shell_polls_fast_and_the_page_layout_is_css_only():
         dashboard = handle.read()
     # Opening the Music page refreshes the snapshot instead of waiting for a tick.
     assert "if(page==='music')showMusic()}" in dashboard
+
+
+def test_music_shell_paints_covers_from_the_console_cache():
+    """Covers come from the console, not from the provider's CDN.
+
+    A provider hands the page absolute image URLs, and painting those costs a
+    CDN round trip on every render. The shell rewrites them to the console's
+    artwork route, which serves the image from disk and lets the browser keep
+    it; non-http artwork is left alone, and the provider's own URL stays visible
+    as artwork_source.
+    """
+    import os
+
+    with open(os.path.join(console.CORE_DIR, "static", "music-page.js"), encoding="utf-8") as handle:
+        shell = handle.read()
+    assert 'const ARTWORK_ROUTE = "/api/music/artwork?src=";' in shell
+    assert "function localArtwork(url)" in shell
+    assert "ARTWORK_ROUTE + encodeURIComponent(url)" in shell
+    assert "function withLocalArtwork(value, depth)" in shell
+    assert "mapped.artwork_source = value.artwork_url;" in shell
+    # Every payload the page receives is rewritten before it is handed over, and
+    # a page that builds its own <img> can ask for the same local URL.
+    assert "return withLocalArtwork(payload, 0);" in shell
+    assert "artwork: (url) => localArtwork(url)," in shell
+    assert "api.artwork(url), api.poll(handler) -> unsubscribe" in shell

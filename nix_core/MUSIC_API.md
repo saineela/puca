@@ -53,13 +53,14 @@ same page against the same state.
 | `GET` | `/api/music` | Capabilities: the page, its assets, the provider skill and which player commands exist. Answers `ok:false`, `code:"no_music_provider"` when no provider is installed. |
 | `GET` | `/api/music/now-playing[?lyrics=1]` | The recorded track, the speaker's reported state, an estimated position and the hand-off result. |
 | `POST` | `/api/music/control` | `{"action":"play"\|"pause"\|"resume"\|"stop"\|"mute"\|"unmute"\|"volume","value":0..1}` — routed to the installed skill's declared control. |
-| `GET` | `/api/music/search?q=&limit=` | Provider catalog search. |
+| `GET` | `/api/music/search?q=&limit=[&refresh=1]` | Provider catalog search, answered from the console's catalog cache. |
 | `POST` | `/api/music/play` | `{"query"}` or `{"video_id"}` — resolves the stream through the provider, remembers the track, and hands the URL to a `play_url` control when one is declared. |
 | `GET` | `/api/music/queue` | The play queue as the provider holds it: `{queue:[…], index, count, message}`. |
 | `POST` | `/api/music/queue` | `{"action":"add"\|"remove"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. |
-| `GET` | `/api/music/library?kind=&limit=&playlist_id=` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `stats`). |
+| `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `stats`), answered from the console's catalog cache. |
 | `POST` | `/api/music/save` | `{"kind":"like"\|"unlike"\|"playlist_add"\|"playlist_create", …}` — writes to the user's own library through the declared `save` provider action. |
 | `GET` | `/api/music/lyrics[?video_id=|title=|artist=|album=|duration_sec=]` | Synchronized lyrics for the current or named track, plus the same position estimate. |
+| `GET` | `/api/music/artwork?src=<image url>` | One cover, from the console's own artwork cache: served from disk, fetched and stored on a miss, safe to keep for a month (`ETag`, `304`). |
 | `GET` | `/api/skills/<skill_id>/page/<path>` | A declared page asset of an installed skill. |
 
 Playback is a single call by design: the provider resolves a stream that can be
@@ -83,12 +84,29 @@ song's cover when the playlist itself has none. It may be an empty string, which
 is a playlist with no picture rather than a missing field: the page draws its own
 tinted tile for it instead of a broken image.
 
-**Reads are cached behind the API.** The OpenDeck provider keeps each library
-read (playlists, a playlist's tracks, likes, history) on disk for ten minutes and
-drops the whole cache on any write, so a repeat read answers instantly instead of
-browsing a linked account again (measured: about 5.7s cold, under 10ms warm). The page
-adds its own copy in local storage on top, which is what makes opening the Music
-page instant: it paints what it had and refreshes from here behind it.
+**Cover art is cached too.** Every `artwork_url` the page paints goes through
+`GET /api/music/artwork`, which serves the image from the console's own disk
+cache: the first paint fetches the cover once, every later paint is a local file
+that the browser also keeps (`max-age` a month, `ETag`, `304` on a re-request). A
+provider's CDN is therefore contacted once per cover, not once per render — the
+music page shell rewrites the URLs it hands a page script, so a skill page paints
+cached covers without changing anything.
+
+**Reads are cached in three layers, each one in front of the next.** The
+OpenDeck provider keeps each library read (playlists, a playlist's tracks, likes,
+history) on disk for ten minutes and drops the whole cache on any write, so a
+repeat read answers instantly instead of browsing a linked account again
+(measured: about 5.7s cold, under 10ms warm). The console keeps its own copy of
+the catalog behind `/api/music/library` and `/api/music/search`, so a read that
+the assistant, the mobile app or a second browser makes never pays the
+skill-worker round trip either: a cached copy is replayed immediately and a
+background refresh asks the provider again, whose reply becomes the new cached
+copy when it arrives. `X-Music-Cache` (`hit`, `stale`, `miss`, `refresh`,
+`disabled`) and `X-Music-Cache-Age` say which copy answered, `?refresh=1` skips
+the cached copy, and any successful write (`POST /api/music/save`) drops the
+catalog it invalidates. The page adds its own copy in local storage on top, which
+is what makes opening the Music page instant: it paints what it had and refreshes
+from here behind it.
 
 ### now-playing payload
 
@@ -190,8 +208,11 @@ console only completes and validates the call.
 `{"ok":false,"code":"…","error":"…"}` with a stable code: `no_music_provider`
 (409), `skill_not_runnable` (409), `player_action_unavailable` (501),
 `provider_action_unsupported` (501), `skill_call_failed` (502),
-`validation_error` (400), `no_track` (409), `queue_empty` (409). A missing player command is a normal
-state, not a crash: install or update the skill that owns the speaker.
+`validation_error` (400), `no_track` (409), `queue_empty` (409),
+`artwork_unavailable` (502, an image that could not be fetched or is not an
+image), `artwork_too_large` (502, beyond the 2 MiB cover cap). A missing player
+command is a normal state, not a crash: install or update the skill that owns
+the speaker.
 
 ## Transport resolution
 
@@ -246,6 +267,12 @@ speaker that is merely reconnecting does not surface as a `502`.
   the API cannot reach a tool the skill does not declare.
 - Page assets are served only from the declared file list of an installed
   package, path-normalised inside that package, with `nosniff`.
+- `GET /api/music/artwork` fetches a caller-supplied URL, so it only accepts
+  `http(s)` images and refuses hosts that resolve to a non-public address (a
+  loopback, a LAN, a link-local or any other private range), re-checking the
+  address a redirect lands on. That keeps the console from being used to reach
+  services on its own network, and only `image/*` responses inside the size cap
+  are stored.
 - The routes are unauthenticated on the console listener, exactly like the
   existing device routes: keep the console on a trusted LAN or bind it to
   loopback. They are not a public mobile backend — see `MOBILE_APP_API.md` for

@@ -92,6 +92,9 @@ register_route("GET", r"/api/music/queue", music_api.music_queue)
 register_route("POST", r"/api/music/queue", music_api.music_queue)
 register_route("POST", r"/api/music/save", music_api.music_save)
 register_route("GET", r"/api/music/lyrics", music_api.music_lyrics)
+# Covers come from the console's own cache, so the page paints them without a
+# CDN round trip; the source image URL travels in the query string.
+register_route("GET", r"/api/music/artwork", music_api.music_artwork)
 register_route("GET", r"/api/skills/([^/]+)/page/([A-Za-z0-9][^?]*)", music_api.music_page_asset)
 
 # Mobile aliases: the NIX Home app mounts the same music page and calls the
@@ -106,6 +109,7 @@ register_route("GET", r"/api/mobile/v1/music/queue", music_api.music_queue)
 register_route("POST", r"/api/mobile/v1/music/queue", music_api.music_queue)
 register_route("POST", r"/api/mobile/v1/music/save", music_api.music_save)
 register_route("GET", r"/api/mobile/v1/music/lyrics", music_api.music_lyrics)
+register_route("GET", r"/api/mobile/v1/music/artwork", music_api.music_artwork)
 
 
 def unregister_route(method: str, expression: str) -> bool:

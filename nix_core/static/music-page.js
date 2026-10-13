@@ -9,13 +9,50 @@
  *   window.NixMusicPage = { mount(rootElement, api) }
  *   api.nowPlaying(), api.control(action, value), api.search(query),
  *   api.play({query|video_id}), api.library(kind), api.lyrics(),
- *   api.poll(handler) -> unsubscribe
+ *   api.artwork(url), api.poll(handler) -> unsubscribe
+ *
+ * Covers arrive already pointing at the console's own artwork cache, so a page
+ * paints api.library(...)/api.search(...) artwork without any extra work.
  */
 (function () {
   "use strict";
   const API = "/api/music";
   const state = { page: null, provider: null, player: null, mounted: false, scriptLoaded: false, pollTimer: null };
   const listeners = new Set();
+
+  /* Covers paint from the console's own artwork cache. A provider hands back
+     absolute URLs, and painting those means a CDN round trip on every render;
+     the console instead keeps the first copy it fetched and serves it from disk
+     (and the browser keeps that copy for a month). Non-http artwork — a data:
+     placeholder, a path that is already local — is left exactly as it was, and
+     the provider's original URL stays available as artwork_source. */
+  const ARTWORK_ROUTE = "/api/music/artwork?src=";
+
+  function localArtwork(url) {
+    return typeof url === "string" && /^https?:\/\//i.test(url)
+      ? ARTWORK_ROUTE + encodeURIComponent(url)
+      : url;
+  }
+
+  // The image fields the music API and the mobile app both use.
+  const ARTWORK_FIELDS = /^(artwork_url|artwork)$/;
+
+  function withLocalArtwork(value, depth) {
+    if (Array.isArray(value)) return value.map((item) => withLocalArtwork(item, depth));
+    if (!value || typeof value !== "object") return value;
+    if (depth > 6) return value;
+    const mapped = {};
+    Object.keys(value).forEach((key) => {
+      const child = value[key];
+      mapped[key] = ARTWORK_FIELDS.test(key) && typeof child === "string"
+        ? localArtwork(child)
+        : withLocalArtwork(child, depth + 1);
+    });
+    if (typeof value.artwork_url === "string" && mapped.artwork_url !== value.artwork_url) {
+      mapped.artwork_source = value.artwork_url;
+    }
+    return mapped;
+  }
 
   /* One call, read as text and parsed here. A reply that is not JSON (the
      console restarting mid-request, a truncated or empty body, something else
@@ -43,7 +80,7 @@
       error.status = response.status;
       throw error;
     }
-    return payload;
+    return withLocalArtwork(payload, 0);
   }
 
   // Reads are idempotent, so a transport failure (a console restart, a dropped
@@ -88,6 +125,9 @@
       const query = params.toString();
       return get("/lyrics" + (query ? "?" + query : ""), options);
     },
+    // A page that builds its own cover URLs (a preload, an <img> it made itself)
+    // gets the same local, cached one this shell paints with.
+    artwork: (url) => localArtwork(url),
     poll(handler) {
       listeners.add(handler);
       return () => listeners.delete(handler);
