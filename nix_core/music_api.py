@@ -761,6 +761,37 @@ def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -
     return state
 
 
+def play_options(result: dict) -> list[dict] | None:
+    """The matches a provider refused to choose between, or None when it played.
+
+    A provider that cannot tell which of several catalog matches a request meant
+    answers with the candidates instead of silently playing the first one. Core
+    turns that into a question for the user, so the guess is never made here.
+    """
+    if not isinstance(result, dict) or not result.get("ambiguous"):
+        return None
+    options = result.get("options")
+    if not isinstance(options, list):
+        return []
+    return [item for item in options if isinstance(item, dict)]
+
+
+def _question_for_play(result: dict, offered: list[dict], query: str) -> dict:
+    """Park the provider's matches as the question the panel asks."""
+    # Deferred: the panel module imports this one for the music handlers.
+    import puca_panel
+
+    count = len(offered)
+    prompt = str(result.get("message") or "").strip()
+    if not prompt:
+        prompt = (
+            f"{count} tracks match “{query}”: which one did you mean?"
+            if query
+            else f"{count} tracks match: which one did you mean?"
+        )
+    return puca_panel.ask_choice(prompt, offered, source="play", query=query)
+
+
 @_guarded
 def music_play(handler, _match=None) -> bool:
     body = _body(handler)
@@ -773,6 +804,30 @@ def music_play(handler, _match=None) -> bool:
         skill_id, result = _provider_call("play", arguments)
     except MusicApiError as exc:
         return _fail(handler, exc)
+    offered = play_options(result)
+    payload = _now_playing_payload()
+    if offered is not None:
+        # Nothing played: the answer is the question, and the page/panel shows
+        # the choices. `/api/panel/state` carries the same question, so the wall
+        # display asks even when the request came from somewhere else.
+        question = _question_for_play(result, offered, query)
+        # Whether the question has a screen to be asked on travels with it: a
+        # page that tells the user to look at a panel that is not installed is
+        # worse than one that tells them to say which track they meant.
+        import puca_panel
+
+        panel = puca_panel.panel_info()
+        return _respond(handler, {
+            "ok": True,
+            "ambiguous": True,
+            "skill_id": skill_id,
+            "message": result.get("message") or "",
+            "question": question,
+            "options": question["options"],
+            "panel_available": bool(panel.get("available")),
+            "panel_url": panel.get("url"),
+            **{key: payload[key] for key in ("track", "playing", "player", "position", "handoff")},
+        })
     _start_playback(result, skill_id)
     payload = _now_playing_payload()
     return _respond(handler, {"ok": True, "skill_id": skill_id, "result": result, **{
@@ -780,7 +835,13 @@ def music_play(handler, _match=None) -> bool:
     }})
 
 
-QUEUE_OPS = {"list", "add", "remove", "clear", "next", "play", "shuffle", "repeat"}
+# The provider's own queue vocabulary (see the skill's declared op enum). The
+# route mirrors it rather than a subset, so a page that can drag a row to a new
+# position is not answered with a 400 for an operation the provider declares.
+QUEUE_OPS = {
+    "list", "add", "remove", "clear", "next", "play", "move", "front", "next_up",
+    "shuffle", "repeat",
+}
 REPEAT_MODES = ("off", "all", "one")
 
 
@@ -841,6 +902,30 @@ def music_queue(handler, _match=None) -> bool:
         if index is None:
             return _fail(handler, MusicApiError("Provide index=<queue position>.", 400, "validation_error"))
         arguments["index"] = index
+    elif op == "move":
+        # Dragging a row to a new position: "move the third track to first" is
+        # the same reorder, in one call.
+        index = _int(body.get("index"), "index", 0, 99)
+        to = _int(body.get("to"), "to", 0, 99)
+        if index is None or to is None:
+            return _fail(handler, MusicApiError("Provide index=<from> and to=<to>.", 400, "validation_error"))
+        arguments["index"] = index
+        arguments["to"] = to
+    elif op in {"front", "next_up"}:
+        # "Play next" / "Play first" on a queued row (or on a track that is not
+        # queued yet, which the provider inserts at that spot).
+        index = _int(body.get("index"), "index", 0, 99)
+        query = _text(body.get("query"), "query", 200)
+        video_id = _text(body.get("video_id"), "video_id", 64)
+        if index is None and not query and not video_id:
+            return _fail(handler, MusicApiError(
+                "Provide index=<queue position>, query=<track> or video_id=<id>.", 400, "validation_error"))
+        if index is not None:
+            arguments["index"] = index
+        if query:
+            arguments["query"] = query
+        if video_id:
+            arguments["video_id"] = video_id
     elif op == "shuffle":
         # No `on` means "toggle", which is what one press of the Shuffle button
         # sends; an explicit true/false is honoured as given.

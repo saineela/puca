@@ -1391,6 +1391,124 @@ def test_runtime_targeting_sends_queue_preferences_to_the_music_skill(skills_sta
         assert runtime.targeted_skill_specs(phrase) == [], phrase
 
 
+def test_runtime_targeting_sends_volume_requests_to_the_speaker(skills_state, monkeypatch):
+    """"increase volume by 10" and "current volume" are the speaker's own
+    commands. Without the volume verbs the change fell through to chat, which
+    invented "Volume increased by 10 percent." while the speaker never changed
+    (measured live)."""
+    skill_id = "github:example/echo-connect-skill:echo-connect"
+    runtime = SkillRuntime(
+        state_path=skills_state / "skills.json",
+        install_dir=skills_state / "installed",
+        data_dir=skills_state / "data",
+    )
+    package = runtime.package_dir(runtime.install_dir, skill_id)
+    package.mkdir(parents=True)
+    (package / "worker.py").write_text("# mocked test package\n", encoding="utf-8")
+    manifest = {
+        "kind": "nix-skill",
+        "id": "echo-connect",
+        "name": "Echo Connect",
+        "runtime": {"protocol": skill_runtime.PROTOCOL, "entrypoint": "worker.py"},
+        "files": ["worker.py"],
+        "tools": [{"name": "control_ring", "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}, "result_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}}],
+        "triggers": ["echo connect", "speaker", "volume", "speaker volume", "mute", "unmute", "say", "brightness"],
+    }
+    (package / "skill.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (skills_state / "skills.json").write_text(json.dumps({
+        "installed": [skill_id],
+        "device_names": {},
+    }), encoding="utf-8")
+    monkeypatch.setattr(runtime, "status", lambda _skill_id: {
+        "configured": True, "trusted": True, "runnable": True, "worker_running": False,
+    })
+
+    for phrase in (
+        "increase volume by 10",
+        "increase volume by 10 more",
+        "raise the volume by 20 percent",
+        "decrease volume by 5",
+        "turn the volume up",
+        "lower the volume",
+        "what is the current volume",
+        "not the brightness, current volume",
+        "set the volume to 55",
+    ):
+        targeted = runtime.targeted_skill_specs(phrase)
+        assert [spec["skill_id"] for spec in targeted] == [skill_id], phrase
+
+    # Ordinary chat that happens to mention a device word still belongs to the
+    # conversation model.
+    for phrase in (
+        "tell me a story about a loud concert",
+        "the store is open",
+    ):
+        assert runtime.targeted_skill_specs(phrase) == [], phrase
+
+
+def test_runtime_targeting_sends_library_writes_to_the_music_skill(skills_state, monkeypatch):
+    """"like this song" and "add this song to my Focus playlist" change the
+    linked account, so the installed music provider must be the target even when
+    the user never names the service: the words are ordinary chat words too ("I
+    like that song", "add milk to my shopping list"), which stay in chat."""
+    skill_id = "github:example/opendeck-skill:opendeck"
+    runtime = SkillRuntime(
+        state_path=skills_state / "skills.json",
+        install_dir=skills_state / "installed",
+        data_dir=skills_state / "data",
+    )
+    package = runtime.package_dir(runtime.install_dir, skill_id)
+    package.mkdir(parents=True)
+    (package / "worker.py").write_text("# mocked test package\n", encoding="utf-8")
+    manifest = {
+        "kind": "nix-skill",
+        "id": "opendeck",
+        "name": "OpenDeck",
+        "runtime": {"protocol": skill_runtime.PROTOCOL, "entrypoint": "worker.py"},
+        "files": ["worker.py"],
+        "device_ui": {"media": {"provider": {"save": {"tool": "opendeck_music", "arguments": {"action": "save", "kind": "like"}}}}},
+        "tools": [{"name": "opendeck_music", "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}, "result_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}}],
+        "triggers": ["opendeck", "play music", "queue", "liked songs"],
+    }
+    (package / "skill.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (skills_state / "skills.json").write_text(json.dumps({
+        "installed": [skill_id],
+        "device_names": {},
+    }), encoding="utf-8")
+    monkeypatch.setattr(runtime, "status", lambda _skill_id: {
+        "configured": True, "trusted": True, "runnable": True, "worker_running": False,
+    })
+
+    for phrase in (
+        "like this song",
+        "can you like this track",
+        "unlike this song",
+        "add this song to my liked music",
+        "save this to my liked songs",
+        "add this song to my Hindi Songs playlist",
+        "put this track in my Focus playlist",
+        "remove this song from my liked music",
+        "create a playlist called Road Trip",
+        "make me a playlist named Sunday Morning",
+        "hey nix, add this song to my Focus playlist",
+    ):
+        targeted = runtime.targeted_skill_specs(phrase)
+        assert [spec["skill_id"] for spec in targeted] == [skill_id], phrase
+
+    # The same words without a command (or pointing at something that is not
+    # music) belong to the conversation model, which is the only surface that
+    # can answer them.
+    for phrase in (
+        "I like that song",
+        "I like that playlist of yours",
+        "like this movie",
+        "add milk to my shopping list",
+        "save my progress in the game",
+        "create a new folder on my desktop",
+    ):
+        assert runtime.targeted_skill_specs(phrase) == [], phrase
+
+
 def test_worker_request_serializes_concurrent_callers():
     """Concurrent callers must never steal each other's correlated responses."""
     import queue

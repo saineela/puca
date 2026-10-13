@@ -56,7 +56,7 @@ same page against the same state.
 | `GET` | `/api/music/search?q=&limit=[&refresh=1]` | Provider catalog search, answered from the console's catalog cache. |
 | `POST` | `/api/music/play` | `{"query"}` or `{"video_id"}` — resolves the stream through the provider, remembers the track, and hands the URL to a `play_url` control when one is declared. |
 | `GET` | `/api/music/queue` | The play queue as the provider holds it: `{queue:[…], index, count, message}`. |
-| `POST` | `/api/music/queue` | `{"action":"add"\|"remove"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. |
+| `POST` | `/api/music/queue` | `{"action":"add"\|"remove"\|"move"\|"front"\|"next_up"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. |
 | `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `stats`), answered from the console's catalog cache. |
 | `POST` | `/api/music/save` | `{"kind":"like"\|"unlike"\|"playlist_add"\|"playlist_create", …}` — writes to the user's own library through the declared `save` provider action. |
 | `GET` | `/api/music/lyrics[?video_id=|title=|artist=|album=|duration_sec=]` | Synchronized lyrics for the current or named track, plus the same position estimate. |
@@ -146,6 +146,8 @@ list, in one place.
 | `POST` | `{"action":"add","query"}` or `{"action":"add","video_id"}` | Resolves the track through the provider and appends it. The speaker is not touched. |
 | `POST` | `{"action":"remove","index"}` | Drops one entry. |
 | `POST` | `{"action":"remove","query":"Believer"}` | Drops the entry that name resolves to — “remove Believer from the queue” without the caller having to know its position. A name that is not queued is refused (`queue_entry_missing`) instead of dropping a different track. |
+| `POST` | `{"action":"move","index","to"}` | Moves the entry at `index` to position `to` — one reorder, which is what dropping a dragged row sends. Both are 0-based queue positions. |
+| `POST` | `{"action":"front"\|"next_up","index"\|\"query"\|\"video_id"}` | Prioritises a track: `front` puts it first, `next_up` puts it behind the playing one. A named track that is not queued yet is inserted at that spot. Neither starts playback. |
 | `POST` | `{"action":"clear"}` | Empties the queue. |
 | `POST` | `{"action":"play","index"}` / `{"action":"next"}` | Resolves that entry and, when the provider returns a `play_url`, hands it to the speaker and records it as now-playing. |
 | `POST` | `{"action":"shuffle"}` / `{"action":"shuffle","on":true\|false}` | Shuffles the tracks waiting behind the playing one, or puts them back in queued order. No `on` toggles. |
@@ -224,6 +226,14 @@ and calls that skill's tool with the merged arguments. A `play_url` control
 the speaker; without one the API still resolves and records the track and
 reports `handoff.supported = false` with the reason.
 
+A **spoken** play (`"play Fate of Ophelia by Taylor Swift"`) goes through the
+assistant and the provider's own tool, so the console makes the same hand-off
+there: after a confirmed execution whose result carries a `play_url`, Core calls
+this same `_start_playback`, which commands the speaker and records now-playing.
+The reply says so plainly when the hand-off could not happen (`"no installed
+skill can play a stream URL"`, or the speaker's refusal), instead of leaving the
+provider's `"Playing …"` sentence to read as playback that never started.
+
 Transport controls answer as soon as the command is accepted (tens of
 milliseconds). Pause/resume confirm by polling the speaker's reported state
 with a short bound instead of waiting for a pushed event that some firmware
@@ -258,6 +268,59 @@ connection to its device, so a reboot, a Wi-Fi blip or an idle timeout makes
 later calls fail with a transport error while the device is still reachable. A
 control call that fails that way restarts the worker once and tries again, so a
 speaker that is merely reconnecting does not surface as a `502`.
+
+## Unclear play requests
+
+`POST /api/music/play` with a `query` is answered by the provider, and a provider
+that cannot tell which catalog match the request meant does not pick one. It
+answers with the candidates instead:
+
+```json
+{"ok": true, "ambiguous": true, "query": "that song from the film",
+ "options": [{"video_id": "…", "title": "…", "artist": "…", "duration_sec": 214,
+             "album": "…", "artwork_url": "…"}],
+ "question": {"id": "…", "prompt": "3 tracks match …: which one did you mean?",
+              "source": "play", "options": ["…"], "asked_at": 0, "expires_at": 0},
+ "panel_available": true, "panel_url": "http://hub:49170/", "track": null}
+```
+
+Nothing plays: the guess the user did not make is the whole point of asking. The
+reply still carries the current now-playing snapshot (`track`, `playing`,
+`player`, `position`) — that is whatever was already playing, not something this
+request started — and it carries no `result`, because the provider resolved no
+stream. The
+question is held in Core (`puca_panel`), not in a page, so it survives a reload
+and every surface can read it — the panel asks it on screen, the Music page names
+the options in its own notice, and a spoken reply says the options and where to
+choose them. A question expires after 15 minutes.
+
+`GET /api/panel` reports the question and where the display lives. The panel's own
+routes are on its own origin: `GET /api/panel/state` (theme, question, now
+playing and the queue in one round trip), `POST /api/panel/answer` with
+`{"index": 0}` (plays that option and closes the question), `POST
+/api/panel/dismiss`, and `POST /api/panel/question`.
+
+## PUCA Panel (wall display)
+
+The panel is a second listener (`puca_panel.py`, port `49170`, `NIX_PANEL_PORT`)
+for a screen that is read from across a room. It serves the page out of the
+installed music provider's package — `PUCA-Panel/panel.html`, `panel.css`,
+`panel.js`, all declared in the skill's `files` — and the same `/api/music`
+handlers as the console, so the music API is not implemented twice and the page
+needs no cross-origin setup.
+
+- The theme follows the console's clock (dark from 22:00, light from 06:00, in
+  the console's own timezone), not the screen's.
+- The lyrics of whatever is playing open by themselves and stay open until the
+  user closes them; the next track opens them again.
+- Spoken requests use the browser's own speech recognition: a phrase that names a
+  command (`pause`, `next`, `volume up`) is obeyed, `play <song>` is the same
+  `play` call the assistant makes — including the unclear case above — and
+  anything else becomes a search the user picks from.
+
+Only the panel folder is servable from that listener, path-normalised inside the
+package; a package's other files (`skill.json`, the worker, the Music page's own
+assets) are not reachable there.
 
 ## Security notes
 

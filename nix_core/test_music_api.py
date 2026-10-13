@@ -800,6 +800,47 @@ def test_queue_remove_forwards_the_position(music_env, monkeypatch):
     assert queue_calls(runtime) == [{"action": "queue", "op": "remove", "index": 1}]
 
 
+def test_queue_move_reorders_a_dragged_row(music_env, monkeypatch):
+    # Dragging a row sends one reorder: from -> to, in the provider's own op.
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result(
+        [queue_track("b2", "Second"), queue_track("a1", "First")], index=-1,
+        message="Moved “Second” to position 1.")})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue", {"action": "move", "index": 1, "to": 0})
+        missing_bad, missing, _h = read_json(server, "/api/music/queue", {"action": "move", "index": 1})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert [item["title"] for item in payload["queue"]] == ["Second", "First"]
+    assert queue_calls(runtime) == [{"action": "queue", "op": "move", "index": 1, "to": 0}]
+    assert missing_bad == 400 and missing["code"] == "validation_error"
+    # A reorder is not a play: the speaker is never handed anything.
+    assert not [item for item in runtime.calls if item["arguments"].get("action") == "play_url"]
+
+
+def test_queue_play_next_moves_a_row_up_without_playing_it(music_env, monkeypatch):
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result(
+        [queue_track("a1", "First"), queue_track("b2", "Second")], index=0,
+        message="Moved “Second” to position 2 (next up).")})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue", {"action": "next_up", "index": 1})
+        front_status, _front, _h = read_json(server, "/api/music/queue", {"action": "front", "query": "Second"})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert queue_calls(runtime) == [
+        {"action": "queue", "op": "next_up", "index": 1},
+        {"action": "queue", "op": "front", "query": "Second"},
+    ]
+    assert front_status == 200
+    # Prioritising a track is not playback.
+    assert not [item for item in runtime.calls if item["arguments"].get("action") == "play_url"]
+
+
 def test_queue_shuffle_and_repeat_come_back_with_the_queue(music_env, monkeypatch):
     def shuffed(_matched):
         return {**queue_result([queue_track("a1", "First")], index=0, message="Shuffling the queue."),

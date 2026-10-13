@@ -335,12 +335,17 @@ MUSIC_CAPABILITIES = [{
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["queue"]}, "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "move", "front", "next_up", "shuffle", "repeat"]}, "query": {"type": "string", "minLength": 1, "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}, "index": {"type": "integer", "minimum": 0, "maximum": 99}, "to": {"type": "integer", "minimum": 0, "maximum": 99}, "on": {"type": "boolean"}, "mode": {"type": "string", "enum": ["off", "all", "one"]}}, "required": ["action", "op"]},
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["lyrics"]}, "title": {"type": "string", "maxLength": 300}}, "required": ["action"]},
                 {"type": "object", "properties": {"action": {"type": "string", "enum": ["now_playing"]}}, "required": ["action"]},
+                {"type": "object", "properties": {"action": {"type": "string", "enum": ["save"]}, "kind": {"type": "string", "enum": ["like", "unlike", "playlist_add", "playlist_create"]}, "video_id": {"type": "string", "maxLength": 64}, "playlist_id": {"type": "string", "maxLength": 100}, "name": {"type": "string", "maxLength": 120}, "title": {"type": "string", "maxLength": 300}, "artist": {"type": "string", "maxLength": 200}, "album": {"type": "string", "maxLength": 300}}, "required": ["action", "kind"]},
             ],
             "properties": {
-                "action": {"type": "string", "enum": ["search", "library", "play", "queue", "lyrics", "now_playing"]},
+                "action": {"type": "string", "enum": ["search", "library", "play", "queue", "lyrics", "now_playing", "save"]},
+                "kind": {"type": "string", "enum": ["playlists", "likes", "history", "stats", "like", "unlike", "playlist_add", "playlist_create"]},
+                "playlist_id": {"type": "string", "maxLength": 100},
+                "name": {"type": "string", "maxLength": 120},
+                "artist": {"type": "string", "maxLength": 200},
+                "album": {"type": "string", "maxLength": 300},
                 "query": {"type": "string", "maxLength": 200},
                 "video_id": {"type": "string", "maxLength": 64},
-                "kind": {"type": "string", "enum": ["playlists", "likes", "history", "stats"]},
                 "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "move", "front", "next_up", "shuffle", "repeat"]},
                 "index": {"type": "integer", "minimum": 0, "maximum": 99},
                 "to": {"type": "integer", "minimum": 0, "maximum": 99},
@@ -404,6 +409,12 @@ def test_queue_wording_is_planned_by_core_without_calling_the_model():
     expected = [
         ("queue up Hotel California", {"action": "queue", "op": "add", "query": "hotel california"}),
         ("add Bohemian Rhapsody to the queue", {"action": "queue", "op": "add", "query": "bohemian rhapsody"}),
+        # "the song" points at which thing is meant, not the title, so it comes
+        # off the track before the provider is asked to search for it.
+        ("add the song believer to the queue", {"action": "queue", "op": "add", "query": "believer"}),
+        ("add the song Believer to my queue", {"action": "queue", "op": "add", "query": "believer"}),
+        ("queue up the track Believer", {"action": "queue", "op": "add", "query": "believer"}),
+        ("OpenDeck and add the song believer to the queue", {"action": "queue", "op": "add", "query": "believer"}),
         ("what's in my queue?", {"action": "queue", "op": "list"}),
         ("play the next queued track", {"action": "queue", "op": "next"}),
         ("clear the queue", {"action": "queue", "op": "clear"}),
@@ -416,6 +427,50 @@ def test_queue_wording_is_planned_by_core_without_calling_the_model():
             "tool": "opendeck_music", "arguments": arguments,
         }], text
         assert "init" not in captured, text
+
+
+def test_play_wording_is_planned_by_core_without_calling_the_model():
+    # Measured live across one session: "play believer" played, "play starboy"
+    # failed, "play the song starboy" played, "play maps by maroon 5" failed —
+    # the same request planned by the model twice with different answers, and
+    # "I didn't send a device command because the dedicated skill planner did
+    # not produce a valid, safe plan" every time it lost. The track is the
+    # user's own words after the verb, so Core owns the whole call.
+    expected = [
+        ("play believer", {"action": "play", "query": "believer"}),
+        ("Play believer", {"action": "play", "query": "believer"}),
+        ("play starboy", {"action": "play", "query": "starboy"}),
+        ("play starboy by the weekend", {"action": "play", "query": "starboy by the weekend"}),
+        ("play maps by maroon 5", {"action": "play", "query": "maps by maroon 5"}),
+        ("play the song circles", {"action": "play", "query": "circles"}),
+        ("play the song maps by maroon five", {"action": "play", "query": "maps by maroon five"}),
+        ("play mad love by Mable", {"action": "play", "query": "mad love by Mable"}),
+        # "the son" is what speech-to-text makes of "the song".
+        ("play the son starboy", {"action": "play", "query": "starboy"}),
+        # Addressing the assistant by name before the command.
+        ("Hey Luna Play believer", {"action": "play", "query": "believer"}),
+        ("hey luna, play circles", {"action": "play", "query": "circles"}),
+        ("luna, play maps by maroon five", {"action": "play", "query": "maps by maroon five"}),
+        ("put on believer", {"action": "play", "query": "believer"}),
+    ]
+    for text, arguments in expected:
+        planner, captured = _planner({"unexpected": True})
+        calls = planner.plan(system_prompt="", user_text=text, capabilities=MUSIC_CAPABILITIES)
+        assert calls == [{
+            "type": "skill_tool_call", "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music", "arguments": arguments,
+        }], text
+        assert "init" not in captured, text
+    # No track named (or only "this song"): which track to play is a real
+    # choice, so it stays with the planner rather than being guessed at.
+    for text in ("play music", "play something", "play this song", "play it"):
+        assert SkillPlanner._grounded_music_call(
+            MUSIC_CAPABILITIES, {"play"}, text
+        ) is None, text
+    # Queue wording still owns its own calls.
+    assert SkillPlanner._grounded_music_call(
+        MUSIC_CAPABILITIES, {"queue"}, "play the next queued track"
+    )["arguments"] == {"action": "queue", "op": "next"}
 
 
 def test_now_playing_and_search_wording_are_planned_by_core():
@@ -445,6 +500,9 @@ def test_queue_reorder_and_priority_wording_are_planned_by_core():
     for text, arguments in [
         ("play Bohemian Rhapsody next", {"action": "queue", "op": "next_up", "query": "bohemian rhapsody"}),
         ("play Hotel California first", {"action": "queue", "op": "front", "query": "hotel california"}),
+        ("play the song believer next", {"action": "queue", "op": "next_up", "query": "believer"}),
+        ("play the song Believer first", {"action": "queue", "op": "front", "query": "believer"}),
+        ("put on the track Believer next", {"action": "queue", "op": "next_up", "query": "believer"}),
         ("move track 3 to position 1", {"action": "queue", "op": "move", "index": 2, "to": 0}),
         ("move Hotel California to the front", {"action": "queue", "op": "front", "query": "hotel california"}),
         # "play this next" names no track: prioritise whatever is playing.
@@ -556,6 +614,17 @@ def test_grounded_volume_retry_emits_the_core_owned_level():
     )
     assert calls[0]["arguments"] == {"action": "volume", "volume": 0.3}
     assert "init" not in captured
+    # A level stated without the word "percent" ("set volume to 55") grounds
+    # the same Core-owned fraction; measured live, it previously failed
+    # planning outright because only the percent sign was recognised.
+    planner, captured = _planner({"unexpected": True})
+    calls = planner.plan(
+        system_prompt="", user_text="set volume to 55",
+        capabilities=SPEAKER_CAPABILITIES, force_grounded=True,
+        volume_grounding={"volume": 0.55},
+    )
+    assert calls[0]["arguments"] == {"action": "volume", "volume": 0.55}
+    assert "init" not in captured
 
 
 def test_grounded_read_retry_emits_deterministic_state_read():
@@ -585,3 +654,53 @@ def test_grounded_read_retry_keeps_catalog_wording_on_color_catalog():
     )
     assert len(calls) == 1
     assert calls[0]["arguments"] == {"action": "color_catalog"}
+
+
+def test_library_writes_are_planned_by_core_without_calling_the_model():
+    # A like or a playlist add changes the user's own account, so the phrase is
+    # read exactly: the track is the one the provider last handed to the speaker
+    # ("this song" names no id at all) and the playlist is the user's own words.
+    expected = [
+        ("like this song", {"action": "save", "kind": "like"}),
+        ("like this track please", {"action": "save", "kind": "like"}),
+        ("can you like this song", {"action": "save", "kind": "like"}),
+        ("add this song to my liked music", {"action": "save", "kind": "like"}),
+        ("add this to my liked songs", {"action": "save", "kind": "like"}),
+        ("save this song to my favourites", {"action": "save", "kind": "like"}),
+        ("unlike this song", {"action": "save", "kind": "unlike"}),
+        ("remove this song from my liked music", {"action": "save", "kind": "unlike"}),
+        ("add this song to my Late Night playlist", {"action": "save", "kind": "playlist_add", "name": "Late Night"}),
+        ("add this to my Hindi Songs playlist", {"action": "save", "kind": "playlist_add", "name": "Hindi Songs"}),
+        ("put this track in my Focus playlist", {"action": "save", "kind": "playlist_add", "name": "Focus"}),
+        ("create a playlist called Road Trip", {"action": "save", "kind": "playlist_create", "name": "Road Trip"}),
+        ("make me a playlist named Sunday Morning", {"action": "save", "kind": "playlist_create", "name": "Sunday Morning"}),
+        # The skill prompt cleanser can hand the planner its own addressing back
+        # ("OpenDeck and add ...") and can say "your" for the user's own library:
+        # neither is part of the command, so both still ground to the same call.
+        ("add this song to your Hindi Songs playlist", {"action": "save", "kind": "playlist_add", "name": "Hindi Songs"}),
+        ("OpenDeck and add this song to my Focus playlist", {"action": "save", "kind": "playlist_add", "name": "Focus"}),
+        ("openDeck, add this song to my Focus playlist", {"action": "save", "kind": "playlist_add", "name": "Focus"}),
+        ("OpenDeck and like this song", {"action": "save", "kind": "like"}),
+        ("remove this track from your liked music", {"action": "save", "kind": "unlike"}),
+    ]
+    for text, arguments in expected:
+        assert SkillPlanner._requested_tool_groups(text, MUSIC_CAPABILITIES) == {"save"}, text
+        assert SkillPlanner._grounded_music_call(MUSIC_CAPABILITIES, {"save"}, text) == {
+            "type": "skill_tool_call",
+            "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music",
+            "arguments": arguments,
+        }, text
+
+
+def test_library_questions_and_queue_wording_are_not_read_as_writes():
+    # A read of the liked songs is a listing, not a write.
+    assert SkillPlanner._requested_tool_groups("show my liked songs", MUSIC_CAPABILITIES) == {"library"}
+    assert SkillPlanner._requested_tool_groups("what's in my liked music", MUSIC_CAPABILITIES) == {"library"}
+    # Queueing keeps its own wording even though it says "add ... to".
+    assert SkillPlanner._requested_tool_groups("add Bohemian Rhapsody to the queue", MUSIC_CAPABILITIES) == {"queue"}
+    # An opinion is not a command, and neither is a non-music list.
+    assert "save" not in (SkillPlanner._requested_tool_groups("I like this song", MUSIC_CAPABILITIES) or set())
+    assert "save" not in (SkillPlanner._requested_tool_groups("add this to my shopping list", MUSIC_CAPABILITIES) or set())
+    # A song other than the one playing is the planner's job: it has to search.
+    assert "save" not in (SkillPlanner._requested_tool_groups("add Believer to my Late Night playlist", MUSIC_CAPABILITIES) or set())

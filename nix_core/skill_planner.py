@@ -22,9 +22,12 @@ _NEEDLE_INFERENCE_LOCK = threading.Lock()
 _MUSIC_PREFERENCE_WORD = re.compile(r"\b(?:shuffl\w*|randomi[sz]\w*|repeat\w*|loop\w*)\b", re.IGNORECASE)
 _MUSIC_SHUFFLE_WORD = re.compile(r"\b(?:shuffl(?:e|es|ed|ing)|randomi[sz]e[ds]?)\b", re.IGNORECASE)
 _MUSIC_REPEAT_WORD = re.compile(r"\b(?:repeat(?:ing|s)?|loop(?:ing)?)\b", re.IGNORECASE)
-# "can you shuffle the queue", "shuffle the queue please": the same request
-# with manners on it, so a polite frame comes off before the words are checked.
-_MUSIC_PREFERENCE_LEAD = re.compile(
+# "can you shuffle the queue", "shuffle the queue please", "can you like this
+# song": the same request with manners on it, so a polite frame comes off before
+# the command words are checked. Because the frame comes off, a command has to
+# lead the sentence — which is what keeps an opinion ("I like this song") from
+# being read as a like.
+_MUSIC_REQUEST_LEAD = re.compile(
     r"^(?:(?:please|hey\s+nix|nix|ok|okay)[,\s]+)*"
     r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?",
     re.IGNORECASE,
@@ -55,6 +58,213 @@ _MUSIC_QUEUE_ADD_WORD = re.compile(
     r"\b(?:add|put|drop|throw|queue)\b[^,;]{0,60}?\b(?:to|into|onto)\s+(?:the|my)\s+queue\b",
     re.IGNORECASE,
 )
+# "add the song Believer to the queue", "play the song Believer next": "the
+# song" points at which thing is meant, it is not part of the title, so it comes
+# off the track before the track is searched for. A title that really opens with
+# those words ("The Song Remains the Same") still matches once the prefix is gone.
+_MUSIC_TRACK_FILLER = re.compile(
+    r"^(?:(?:the|a|an|my|our|this|that|current|the\s+current|the\s+same)\s+"
+    # "son" is what speech-to-text makes of "song" often enough to matter
+    # ("play the son starboy" was measured live); a title that really opens
+    # with "The Son …" still matches once the prefix is gone.
+    r"(?:song|songs|track|tune|one|son)(?:\s+(?:called|named|titled))?)\s+",
+    re.IGNORECASE,
+)
+
+
+# The verbs a music command can start with. An address ("hey Luna play X",
+# "Luna, add this to my queue") is only an address when the words after it are
+# one of these, so a song whose title is itself a name is never eaten.
+_MUSIC_COMMAND_VERB = re.compile(
+    r"^(?:play|put|queue|add|drop|throw|save|like|unlike|remove|take|delete|"
+    r"create|make|start|search|find|look|show|list|what|which|skip|next|"
+    r"pause|resume|unpause|stop|shuffle|repeat|loop|turn|set|mute|unmute|say)\b",
+    re.IGNORECASE,
+)
+_MUSIC_GREETING = re.compile(r"^(?:hey|hi|hello|ok|okay|yo)\b[,\s]*", re.IGNORECASE)
+
+
+def _music_command_body(text: str) -> str:
+    """The user's own words with the addressing taken off the front.
+
+    "hey Luna play starboy" and "hey nix, add this to my queue" both address the
+    assistant before giving the command. The exactly-read matchers below anchor
+    on the command verb, so the greeting and the assistant's name are stripped
+    first — and only when a command verb follows, which is what keeps a song
+    title that happens to start with a name intact.
+    """
+    body = _MUSIC_REQUEST_LEAD.sub("", str(text).strip()).strip()
+    name = re.compile(r"^[A-Za-z][A-Za-z'-]{1,19}[,\s]+")
+    for _ in range(3):
+        without_greeting = _MUSIC_GREETING.sub("", body, count=1)
+        without_name = name.sub("", body, count=1)
+        without_both = name.sub("", without_greeting, count=1)
+        picked = next(
+            (
+                candidate for candidate in (without_both, without_greeting, without_name)
+                if candidate != body and _MUSIC_COMMAND_VERB.match(candidate)
+            ),
+            None,
+        )
+        if picked is None:
+            break
+        body = picked
+    return body
+
+
+def _music_track_text(track: str) -> str:
+    """A spoken track with its pointing words removed, or the track unchanged.
+
+    "the song Believer" is what a person says when they mean the track Believer,
+    so the filler is dropped before the words are sent to the provider's search;
+    a track that is only the filler ("play this song") is left alone, because
+    there is nothing behind it to name a different track.
+    """
+    cleaned = _MUSIC_TRACK_FILLER.sub("", track.strip(), count=1).strip()
+    return cleaned or track.strip()
+
+# Writing to the user's own library: "like this song", "add this song to my Late
+# Night playlist", "remove this from my liked songs". A like or a playlist add is
+# a change to the account, so the sentence is read exactly instead of being
+# guessed at: Core owns the call when the request is one of these, and a request
+# that names another song to save is left to the planner, which can search for
+# it first. The track is always the one playing ("this", "it", "the song"), which
+# is the one thing the provider can fill in by itself.
+_MUSIC_SONG_REFERENCE = (
+    r"(?:(?:this|that|it)(?:\s+(?:song|track|tune))?|"
+    r"(?:the|my)\s+(?:current\s+)?(?:song|track|tune)|"
+    r"the\s+one\s+(?:playing|that\s+is\s+playing)|"
+    r"(?:the\s+)?(?:song|track|tune)\s+playing)"
+)
+_MUSIC_LIKED_REFERENCE = r"(?:liked|loved|favorites?|favourites?|likes)(?:\s+(?:music|songs?|tracks?|list))?"
+_MUSIC_SAVE_LIKE = re.compile(
+    rf"^(?:like|heart|favourite|favorite|love)\s+{_MUSIC_SONG_REFERENCE}\b", re.IGNORECASE
+)
+_MUSIC_SAVE_UNLIKE = re.compile(
+    rf"^(?:unlike|unlove|un-?favourite|un-?favorite|dislike)\b|"
+    rf"^(?:remove|take|delete)\s+{_MUSIC_SONG_REFERENCE}\s+(?:from|out\s+of)\s+"
+    rf"(?:(?:my|your|our|the)\s+)?{_MUSIC_LIKED_REFERENCE}\b",
+    re.IGNORECASE,
+)
+_MUSIC_SAVE_TO_LIKED = re.compile(
+    rf"^(?:add|save|put|drop|throw)\s+{_MUSIC_SONG_REFERENCE}\b[^,;]{{0,60}}?"
+    rf"\b(?:to|into|onto|in)\s+(?:my|your|our|the)\s+{_MUSIC_LIKED_REFERENCE}\b",
+    re.IGNORECASE,
+)
+# A named playlist has to be called a playlist here: "add this to my shopping
+# list" is the assistant's business, not the music provider's. The name keeps the
+# words and casing the user said, because the provider creates the playlist when
+# the name is new and matches an existing one case-insensitively.
+_MUSIC_SAVE_TO_PLAYLIST = re.compile(
+    rf"^(?:add|save|put|drop|throw)\s+{_MUSIC_SONG_REFERENCE}\b[^,;]{{0,60}}?"
+    r"\b(?:to|into|onto|in)\s+(?:my|your|our|the)\s+(.+?)\s+playlists?\b",
+    re.IGNORECASE,
+)
+_MUSIC_SAVE_CREATE_PLAYLIST = re.compile(
+    r"^(?:create|make|start)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?playlist\s+(?:called|named)\s+(.+?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_skill_frame(user_text: str, capabilities: list[dict[str, Any]]) -> str:
+    """Drop a leading skill/device name the request was addressed to.
+
+    A cleansed step can read "OpenDeck and add this song to my Focus playlist":
+    the name is how the service was addressed, not part of the command, and
+    leaving it on defeats an exactly-read call. Only a name the installed
+    capabilities actually declare is stripped, so this never edits an ordinary
+    sentence of the user's own.
+    """
+    names: list[str] = []
+    for spec in capabilities or []:
+        if not isinstance(spec, dict):
+            continue
+        for key in ("name", "device_name"):
+            value = " ".join(str(spec.get(key) or "").split())
+            if value and value.casefold() not in [name.casefold() for name in names]:
+                names.append(value)
+    text = " ".join(str(user_text).split())
+    for _ in range(3):
+        lowered = text.casefold()
+        matched = next(
+            (name for name in names if lowered.startswith(name.casefold())), None
+        )
+        if matched is None:
+            break
+        rest = text[len(matched):].lstrip()
+        rest = re.sub(r"^(?:,|and)\s+", "", rest, flags=re.IGNORECASE)
+        if not rest or rest.casefold() == text.casefold():
+            break
+        text = rest
+    return text
+
+
+def _music_save_request(text: str) -> dict[str, Any] | None:
+    """A spoken library write as save arguments, or None.
+
+    Returns the arguments for the provider's ``save`` action: a like, an unlike,
+    an add to a named playlist, or a new playlist. The playlist name is the user's
+    own words (the provider matches it case-insensitively and creates it when the
+    name is new), and no track is named at all — the provider uses the one it last
+    handed to the speaker, which is what "this song" means out loud.
+    """
+    body = _music_command_body(text)
+    if not body:
+        return None
+    if _MUSIC_SAVE_UNLIKE.search(body) is not None:
+        return {"action": "save", "kind": "unlike"}
+    if _MUSIC_SAVE_TO_LIKED.search(body) is not None:
+        return {"action": "save", "kind": "like"}
+    playlist = _MUSIC_SAVE_TO_PLAYLIST.search(body)
+    if playlist is not None:
+        name = " ".join(playlist.group(1).split()).strip(" ,.!?\"'")
+        if name:
+            return {"action": "save", "kind": "playlist_add", "name": name[:120]}
+    created = _MUSIC_SAVE_CREATE_PLAYLIST.search(body)
+    if created is not None:
+        name = " ".join(created.group(1).split()).strip(" ,.!?\"'")
+        if name:
+            return {"action": "save", "kind": "playlist_create", "name": name[:120]}
+    if _MUSIC_SAVE_LIKE.search(body) is not None:
+        return {"action": "save", "kind": "like"}
+    return None
+
+
+# "play <track>", "play the song <track>", "put on <track>": the track is the
+# user's own words after the verb, so Core owns the whole call. Measured live:
+# left to the planner's model, "play starboy" failed planning outright while
+# "play the song starboy" happened to succeed — the same request, twice.
+_MUSIC_PLAY_LEAD = re.compile(r"^(?:play|put\s+on|start\s+playing)\s+(?:me\s+)?", re.IGNORECASE)
+# "play music", "play something": no track is named, so which track to play is
+# a real choice and the provider's own search is the only thing that can make
+# it. These stay with the planner instead of being guessed at.
+_MUSIC_PLAY_ANY = re.compile(
+    r"^(?:music|some\s+music|songs?|something|anything|a\s+song|some\s+songs|"
+    r"a\s+track|some\s+music|the\s+music)$",
+    re.IGNORECASE,
+)
+
+
+def _music_play_request(text: str) -> dict[str, Any] | None:
+    """A spoken play as play arguments, or None when no track is named.
+
+    Returns the arguments for the provider's ``play`` action with the track the
+    user named, exactly as they said it ("mad love by Mable" keeps the artist
+    words, which is what the provider's search matches on).
+    """
+    body = _music_command_body(text)
+    match = _MUSIC_PLAY_LEAD.match(body)
+    if match is None:
+        return None
+    track = _music_track_text(body[match.end():].strip(" ,.!?"))
+    if not track or _MUSIC_PLAY_ANY.fullmatch(track):
+        return None
+    # "play this song", "play it": the track is the one already playing, which
+    # names no search text at all — the planner resolves it against the
+    # conversation instead of searching the provider for the word "it".
+    if re.fullmatch(_MUSIC_SONG_REFERENCE, track, re.IGNORECASE):
+        return None
+    return {"action": "play", "query": track[:200]}
 
 
 def _music_queue_preference(text: str) -> dict[str, Any] | None:
@@ -66,7 +276,7 @@ def _music_queue_preference(text: str) -> dict[str, Any] | None:
     "repeat" cycles, which is what the provider does with no mode given.
     """
     lowered = _MUSIC_PREFERENCE_TRAIL.sub(
-        "", _MUSIC_PREFERENCE_LEAD.sub("", text.casefold()).strip()
+        "", _MUSIC_REQUEST_LEAD.sub("", text.casefold()).strip()
     ).strip()
     if _MUSIC_PREFERENCE_WORD.search(lowered) is None:
         return None
@@ -306,6 +516,10 @@ class SkillPlanner:
         capabilities: list[dict[str, Any]],
     ) -> set[str] | None:
         """Narrow choices only when unambiguous surface wording maps to declared actions."""
+        # A cleansed step can address the service first ("OpenDeck and like this
+        # song"); the name is not part of the command, and leaving it on would
+        # hide the save wording behind a device name.
+        user_text = _strip_leading_skill_frame(str(user_text), capabilities)
         text = user_text.casefold()
         # "stop speaking" and "stop the music" are the actions themselves, not a
         # negation of a plan, so they are removed before the negation guard runs.
@@ -403,7 +617,12 @@ class SkillPlanner:
         # playing") is a read of the provider's now-playing state, not a "play"
         # command: the "playing" in it would otherwise narrow the planner to the
         # play action, which has no valid call for a question and fails closed.
-        if re.search(
+        # A like, an unlike or a playlist write changes the user's own library,
+        # so the whole call is Core-owned; see _music_save_request.
+        save_request = _music_save_request(text)
+        if save_request is not None:
+            groups.add("save")
+        elif re.search(
             r"\b(?:what(?:'s|\s+song\s+is|\s+tune\s+is|\s+is)?\s+playing|"
             r"what\s+(?:song|tune)\s+is\s+this|now\s+playing|currently\s+playing|"
             r"what\s+am\s+i\s+listening\s+to)\b",
@@ -433,7 +652,7 @@ class SkillPlanner:
             # "search for X" / "find X": a catalog search, never a play. Naming
             # the provider's search action keeps the model from choosing play.
             groups.add("search")
-        if re.search(
+        if save_request is None and re.search(
             r"\b(?:playlists?|liked|loved|favorites?|favourites?|history|library|"
             r"listened\s+to|been\s+listening|did\s+i\s+listen)\b",
             text,
@@ -481,6 +700,7 @@ class SkillPlanner:
         """Build the music call the request names, or None when it is ambiguous."""
         if not groups:
             return None
+        user_text = _strip_leading_skill_frame(str(user_text), capabilities)
         text = " ".join(str(user_text).casefold().split())
         action: str | None = None
         arguments: dict[str, Any] | None = None
@@ -488,6 +708,11 @@ class SkillPlanner:
             # "what's playing" names no argument at all, so Core owns the call.
             action = "now_playing"
             arguments = {"action": "now_playing"}
+        elif "play" in groups:
+            play_request = _music_play_request(str(user_text))
+            if play_request is not None:
+                action = "play"
+                arguments = play_request
         elif "search" in groups:
             # "search for X" / "find X" / "look for X": the search text is the
             # user's own words after the verb, never a model-chosen title.
@@ -498,7 +723,7 @@ class SkillPlanner:
             )
             query = re.sub(r"\b(?:on|in)\s+opendeck\b", " ", query)
             query = re.sub(r"\b(?:please|thanks|thank\s+you)\b", " ", query)
-            query = " ".join(query.split()).strip(" ,.!?")
+            query = _music_track_text(" ".join(query.split()).strip(" ,.!?"))
             if query:
                 action = "search"
                 arguments = {"action": "search", "query": query[:200]}
@@ -508,7 +733,9 @@ class SkillPlanner:
             # queue's own preferences, which the page drives by op.
             preference = _music_queue_preference(text)
             # "play <song> next/first" prioritises that track in the queue.
-            priority = re.search(r"\b(?:play|put\s+on)\s+(?:the\s+)?(.+?)\s+(?:next|first)\b", text)
+            # The track keeps a leading article ("play the song Believer next") so
+            # the pointing words can be stripped from it as a whole.
+            priority = re.search(r"\b(?:play|put\s+on)\s+(.+?)\s+(?:next|first)\b", text)
             # "move track 3 to position 1" / "move <song> to the front".
             move = re.search(
                 r"\bmove\s+(?:track\s+|song\s+)?(\d+)\s+(?:to\s+)?(?:position\s+)?(\d+)\b",
@@ -537,7 +764,7 @@ class SkillPlanner:
             elif advance is not None:
                 arguments = {"action": "queue", "op": "next"}
             elif priority is not None:
-                track = " ".join(priority.group(1).split()).strip(" ,.!?")
+                track = _music_track_text(" ".join(priority.group(1).split()).strip(" ,.!?"))
                 op = "next_up" if re.search(r"\bnext\b", priority.group(0)) else "front"
                 if not track or re.fullmatch(
                     r"(?:this|that|it|the\s+one|(?:this|that|the|a|my)?\s*(?:current\s+)?"
@@ -549,7 +776,7 @@ class SkillPlanner:
                 else:
                     arguments = {"action": "queue", "op": op, "query": track[:200]}
             elif move_front is not None:
-                track = " ".join(move_front.group(1).split()).strip(" ,.!?")
+                track = _music_track_text(" ".join(move_front.group(1).split()).strip(" ,.!?"))
                 if re.fullmatch(r"(?:\d+\s+)?(?:track|song|tune)", track):
                     index = int(re.match(r"(\d+)", track).group(1)) - 1
                     arguments = {"action": "queue", "op": "front", "index": max(0, index)}
@@ -570,14 +797,25 @@ class SkillPlanner:
                 # "queue up X", "add X to the queue", "queue X": the track is the
                 # user's own words between the verb and the queue itself.
                 track = re.sub(
-                    r"^\s*(?:please\s+)?(?:can\s+you\s+)?(?:queue|add|put)\s+(?:up\s+)?",
+                    r"^\s*(?:please\s+)?(?:can\s+you\s+)?(?:queue|add|put|drop|throw)\s+(?:up\s+)?",
                     "",
                     text,
                 )
                 track = re.sub(r"\s*(?:,?\s*)?(?:to|onto|into)\s+(?:the|my)\s+queue\b.*$", "", track)
-                track = track.strip(" ,.!?")
+                track = _music_track_text(track.strip(" ,.!?"))
                 if track:
                     arguments = {"action": "queue", "op": "add", "query": track[:200]}
+        elif "save" in groups:
+            # A like, an unlike, an add to a named playlist, or a new playlist,
+            # for the track the provider last handed to the speaker: a spoken
+            # "like this song" names no id at all, which is exactly what the
+            # provider fills in from its own remembered track.
+            # The user's own words, not the casefolded copy: a playlist the
+            # provider has to create keeps the name and casing that was spoken.
+            save_request = _music_save_request(str(user_text))
+            if save_request is not None:
+                action = "save"
+                arguments = save_request
         elif "library" in groups:
             if re.search(r"\b(?:liked|loved|favorite|favourite)s?\b", text):
                 arguments = {"action": "library", "kind": "likes"}
@@ -925,10 +1163,11 @@ class SkillPlanner:
         # for the same reason a brightness level is: the model is not asked to
         # choose between two plausible actions (Measured: "queue up <song>" was
         # planned as a search) and cannot lose the call to a confidence floor.
-        # Anything Core cannot read (opening a named playlist, saving a like) is
-        # left to the planner below.
+        # Anything Core cannot read (opening a named playlist, saving a track the
+        # user names rather than the one playing) is left to the planner below:
+        # the grounding call returns None for it, and the group falls through.
         if selected_groups is not None and selected_groups <= {
-            "queue", "library", "lyrics", "now_playing", "search"
+            "queue", "library", "lyrics", "now_playing", "search", "save", "play"
         }:
             grounded_music = self._grounded_music_call(capabilities, selected_groups, user_text)
             if grounded_music is not None:

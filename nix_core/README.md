@@ -166,7 +166,8 @@ See [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for exact model paths, adapter
 |---|---|
 | Knowledge API | `nix_knowledge` HTTP service, commonly port `8100` |
 | Actions API | `nix_actions` HTTP service, commonly port `8200` |
-| Console | Browser test dashboard; the **only** port it listens on (`49117`, fixed) |
+| Console | Browser test dashboard; its own fixed port (`49117`) |
+| PUCA Panel | Wall display for the music NIX plays; its own fixed port (`49170`) |
 | Websocket gateway | Voice/client interface, commonly port `9000` |
 
 Start the console:
@@ -177,12 +178,15 @@ python nix_core/console_extend.py
 
 The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict it) and serves the UI, every `/api/*` route, and the `/v1` OpenAI surface on that one fixed port. There is no port override; the port remains stable across restarts and browser reloads. This enables LAN access subject to firewall/network policy but does not provide internet port forwarding.
 
-Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens exactly one listening socket — a browser needs only the console URL. The optional Testing-page runner is the sole exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
+Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens one listening socket for the console itself — a browser needs only the console URL. The optional Testing-page runner is an exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
+
+The console also starts the **PUCA Panel** (`puca_panel.py`) on its own fixed port, `49170` by default (`NIX_PANEL_PORT`, `NIX_PANEL_HOST`). It is the wall display for the music an installed provider serves: one large now-playing card, large library tiles, the queue, the volume, the lyrics of whatever is playing, and the browser's own speech recognition for spoken requests. It serves the panel page from the installed provider's package (`PUCA-Panel/`) and the same `/api/music` handlers as the console, from its own origin, so the display never needs the console tab. A port already in use is reported and the console keeps running without the panel. See [`MUSIC_API.md`](MUSIC_API.md).
 
 Useful console endpoints:
 
 - `GET /api/mobile/v1` and `GET /api/mobile/v1/home-copy` — Mobile App category index and randomized home-copy prototype, available only when started with `console_extend.py`; the full mobile API is not implemented. See [`MOBILE_APP_API.md`](MOBILE_APP_API.md).
 
+- `GET /api/panel` — the PUCA Panel's URL, providing skill, and any question it is waiting on
 - `GET /api/health` — service, model, GPU, and timezone status
 - `GET /api/feed` — trace, turns, actions, and Knowledge summaries
 - `GET /api/sessions` — grouped live chat sessions

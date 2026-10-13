@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 import console as base_console
 import mobile_app_api
 import music_api
+import puca_panel
 
 
 ExtensionCallback = Callable[[BaseHTTPRequestHandler, re.Match[str]], bool]
@@ -110,6 +111,15 @@ register_route("POST", r"/api/mobile/v1/music/queue", music_api.music_queue)
 register_route("POST", r"/api/mobile/v1/music/save", music_api.music_save)
 register_route("GET", r"/api/mobile/v1/music/lyrics", music_api.music_lyrics)
 register_route("GET", r"/api/mobile/v1/music/artwork", music_api.music_artwork)
+
+# The PUCA Panel is served on its own fixed port (puca_panel.PANEL_PORT), but
+# the console still answers "/api/panel" so the dashboard, the docs and anyone
+# on the LAN can find where that display lives without guessing.
+def panel_index(handler, _match=None) -> bool:
+    return music_api._respond(handler, {"ok": True, **puca_panel.panel_info(), "question": puca_panel.pending_question()})
+
+
+register_route("GET", r"/api/panel", panel_index)
 
 
 def unregister_route(method: str, expression: str) -> bool:
@@ -194,19 +204,43 @@ def main() -> int:
     host = os.environ.get("NIX_CONSOLE_HOST", "0.0.0.0")
     server, port = build_app(host=host, port=49117)
     lan = host if host not in ("0.0.0.0", "::") else _lan_ip()
-    print()
-    print("  NIX TEST CONSOLE (extended)")
-    print(f"  local : http://127.0.0.1:{port}")
-    print(f"  LAN   : http://{lan}:{port}   (from any device on your network)")
-    print(f"  ports : {port} only - Knowledge/Actions run in-process")
-    print(f"  chat backend : {base_console.CASPER_BACKEND} ({base_console.OLLAMA_MODEL} / {base_console.TABBY_MODEL})")
-    print(f"  timezone   : {base_console.TIMEZONE}")
-    print("  Ctrl+C to stop")
-    print()
+    # The PUCA Panel is a second, deliberate listener: a wall display is pointed
+    # at its fixed port once and left there, and it serves the same music API, so
+    # the display never needs the console tab. A port already taken is reported
+    # and the console still starts without it.
+    panel_server = None
+    panel_note = "disabled (port unavailable)"
     try:
+        panel_server, panel_port = puca_panel.start_in_thread(
+            host=os.environ.get("NIX_PANEL_HOST", puca_panel.PANEL_HOST),
+            port=int(os.environ.get("NIX_PANEL_PORT", puca_panel.PANEL_PORT)),
+        )
+        panel_skill = puca_panel.panel_skill()
+        panel_note = (
+            f"http://{lan}:{panel_port}/ ({panel_skill[0]})"
+            if panel_skill
+            else f"http://{lan}:{panel_port}/ (no installed music provider ships the page)"
+        )
+    except OSError as exc:
+        panel_note = f"disabled ({type(exc).__name__}: {exc})"
+    try:
+        print()
+        print("  NIX TEST CONSOLE (extended)")
+        print(f"  local : http://127.0.0.1:{port}")
+        print(f"  LAN   : http://{lan}:{port}   (from any device on your network)")
+        print(f"  ports : {port} console (Knowledge/Actions run in-process)")
+        print(f"          {panel_note} - PUCA Panel")
+        print(f"  chat backend : {base_console.CASPER_BACKEND} ({base_console.OLLAMA_MODEL} / {base_console.TABBY_MODEL})")
+        print(f"  timezone   : {base_console.TIMEZONE}")
+        print("  Ctrl+C to stop")
+        print()
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nconsole stopped.")
+    finally:
+        if panel_server is not None:
+            panel_server.shutdown()
+            panel_server.server_close()
     return 0
 
 

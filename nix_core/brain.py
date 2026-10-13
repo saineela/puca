@@ -442,6 +442,53 @@ def _explicit_combined_color_intent(
     return None
 
 
+def _ambiguous_play_reply(handoff: dict[str, Any]) -> str:
+    """Say which matches are being chosen between, and where to choose.
+
+    The provider returned candidates instead of playing, so the reply is the
+    question: naming the options is far more useful than its count, and the user
+    has to be told where the choice is waiting (the wall display when one is
+    installed, otherwise in words).
+    """
+    question = handoff.get("question") if isinstance(handoff.get("question"), dict) else {}
+    options = [item for item in (handoff.get("options") or []) if isinstance(item, dict)]
+    query = str(question.get("query") or "").strip()
+    names = ", ".join(
+        f"“{item.get('title')}”" for item in options[:3] if item.get("title")
+    )
+    lead = f"“{query}”" if query else "That request"
+    where = (
+        "The options are on the PUCA Panel — pick the one you meant."
+        if handoff.get("panel")
+        else "Say which one you meant."
+    )
+    named = f" {names}." if names else ""
+    return f"{lead} matches {len(options)} tracks.{named} {where}"[:400]
+
+
+def _playback_reply_with_handoff(reply: str, handoff: dict[str, Any]) -> str:
+    """Say plainly when a resolved stream never reached the speaker.
+
+    The provider's own sentence says the track was resolved, which reads as
+    "it is playing" — so a handoff that did not happen has to be said out loud
+    rather than left to the provider's wording.
+    """
+    if handoff.get("ambiguous"):
+        return _ambiguous_play_reply(handoff)
+    if handoff.get("supported") and not handoff.get("error"):
+        return reply
+    if handoff.get("supported"):
+        reason = str(handoff.get("error") or "").strip()
+        note = (
+            " Your speaker refused the stream"
+            + (f" ({reason[:160]})" if reason else "")
+            + ", so nothing is playing."
+        )
+    else:
+        note = " No installed skill can play a stream URL, so nothing is playing."
+    return (reply.rstrip() + note)[:400]
+
+
 def _ring_light_result_confirms_action(matched: dict[str, Any], outcome: dict[str, Any]) -> bool:
     """Honor the Ring Light skill contract by checking its returned device state."""
     tool = matched.get("tool") or {}
@@ -702,6 +749,28 @@ def _speaker_level_wording(text: str) -> bool:
     )
 
 
+def _stated_level_percent(text: str, noun: str) -> float | None:
+    """A level written as a whole number, as a 0-1 fraction, or None.
+
+    "set volume to 55", "volume 55" and "at 55" all state the level without
+    the word "percent", and the control's own UI shows it that way — but a bare
+    number anywhere in the sentence is not a level ("set brightness on device
+    3"), so the number has to be introduced as one: by "to"/"at"/"=", or by
+    the control's own noun. A number over 100 is not a level and returns None.
+    """
+    for pattern in (
+        rf"\b(?:to|at|=)\s*(\d{{1,3}})\b",
+        rf"\b{noun}\s+(?:to\s+|at\s+|=)?(\d{{1,3}})\b",
+    ):
+        match = re.search(pattern, text)
+        if match is None:
+            continue
+        value = int(match.group(1))
+        if 0 <= value <= 100:
+            return value / 100.0
+    return None
+
+
 def _grounded_brightness_level(text: str) -> dict[str, float] | None:
     """Extract a Core-owned brightness level from explicit phrasings only.
 
@@ -713,10 +782,20 @@ def _grounded_brightness_level(text: str) -> dict[str, float] | None:
     normalized = " ".join((text or "").casefold().split())
     if _speaker_level_wording(normalized):
         return None
-    percent = re.search(r"\b(\d{1,3})\s*(?:percent|%)", normalized)
+    # "50 percent", "50%" and a stated "50" ("set brightness to 50") are three
+    # notations for the same level, so all three are read as a percentage: a
+    # stated bare number previously fell through and the request failed
+    # planning. A decimal ("0.5") is the fraction notation instead.
+    percent = re.search(r"\b(\d{1,3})\s*(?:percent|pct)\b|\b(\d{1,3})%", normalized)
     if percent is not None:
-        value = min(1.0, max(0.05, int(percent.group(1)) / 100.0))
+        value = min(1.0, max(0.05, int(percent.group(1) or percent.group(2)) / 100.0))
         return {"brightness": value}
+    decimal = re.search(r"\b(\d+\.\d+)\b", normalized)
+    if decimal is not None:
+        return {"brightness": min(1.0, max(0.05, float(decimal.group(1))))}
+    stated = _stated_level_percent(normalized, "brightness")
+    if stated is not None:
+        return {"brightness": min(1.0, max(0.05, stated))}
     if re.search(r"\b(?:full|max(?:imum)?|100(?:\s*percent)?)\b", normalized):
         return {"brightness": 1.0}
     if re.search(r"\bhalf\b", normalized):
@@ -736,18 +815,33 @@ def _grounded_volume_level(text: str) -> dict[str, float] | None:
     normalized = " ".join((text or "").casefold().split())
     if not _speaker_level_wording(normalized):
         return None
-    # "30 percent" and "0.3" are different notations for the same level, so the
-    # percentage form is matched first and the bare number is only read as a
-    # fraction (a lone "30" is not a volume level).
+    # A step relative to the current level is not an absolute level: "raise the
+    # volume by 20 percent" and "increase the volume 10 percent" are handled by
+    # ``_speaker_volume_intent`` as read-then-act, so they must not ground here
+    # as "set the volume to 20%" (measured live). Only a direction with an
+    # explicit destination ("turn the volume up to 55") is an absolute level.
+    if (
+        _VOLUME_UP_PATTERN.search(normalized) is not None
+        or _VOLUME_DOWN_PATTERN.search(normalized) is not None
+    ) and re.search(r"\b(?:to|at)\s+\d{1,3}\b", normalized) is None:
+        return None
+    # "30 percent", "30%" and a stated "30" ("set volume to 55") are three
+    # notations for the same level, so all three are read as a percentage:
+    # measured live, "set volume to 55" (no percent sign) failed planning
+    # outright because only the first two were recognised. A decimal ("0.55")
+    # is the fraction notation instead.
     percent = re.search(r"\b(\d{1,3})\s*(?:percent|pct)\b|\b(\d{1,3})%", normalized)
     if percent is not None:
         value = int(percent.group(1) or percent.group(2))
         if 0 <= value <= 100:
             return {"volume": min(1.0, max(0.0, value / 100.0))}
         return None
-    fraction = re.search(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
-    if fraction is not None:
-        return {"volume": min(1.0, max(0.0, float(fraction.group(1))))}
+    decimal = re.search(r"\b(\d+\.\d+)\b", normalized)
+    if decimal is not None:
+        return {"volume": min(1.0, max(0.0, float(decimal.group(1))))}
+    stated = _stated_level_percent(normalized, "volume")
+    if stated is not None:
+        return {"volume": min(1.0, max(0.0, stated))}
     if re.search(r"\b(?:full|max(?:imum)?)\b", normalized):
         return {"volume": 1.0}
     if re.search(r"\bhalf\b", normalized):
@@ -755,6 +849,99 @@ def _grounded_volume_level(text: str) -> dict[str, float] | None:
     if re.search(r"\bquarter\b", normalized):
         return {"volume": 0.25}
     return None
+
+
+# The speaker's own noun, the way a person names the thing they mean.
+_VOLUME_NOUN_PATTERN = r"\b(?:volume|loudness|sound\s+level|speaker\s+level|how\s+loud)\b"
+# A louder/quieter request. The bare words "up"/"down" only count next to the
+# volume noun ("volume up", "turn the volume up"), so an unrelated "up"
+# ("what's up with the volume") is not read as a change. A phrase with no
+# number is a default one-step change, which is what "turn it up" means.
+_VOLUME_UP_PATTERN = re.compile(
+    r"\b(?:increase|raise|boost|louder|crank|bump|bring\s+up\s+the\s+volume|"
+    r"pump\s+up\s+the\s+volume|turn\s+up\s+the\s+volume|volume\s+up|"
+    r"turn\s+(?:it|your|the\s+volume|the\s+speaker|the\s+dot)\s+up)\b"
+)
+_VOLUME_DOWN_PATTERN = re.compile(
+    r"\b(?:decrease|lower|reduce|quieter|bring\s+down\s+the\s+volume|"
+    r"turn\s+down\s+the\s+volume|volume\s+down|"
+    r"turn\s+(?:it|your|the\s+volume|the\s+speaker|the\s+dot)\s+down)\b"
+)
+_VOLUME_STEP = 0.10
+
+
+def _speaker_volume_intent(text: str) -> dict[str, Any] | None:
+    """A speaker-volume question or relative change Core can read exactly.
+
+    Returns ``{"kind": "read"}`` for a question about the current level, or
+    ``{"kind": "relative", "delta": ±fraction}`` for a change. Returns None
+    for an absolute level ("set volume to 55"), which Core grounds elsewhere,
+    and for anything that is not about the speaker's volume at all.
+    """
+    normalized = " ".join((text or "").casefold().split())
+    if re.search(_VOLUME_NOUN_PATTERN, normalized) is None:
+        return None
+    up = _VOLUME_UP_PATTERN.search(normalized)
+    down = _VOLUME_DOWN_PATTERN.search(normalized)
+    if up is not None or down is not None:
+        # "increase volume by 10", "raise the volume by 20 percent" and
+        # "10 percent more" all state the same step; with no number the change
+        # is one default step. A direction with an explicit destination instead
+        # ("turn the volume up to 55") is an absolute level, which the
+        # grounding below owns.
+        destination = re.search(r"\b(?:to|at)\s+\d{1,3}\b", normalized)
+        if destination is None:
+            amount = re.search(r"\b(\d{1,3})\s*(?:percent|pct|%)\b", normalized)
+            if amount is None:
+                amount = re.search(r"\bby\s+(\d{1,3})\b", normalized)
+            delta = (
+                min(100, int(amount.group(1))) / 100.0
+                if amount is not None else _VOLUME_STEP
+            )
+            return {"kind": "relative", "delta": delta if up is not None else -delta}
+    if _grounded_volume_level(normalized) is not None:
+        return None
+    # Anything else that names the speaker's volume is a question about it: a
+    # level mentioned with no destination and no direction ("not the
+    # brightness, current volume", "the volume is loud") is answered from the
+    # speaker's own reading rather than left to the model, which invented one.
+    return {"kind": "read"}
+
+
+def _speaker_reported_volume(result: Any) -> float | None:
+    """The speaker's own reported level from a worker result, or None."""
+    if not isinstance(result, dict):
+        return None
+    for source in (result.get("speaker"), result):
+        if not isinstance(source, dict):
+            continue
+        value = source.get("volume")
+        if (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and 0.0 <= float(value) <= 1.0
+        ):
+            return float(value)
+    return None
+
+
+def _declared_tool_actions(tool: dict[str, Any]) -> set[str]:
+    """Every action name a tool's schema declares, straight from its enums."""
+    schema = tool.get("input_schema") if isinstance(tool, dict) else None
+    actions: set[str] = set()
+    if not isinstance(schema, dict):
+        return actions
+    branches = list(schema.get("oneOf") or []) + [schema]
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        properties = branch.get("properties")
+        if not isinstance(properties, dict):
+            continue
+        action = properties.get("action")
+        if isinstance(action, dict) and isinstance(action.get("enum"), list):
+            actions.update(str(item) for item in action["enum"] if isinstance(item, str))
+    return actions
 
 
 def _rgb_matches_named_color(rgb: Any, color_name: str) -> bool:
@@ -911,6 +1098,15 @@ _DEVICE_WORD_TYPO_FIXES = {
     "deivce": "device",
     "chaneg": "change",
     "chnage": "change",
+    # Volume wording, and the "current" typo measured live ("what is it
+    # scurrent volume"): the intent gate and the speaker grounding both key on
+    # these words, so they have to be corrected before either runs.
+    "scurrent": "current",
+    "volum": "volume",
+    "volumn": "volume",
+    "voluem": "volume",
+    "vloume": "volume",
+    "voume": "volume",
 }
 
 
@@ -4302,6 +4498,15 @@ class Brain:
         if resolution_debug:
             details["skill_pronoun_resolution"] = resolution_debug
         try:
+            # Core owns the speaker's volume end to end: a question about the
+            # level is a read, and a relative change ("increase volume by 10")
+            # is read-then-act. Neither is left to the model, which invented
+            # both the change and the reading (measured live).
+            speaker_volume = self._core_speaker_volume(
+                user_request or "", capabilities, allowed_skill_ids
+            )
+            if speaker_volume is not None:
+                return speaker_volume
             # Core-owned groundings rescue only the argument classes the model
             # measured-unreliably fails on (RGB numbers, percent levels, exact
             # effect names). Needle always gets the first attempt.
@@ -4616,6 +4821,15 @@ class Brain:
                 if len(execution["outcomes"]) == 1
                 else execution
             )
+            # A music provider resolves a track into a stream URL; only the skill
+            # that owns the speaker can play it. The page has always made this
+            # handoff through the media API, and a spoken "play X" has to make
+            # the same one or the reply claims playback that never reached the
+            # device (measured live: "Playing "The Fate of Ophelia"" with nothing
+            # on the speaker).
+            playback_handoff = self._hand_over_media_playback(execution)
+            if playback_handoff is not None:
+                details["playback_handoff"] = playback_handoff
             # A pure catalog read is answered from Core's deterministic
             # data-to-text (the companion model previously acknowledged it
             # with "The device action was executed successfully.", dropping
@@ -4632,6 +4846,8 @@ class Brain:
                 execution,
                 user_request=acknowledgment_request if acknowledgment_request else user_request,
             )
+            if playback_handoff is not None:
+                reply = _playback_reply_with_handoff(reply, playback_handoff)
             first_action = (validated[0].get("arguments") or {}).get("action")
             rule = (
                 "nix_worker_skill_color_confirmed" if first_action == "color"
@@ -4703,6 +4919,218 @@ class Brain:
                 ),
                 "details": details,
             }
+
+    def _core_speaker_volume(
+        self,
+        text: str,
+        capabilities: list[dict[str, Any]],
+        allowed_skill_ids: set[str],
+    ) -> dict[str, Any] | None:
+        """Answer or perform a speaker-volume request Core can read exactly.
+
+        A question about the level is a read of what the speaker reports, and a
+        relative change ("increase volume by 10") is read-then-act: the current
+        level comes from the device and the target is a fraction of it, so Core
+        owns both. Left to the model, both were answered with invented text
+        (measured live: "Volume increased by 10 percent." with the speaker
+        untouched, and "Current volume is 80%." reported from nothing). Returns
+        a complete response dict, or None when the request is not a
+        Core-readable volume request (then the planner handles it as before).
+        """
+        intent = _speaker_volume_intent(text)
+        if intent is None:
+            return None
+        # A compound request ("set the volume to 55 and turn the light on")
+        # names more than one device action; Core owns each step separately, so
+        # it is left to the planner rather than answered as volume alone.
+        if re.search(
+            r"\b(?:and\s+then|then|after\s+that|while|also|plus|and|;)\s*"
+            r"(?:(?:please|then)\s+)*(?:turn|switch|power|set|make|change|apply|enable|disable|"
+            r"start|stop|brighten|dim|run|play|animate|show|on|off|mute|unmute)\b",
+            " ".join(str(text or "").casefold().split()),
+        ) is not None:
+            return None
+        speaker = next(
+            (
+                (spec.get("skill_id"), tool.get("name"), _declared_tool_actions(tool))
+                for spec in capabilities or []
+                if spec.get("skill_id") in allowed_skill_ids
+                for tool in (spec.get("tools") or [])
+                if isinstance(tool, dict) and "volume" in _declared_tool_actions(tool)
+            ),
+            None,
+        )
+        if speaker is None:
+            return None
+        skill_id, tool_name, _actions = speaker
+
+        def call(arguments: dict[str, Any]) -> dict[str, Any]:
+            matched = self.skill_runtime.validate_proposal({
+                "type": "skill_tool_call",
+                "skill_id": skill_id,
+                "tool": tool_name,
+                "arguments": arguments,
+            })
+            if matched is None:
+                raise SkillRuntimeError("The volume call did not validate for the speaker.")
+            outcome = self.skill_runtime.execute(matched)
+            result = outcome.get("result")
+            return result if isinstance(result, dict) else {}
+
+        details: dict[str, Any] = {
+            "model_called": False,
+            "skill_planner_called": False,
+            "conversation_model_called": False,
+            "skill_execution_confirmed": False,
+            "speaker_volume": {"kind": intent["kind"]},
+        }
+        # Both the answer and the relative target come from the speaker's own
+        # reported level, never from a guess.
+        try:
+            result = call({"action": "state"})
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_read_failed",
+                "reply": "I couldn't read the speaker's volume just now; try again in a moment.",
+                "details": {
+                    **details,
+                    "skill_error": f"{type(exc).__name__}: {str(exc)[:160]}",
+                },
+            }
+        current = _speaker_reported_volume(result)
+        if current is None:
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_read_failed",
+                "reply": "The speaker didn't report a volume level, so I can't answer that right now.",
+                "details": details,
+            }
+        details["speaker_volume"]["observed"] = round(current, 3)
+        if intent["kind"] == "read":
+            details["skill_execution_confirmed"] = True
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_read",
+                "reply": f"The speaker volume is at {int(round(current * 100))}%.",
+                "details": details,
+            }
+        delta = float(intent["delta"])
+        target = max(0.0, min(1.0, round(current + delta, 2)))
+        if abs(target - current) < 0.005:
+            reached = "maximum" if delta > 0 else "minimum"
+            details["skill_execution_confirmed"] = True
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_unchanged",
+                "reply": (
+                    f"The speaker volume is already at {reached} "
+                    f"({int(round(current * 100))}%)."
+                ),
+                "details": details,
+            }
+        try:
+            result = call({"action": "volume", "volume": target})
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_unconfirmed",
+                "reply": "I couldn't change the speaker's volume; try again in a moment.",
+                "details": {
+                    **details,
+                    "skill_error": f"{type(exc).__name__}: {str(exc)[:160]}",
+                },
+            }
+        reported = _speaker_reported_volume(result)
+        details["speaker_volume"].update({
+            "target": round(target, 3),
+            "reported": round(reported, 3) if reported is not None else None,
+        })
+        # The Dot quantises volume to its own steps, so the readback agrees with
+        # the request within one step rather than exactly.
+        if reported is None or abs(reported - target) > 0.08:
+            return {
+                "route": CHAT,
+                "rule": "nix_worker_skill_volume_unconfirmed",
+                "reply": "The speaker didn't confirm the volume change, so I can't say it changed.",
+                "details": details,
+            }
+        details["skill_execution_confirmed"] = True
+        return {
+            "route": CHAT,
+            "rule": "nix_worker_skill_volume_confirmed",
+            "reply": f"The speaker volume is now at {int(round(reported * 100))}%.",
+            "details": details,
+        }
+
+    def _hand_over_media_playback(self, execution: dict[str, Any]) -> dict[str, Any] | None:
+        """Give a resolved stream to the speaker skill, as the page does.
+
+        Returns the media API's handoff record when the executed plan resolved
+        playable audio, or None when the plan never produced a stream. The media
+        API owns the handoff (finding the skill that declares a URL playback
+        control, commanding it, and recording now-playing); importing it here
+        keeps one implementation instead of a second, drifting copy.
+        """
+        resolved: tuple[str, dict[str, Any]] | None = None
+        ambiguous: tuple[str, dict[str, Any]] | None = None
+        for outcome in execution.get("outcomes") or []:
+            if not isinstance(outcome, dict):
+                continue
+            result = outcome.get("result")
+            if not isinstance(result, dict):
+                continue
+            # A provider that could not tell which of several catalog matches the
+            # request meant answers with the candidates; the user is asked, and
+            # no track is started here (never guess on the user's behalf).
+            if ambiguous is None and result.get("ambiguous"):
+                ambiguous = (str(outcome.get("skill_id") or ""), result)
+                continue
+            if isinstance(result.get("play_url"), str) and result["play_url"]:
+                resolved = (str(outcome.get("skill_id") or ""), result)
+        if ambiguous is not None:
+            _skill_id, result = ambiguous
+            try:
+                # Deferred: the media API imports the console, which imports brain.
+                from music_api import play_options
+                import puca_panel
+            except Exception as exc:  # pragma: no cover - import-time misconfiguration
+                return {"supported": False, "error": f"{type(exc).__name__}: {exc}"}
+            offered = play_options(result) or []
+            if offered:
+                try:
+                    question = puca_panel.ask_choice(
+                        str(result.get("message") or ""),
+                        offered,
+                        source="play",
+                        query=str(result.get("query") or ""),
+                    )
+                except Exception as exc:
+                    return {"supported": False, "error": f"{type(exc).__name__}: {exc}"}
+                return {
+                    "supported": False,
+                    "ambiguous": True,
+                    "question": question,
+                    "options": question["options"],
+                    # A question nobody can see is worse than an honest refusal,
+                    # so the reply says where the choice is waiting.
+                    "panel": bool(puca_panel.panel_info().get("available")),
+                }
+            return {"supported": False, "error": str(result.get("message") or "ambiguous play request")}
+        if resolved is None:
+            return None
+        skill_id, result = resolved
+        try:
+            # Deferred: the media API imports the console, which imports brain.
+            from music_api import _start_playback
+        except Exception as exc:  # pragma: no cover - import-time misconfiguration
+            return {"supported": False, "error": f"{type(exc).__name__}: {exc}"}
+        try:
+            state = _start_playback(result, skill_id)
+        except Exception as exc:
+            return {"supported": False, "error": f"{type(exc).__name__}: {exc}"}
+        handoff = state.get("handoff")
+        return handoff if isinstance(handoff, dict) else {"supported": False, "error": "no handoff record"}
 
     def _compose_verified_skill_reply(
         self, execution: dict[str, Any], *, user_request: str = ""

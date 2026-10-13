@@ -856,7 +856,15 @@ class SkillRuntime:
             # song", "shuffle the queue" - targets the player instead of
             # falling through to chat, which cannot act on the queue.
             bool(re.search(
-                r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|repeating|loop|looping|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
+                r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|repeating|loop|looping|mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|"
+                # A relative volume change ("increase volume by 10", "lower the
+                # volume") is a device command too; without these verbs it fell
+                # through to chat, which invented "Volume increased by 10
+                # percent." while the speaker never changed (measured live).
+                r"status|state|increase|decrease|raise|lower|boost|reduce|louder|quieter|"
+                # The speaker's own noun is enough to address it: a question
+                # ("not the brightness, current volume") names no other verb.
+                r"volume|loudness|brightness)\b",
                 current,
             ))
             # Direct state questions about a device ("is the light on?")
@@ -968,6 +976,23 @@ class SkillRuntime:
         ) and re.search(
             r"\b(?:song|songs|track|tracks|tune|tunes|queue|playlist|playlists|"
             r"album|albums|artist|artists|music|playing)\b",
+            current,
+        ):
+            media_intent = True
+        # "like this song", "add this to my Focus playlist", "remove this from my
+        # liked music": a write to the linked library. The words are ordinary chat
+        # words too ("I like that playlist", "add milk to my shopping list"), so a
+        # write counts as playback only when it is the command this turn leads
+        # with (after a polite frame) and it names something to write about.
+        write_request = re.match(
+            r"^(?:(?:please|hey\s+nix|nix|ok|okay)[,\s]+)*"
+            r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?"
+            r"(?:like|liked|unlike|save|add|put|remove|delete|create|make|"
+            r"heart|favorite|favourite)\b",
+            current,
+        )
+        if not media_intent and write_request is not None and re.search(
+            r"\b(?:song|songs|track|tracks|tune|tunes|music|playlist|playlists)\b",
             current,
         ):
             media_intent = True

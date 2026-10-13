@@ -17,7 +17,10 @@ from brain import (
     _explicit_combined_color_intent,
     _explicit_color_request_skill,
     _explicit_named_color_intent,
+    _grounded_brightness_level,
+    _grounded_volume_level,
     _recent_assistant_rgb,
+    _speaker_volume_intent,
     _rgb_matches_named_color,
     _retry_failed_device_request,
     _unapplied_device_request,
@@ -2366,3 +2369,662 @@ def test_knowledge_failure_reply_hides_internal_status_codes():
     assert "no_function_selected" not in reply
     assert "Knowledge engine" not in reply
     assert reply.startswith("I couldn't complete that request")
+
+
+def test_a_stated_level_without_the_word_percent_is_grounded_by_core():
+    # Measured live: "set volume to 55", "set nix volume to 55" and "change nix
+    # volume to 55" all failed with "the dedicated skill planner did not
+    # produce a valid, safe plan" because the level was only recognised with
+    # the word "percent" or a "%" sign. The number is the level the user
+    # stated, on the same 0-100 scale the control's own UI shows.
+    for text, level in [
+        ("set volume to 55", 0.55),
+        ("set nix volume to 55", 0.55),
+        ("change nix volume to 55", 0.55),
+        ("turn the volume up to 55", 0.55),
+        ("volume 55", 0.55),
+        ("set volume 55", 0.55),
+        ("set the volume to 30 percent", 0.3),
+        ("set volume to 55%", 0.55),
+        ("set volume to 0.55", 0.55),
+        ("set volume to 100", 1.0),
+        ("set volume to 0", 0.0),
+    ]:
+        assert _grounded_volume_level(text) == {"volume": level}, text
+    # A number that is not stated as a level, or is out of range, is not one.
+    for text in ("set volume", "turn the volume up on device 3", "set volume to 101"):
+        assert _grounded_volume_level(text) is None, text
+    # Brightness is the same argument class on the same device.
+    assert _grounded_brightness_level("set brightness to 55") == {"brightness": 0.55}
+    assert _grounded_brightness_level("set brightness on device 3") is None
+    # A loudness level must never be grounded as brightness, and vice versa.
+    assert _grounded_brightness_level("set volume to 55") is None
+    assert _grounded_volume_level("set brightness to 55") is None
+
+
+# ── Music provider, driven by spoken user requests ───────────────────────
+#
+# The assistant is what makes spoken music work: a sentence has to arrive at the
+# provider as the right tool call, through the same path a real turn takes
+# (targeting, Core-owned grounding, validation, dispatch). The planner tests
+# cover the wording, and these drive the whole conversation so a Core-owned call
+# that is planned but never dispatched (or dispatched as something else) fails a
+# test instead of only being noticed out loud.
+MUSIC_SKILL_ID = "github:example/opendeck:opendeck"
+
+
+def _music_provider_spec():
+    """The OpenDeck manifest's tool surface, as the runtime advertises it."""
+    queue_ops = ["list", "add", "remove", "clear", "next", "play", "move", "front", "next_up", "shuffle", "repeat"]
+    save_kinds = ["like", "unlike", "playlist_add", "playlist_create"]
+    library_kinds = ["playlists", "likes", "history", "stats", "playlist"]
+    text = {"type": "string", "maxLength": 300}
+    return {
+        "skill_id": MUSIC_SKILL_ID,
+        "name": "OpenDeck",
+        "device_name": "OpenDeck",
+        "description": "Mock music provider",
+        "summary": "Mock music provider",
+        # The declared triggers the runtime matches on, held here so a spoken
+        # request is targeted the way the installed skill targets it.
+        "triggers": [
+            "opendeck", "play music", "play a song", "put on some music",
+            "my music library", "liked songs", "listening history", "my playlists",
+            "queue", "add to the queue", "play next", "next track", "skip track",
+            "play this next", "lyrics", "next queued track", "now playing",
+            "what's playing", "move in queue", "shuffle", "shuffle the queue",
+            "repeat this song", "repeat the queue", "stop repeating",
+        ],
+        "device_ui": {"media": {"provider": {"search": {"tool": "opendeck_music", "arguments": {"action": "search"}}}}},
+        "configured": True,
+        "trusted": True,
+        "runnable": True,
+        "tools": [{
+            "name": "opendeck_music",
+            "description": "Search, play, queue and save music.",
+            "input_schema": {
+                "type": "object",
+                "oneOf": [
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["search"]}, "query": text}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["library"]}, "kind": {"type": "string", "enum": library_kinds}, "playlist_id": {"type": "string", "maxLength": 100}}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["play"]}, "query": text, "video_id": {"type": "string", "maxLength": 64}}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["queue"]}, "op": {"type": "string", "enum": queue_ops}, "query": text, "index": {"type": "integer", "minimum": 0, "maximum": 99}, "to": {"type": "integer", "minimum": 0, "maximum": 99}, "on": {"type": "boolean"}, "mode": {"type": "string", "enum": ["off", "all", "one"]}}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["lyrics"]}, "title": text}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["now_playing"]}}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["save"]}, "kind": {"type": "string", "enum": save_kinds}, "video_id": {"type": "string", "maxLength": 64}, "playlist_id": {"type": "string", "maxLength": 100}, "name": {"type": "string", "maxLength": 120}, "title": text}, "required": ["action", "kind"]},
+                ],
+                "properties": {
+                    "action": {"type": "string", "enum": ["search", "library", "play", "queue", "lyrics", "now_playing", "save"]},
+                    "kind": {"type": "string", "enum": library_kinds + save_kinds},
+                    "query": text,
+                    "op": {"type": "string", "enum": queue_ops},
+                    "name": {"type": "string", "maxLength": 120},
+                    "video_id": {"type": "string", "maxLength": 64},
+                    "playlist_id": {"type": "string", "maxLength": 100},
+                    "title": text,
+                    "index": {"type": "integer", "minimum": 0, "maximum": 99},
+                    "to": {"type": "integer", "minimum": 0, "maximum": 99},
+                    "on": {"type": "boolean"},
+                    "mode": {"type": "string", "enum": ["off", "all", "one"]},
+                },
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+        }],
+    }
+
+
+class MusicSkillRuntime:
+    """A music provider that records the calls the assistant actually dispatches."""
+
+    skill_id = MUSIC_SKILL_ID
+
+    def __init__(self):
+        self.spec = _music_provider_spec()
+        self.validations = []
+        self.executions = []
+
+    def installed_skill_specs(self, only_runnable=False):
+        return [self.spec]
+
+    def targeted_skill_specs(self, text, history=None):
+        """Mirror the runtime's media rules: a declared trigger, a media verb, or
+        an imperative library write (the only music skill installed here)."""
+        current = " ".join(str(text or "").casefold().split())
+
+        def contains(term):
+            return bool(term and re.search(rf"(?<![a-z0-9]){re.escape(term.casefold())}(?![a-z0-9])", current))
+
+        actionable = bool(re.search(
+            r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|"
+            r"repeat|repeating|loop|looping|mute|unmute|say|stop|disable|enable|"
+            r"brighten|dim|paint|animate|show|list|what|which|tell|apply|status|state)\b",
+            current,
+        ))
+        if actionable and any(contains(term) for term in (self.spec["name"], self.spec["device_name"], *self.spec["triggers"])):
+            return [self.spec]
+        media_verb = bool(re.search(
+            r"\b(?:play|playing|pause|paused|resume|skip|next|previous|queue|search|find|lyrics|sing|shuffle)\b",
+            current,
+        ))
+        write_request = re.match(
+            r"^(?:(?:please|hey\s+nix|nix|ok|okay)[,\s]+)*"
+            r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?"
+            r"(?:like|liked|unlike|save|add|put|remove|delete|create|make|heart|favorite|favourite)\b",
+            current,
+        )
+        names_media = bool(re.search(
+            r"\b(?:song|songs|track|tracks|tune|tunes|music|playlist|playlists)\b", current
+        ))
+        if media_verb or (write_request is not None and names_media):
+            return [self.spec]
+        return []
+
+    def trigger_candidate(self, _text):
+        return None
+
+    def status(self, _skill_id):
+        return {"runnable": True, "configured": True, "trusted": True}
+
+    def proposal_context(self, skill_ids=None):
+        return json.dumps([self.spec])
+
+    def validate_proposal(self, proposal):
+        self.validations.append(proposal)
+        if proposal.get("skill_id") != MUSIC_SKILL_ID:
+            raise SkillRuntimeError("not supplied")
+        if proposal.get("tool") != "opendeck_music":
+            raise SkillRuntimeError("undeclared tool")
+        arguments = proposal.get("arguments")
+        if not isinstance(arguments, dict) or not isinstance(arguments.get("action"), str):
+            raise SkillRuntimeError("invalid schema")
+        return {"skill_id": MUSIC_SKILL_ID, "tool": {"name": "opendeck_music"}, "arguments": arguments}
+
+    def execute(self, matched):
+        self.executions.append(matched)
+        arguments = matched["arguments"]
+        result = {"ok": True, "action": arguments["action"], "message": "Done."}
+        if arguments["action"] == "queue":
+            result["message"] = "Queued it." if arguments.get("op") == "add" else "Queue updated."
+        elif arguments["action"] == "save":
+            result["message"] = "Saved it."
+        elif arguments["action"] == "play":
+            # A provider play resolves the track into a stream URL; only the
+            # speaker skill can actually play it, which is the handoff under test.
+            result.update({
+                "message": "Playing “The Fate of Ophelia” on OpenDeck.",
+                "video_id": "fate-ophelia",
+                "title": "The Fate of Ophelia",
+                "artist": "Taylor Swift",
+                "duration_sec": 200,
+                "play_url": "http://music.example/api/media/stream?url=ophelia",
+            })
+        return {
+            "ok": True,
+            "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music",
+            "arguments": arguments,
+            "result": result,
+        }
+
+
+class ScriptedMusicPlanner:
+    """A planner that answers with one prepared music plan.
+
+    A plain "play <song>" is the model's step (only the arguments the model
+    measures badly are Core-owned), so the handoff tests script that step and
+    keep every other stage — targeting, validation, dispatch, handoff — real.
+    """
+
+    def __init__(self, arguments):
+        self.arguments = arguments
+        self.requests = []
+
+    def plan(self, **kwargs):
+        self.requests.append(kwargs.get("user_text"))
+        return [{
+            "type": "skill_tool_call",
+            "skill_id": MUSIC_SKILL_ID,
+            "tool": "opendeck_music",
+            "arguments": dict(self.arguments),
+        }]
+
+
+def _music_brain(runtime, planner=None):
+    """A brain whose only installed skill is the music provider.
+
+    The Needle adapter is a stand-in that records any use: a Core-owned request
+    never reaches it, so a plan that leaks to the model fails the test.
+    """
+    if planner is not None:
+        captured: dict[str, Any] = {}
+    else:
+        planner, captured = _fake_needle_planner({"unexpected": True})
+    chat = ProposalChat("unexpected")
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        skill_planner=planner, log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+    return brain, captured
+
+
+def test_spoken_queue_requests_reach_the_music_provider():
+    # "add the song believer to the queue" and "play the song believer next" are
+    # the phrasings a person actually uses; "the song" points at which thing is
+    # meant, so it comes off the track before the provider is asked to find it.
+    expected = [
+        ("add the song believer to the queue", {"action": "queue", "op": "add", "query": "believer"}),
+        ("add the song Believer to my queue", {"action": "queue", "op": "add", "query": "believer"}),
+        ("queue up Bohemian Rhapsody", {"action": "queue", "op": "add", "query": "bohemian rhapsody"}),
+        ("play the song believer next", {"action": "queue", "op": "next_up", "query": "believer"}),
+        ("play the song Believer first", {"action": "queue", "op": "front", "query": "believer"}),
+        ("play the next queued track", {"action": "queue", "op": "next"}),
+        ("what's in my queue?", {"action": "queue", "op": "list"}),
+        ("clear the queue", {"action": "queue", "op": "clear"}),
+        ("shuffle the queue", {"action": "queue", "op": "shuffle", "on": True}),
+        ("repeat the queue", {"action": "queue", "op": "repeat", "mode": "all"}),
+    ]
+    for request, arguments in expected:
+        runtime = MusicSkillRuntime()
+        brain, captured = _music_brain(runtime)
+        response = brain.handle(text=request)
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert [execution["arguments"] for execution in runtime.executions] == [arguments], request
+        assert "init" not in captured, request  # Core read the request exactly
+
+
+def test_spoken_like_and_playlist_requests_reach_the_music_provider():
+    # A like, an unlike and a playlist write change the user's own account, so the
+    # whole call is Core-owned: the track is the one the provider last handed to
+    # the speaker (a spoken "this song" names no id at all), and the playlist is
+    # the name the user said, which the provider matches or creates.
+    expected = [
+        ("like this song", {"action": "save", "kind": "like"}),
+        ("can you like this song", {"action": "save", "kind": "like"}),
+        ("add this song to my liked music", {"action": "save", "kind": "like"}),
+        ("save this to my liked songs", {"action": "save", "kind": "like"}),
+        ("unlike this song", {"action": "save", "kind": "unlike"}),
+        ("remove this song from my liked music", {"action": "save", "kind": "unlike"}),
+        ("add this song to my Hindi Songs playlist", {"action": "save", "kind": "playlist_add", "name": "Hindi Songs"}),
+        ("put this track in my Focus playlist", {"action": "save", "kind": "playlist_add", "name": "Focus"}),
+        ("create a playlist called Road Trip", {"action": "save", "kind": "playlist_create", "name": "Road Trip"}),
+    ]
+    for request, arguments in expected:
+        runtime = MusicSkillRuntime()
+        brain, captured = _music_brain(runtime)
+        response = brain.handle(text=request)
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert [execution["arguments"] for execution in runtime.executions] == [arguments], request
+        assert "init" not in captured, request
+
+
+def test_spoken_library_reads_reach_the_music_provider():
+    expected = [
+        ("show my liked songs", {"action": "library", "kind": "likes"}),
+        ("show me my playlists", {"action": "library", "kind": "playlists"}),
+        ("show my listening history", {"action": "library", "kind": "history"}),
+        ("what's playing?", {"action": "now_playing"}),
+        ("search for Bohemian Rhapsody", {"action": "search", "query": "bohemian rhapsody"}),
+    ]
+    for request, arguments in expected:
+        runtime = MusicSkillRuntime()
+        brain, captured = _music_brain(runtime)
+        response = brain.handle(text=request)
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert [execution["arguments"] for execution in runtime.executions] == [arguments], request
+        assert "init" not in captured, request
+
+
+def test_spoken_play_requests_reach_the_provider_without_the_model(monkeypatch):
+    # The failing shapes from the live session: the same "play <track>" request
+    # planned by the model two different ways, one of which was refused with
+    # "the dedicated skill planner did not produce a valid, safe plan". Core owns
+    # the track now, so none of these reach the model at all.
+    import music_api
+
+    monkeypatch.setattr(
+        music_api, "_start_playback",
+        lambda result, skill_id, *, queue=None: {"handoff": {"supported": True, "result": {"ok": True}}},
+    )
+    expected = [
+        ("play believer", "believer"),
+        ("Hey Luna Play believer", "believer"),
+        ("play starboy", "starboy"),
+        ("play starboy by the weekend", "starboy by the weekend"),
+        ("play the son starboy", "starboy"),
+        ("play the song maps by maroon five", "maps by maroon five"),
+        ("play mad love by Mable", "mad love by Mable"),
+    ]
+    for request, query in expected:
+        runtime = MusicSkillRuntime()
+        brain, captured = _music_brain(runtime)
+        response = brain.handle(text=request)
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert [execution["arguments"] for execution in runtime.executions] == [
+            {"action": "play", "query": query}
+        ], request
+        assert "init" not in captured, request
+
+
+def test_a_spoken_play_hands_the_resolved_stream_to_the_speaker(monkeypatch):
+    # A provider resolves the track into a stream; only the skill that owns the
+    # speaker plays it. Without this handoff a spoken "play X" was answered with
+    # the provider's sentence and nothing ever reached the device.
+    import music_api
+
+    runtime = MusicSkillRuntime()
+    planner = ScriptedMusicPlanner({"action": "play", "query": "fate of ophelia by taylor swift"})
+    brain, _captured = _music_brain(runtime, planner)
+    handed = []
+
+    def fake_start_playback(result, skill_id, *, queue=None):
+        handed.append({"result": result, "skill_id": skill_id, "queue": queue})
+        return {"handoff": {"supported": True, "skill_id": "github:example:echo-connect", "result": {"ok": True}}}
+
+    monkeypatch.setattr(music_api, "_start_playback", fake_start_playback)
+    response = brain.handle(text="play fate of ophelia by taylor swift")
+
+    assert response["details"]["skill_execution_confirmed"] is True
+    assert len(handed) == 1
+    assert handed[0]["skill_id"] == MUSIC_SKILL_ID
+    assert handed[0]["result"]["play_url"].startswith("http")
+    # The handoff succeeded, so the provider's own sentence stands.
+    assert response["reply"] == "Playing “The Fate of Ophelia” on OpenDeck."
+    assert response["details"]["playback_handoff"]["supported"] is True
+
+
+def test_a_play_that_cannot_reach_the_speaker_is_reported_honestly(monkeypatch):
+    import music_api
+
+    runtime = MusicSkillRuntime()
+    planner = ScriptedMusicPlanner({"action": "play", "query": "fate of ophelia by taylor swift"})
+    brain, _captured = _music_brain(runtime, planner)
+
+    def fake_start_playback(result, skill_id, *, queue=None):
+        return {
+            "handoff": {
+                "supported": False,
+                "reason": "No installed skill declares a URL playback control.",
+            }
+        }
+
+    monkeypatch.setattr(music_api, "_start_playback", fake_start_playback)
+    response = brain.handle(text="play fate of ophelia by taylor swift")
+
+    # The provider says "Playing ..." — reporting that as playback while the
+    # speaker never received the stream is exactly the claim to avoid.
+    assert "nothing is playing" in response["reply"]
+    assert response["details"]["playback_handoff"]["supported"] is False
+
+
+def test_a_like_of_a_song_the_user_names_is_left_to_the_planner():
+    # "like this song" is the track that is playing, but "save Believer to my
+    # Focus playlist" names another track: the provider has to search for it
+    # first, so Core must not send a like for whatever happens to be playing.
+    runtime = MusicSkillRuntime()
+    brain, captured = _music_brain(runtime)
+    response = brain.handle(text="add Believer to my Focus playlist")
+
+    assert runtime.executions == []
+    assert response["details"]["skill_execution_confirmed"] is not True
+    assert "init" in captured
+
+
+# ── Speaker volume, driven by spoken user requests ────────────────────────
+#
+# Volume is the argument class Core can read exactly: a question about the
+# level is a read of what the speaker reports, and a relative change
+# ("increase volume by 10") is read-then-act. Left to the model, both were
+# answered with invented text — "Volume increased by 10 percent." with the
+# speaker untouched, and "Current volume is 80%." reported from nothing.
+SPEAKER_SKILL_ID = "github:example:echo-connect"
+
+
+def _speaker_provider_spec():
+    """The Echo Connect manifest's tool surface, as the runtime advertises it."""
+    return {
+        "skill_id": SPEAKER_SKILL_ID,
+        "name": "Echo Connect",
+        "device_name": "Nix Dev",
+        "description": "Mock speaker",
+        "summary": "Mock speaker",
+        "triggers": ["echo connect", "speaker", "volume", "speaker volume", "mute", "unmute", "say"],
+        "device_ui": {
+            "status_tool": "control_ring",
+            "status_arguments": {"action": "state"},
+            "controls": [
+                {"label": "Set volume", "tool": "control_ring", "arguments": {"action": "volume"}, "fields": [{"name": "volume"}]},
+                {"label": "Mute", "tool": "control_ring", "arguments": {"action": "mute"}, "fields": []},
+            ],
+        },
+        "configured": True,
+        "trusted": True,
+        "runnable": True,
+        "tools": [{
+            "name": "control_ring",
+            "description": "Control the ring and the speaker.",
+            "input_schema": {
+                "type": "object",
+                "oneOf": [
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["state", "mute", "unmute"]}}, "required": ["action"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["volume"]}, "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0}}, "required": ["action", "volume"]},
+                ],
+                "properties": {
+                    "action": {"type": "string", "enum": ["state", "mute", "unmute", "volume"]},
+                    "volume": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                },
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+        }],
+    }
+
+
+class SpeakerSkillRuntime:
+    """A speaker provider that records the calls the assistant actually dispatches."""
+
+    skill_id = SPEAKER_SKILL_ID
+
+    def __init__(self, volume=0.5, step=None):
+        self.spec = _speaker_provider_spec()
+        self.volume = float(volume)
+        # The Dot quantises volume to its own steps; None means an exact device.
+        self.step = step
+        self.executions = []
+        self.validations = []
+
+    def _reported(self):
+        if self.step:
+            return max(0.0, min(1.0, round(round(self.volume / self.step) * self.step, 4)))
+        return round(self.volume, 2)
+
+    def installed_skill_specs(self, only_runnable=False):
+        return [self.spec]
+
+    def targeted_skill_specs(self, text, history=None):
+        """Mirror the runtime's device targeting for the only installed skill."""
+        current = " ".join(str(text or "").casefold().split())
+
+        def contains(term):
+            return bool(term and re.search(rf"(?<![a-z0-9]){re.escape(term.casefold())}(?![a-z0-9])", current))
+
+        actionable = bool(re.search(
+            r"\b(?:turn|switch|power|set|make|change|run|start|play|queue|shuffle|repeat|repeating|loop|looping|"
+            r"mute|unmute|say|stop|disable|enable|brighten|dim|paint|animate|show|list|what|which|tell|apply|"
+            r"status|state|increase|decrease|raise|lower|boost|reduce|louder|quieter|"
+            r"volume|loudness|brightness)\b",
+            current,
+        ))
+        if actionable and any(contains(term) for term in (self.spec["name"], self.spec["device_name"], *self.spec["triggers"])):
+            return [self.spec]
+        return []
+
+    def trigger_candidate(self, _text):
+        return None
+
+    def status(self, _skill_id):
+        return {"runnable": True, "configured": True, "trusted": True}
+
+    def proposal_context(self, skill_ids=None):
+        return json.dumps([self.spec] if self.skill_id in (skill_ids or []) else [])
+
+    def validate_proposal(self, proposal):
+        self.validations.append(proposal)
+        if proposal.get("skill_id") != SPEAKER_SKILL_ID:
+            raise SkillRuntimeError("not supplied")
+        if proposal.get("tool") != "control_ring":
+            raise SkillRuntimeError("undeclared tool")
+        arguments = proposal.get("arguments")
+        action = arguments.get("action") if isinstance(arguments, dict) else None
+        if action not in {"state", "volume"}:
+            raise SkillRuntimeError("invalid schema")
+        if action == "volume" and not isinstance(arguments.get("volume"), (int, float)):
+            raise SkillRuntimeError("invalid volume")
+        return {"skill_id": SPEAKER_SKILL_ID, "tool": {"name": "control_ring"}, "arguments": arguments}
+
+    def execute(self, matched):
+        self.executions.append(matched)
+        arguments = matched["arguments"]
+        if arguments["action"] == "volume":
+            self.volume = float(arguments["volume"])
+        result = {
+            "ok": True,
+            "action": arguments["action"],
+            "state": {"on": True, "rgb": [0, 0, 0], "brightness": 1.0, "effect": "None"},
+            "speaker": {"volume": self._reported(), "muted": False, "state": "idle"},
+            "device_connected": True,
+            "device_name": "Nix Dev",
+            "available_effects": ["None", "Rainbow"],
+            "message": "Done.",
+        }
+        return {
+            "ok": True,
+            "skill_id": SPEAKER_SKILL_ID,
+            "tool": "control_ring",
+            "arguments": arguments,
+            "result": result,
+        }
+
+
+def _speaker_brain(runtime):
+    planner, captured = _fake_needle_planner({"unexpected": True})
+    chat = ProposalChat("unexpected")
+    brain = brain_for_test(
+        knowledge=FakeKnowledge({}), actions=FakeActions(), ollama=chat,
+        skill_planner=planner, log_requests=False,
+    )
+    brain.skill_runtime = runtime
+    brain.skill_manager = SkillManager(runtime)
+    return brain, captured
+
+
+def test_a_spoken_relative_volume_change_reads_the_device_then_sets_it():
+    # Measured live: "increase volume by 10" was answered "Volume increased by
+    # 10 percent." with the speaker untouched, and "increase volume by 10 more"
+    # with a fabricated "the Echo Dot has reached maximum volume". Core reads
+    # the speaker's own level first, so both are real changes from the device.
+    for request, start, expected in [
+        ("increase volume by 10", 0.50, 0.60),
+        ("increase volume by 10 more", 0.60, 0.70),
+        ("raise the volume by 20 percent", 0.30, 0.50),
+        ("decrease volume by 5", 0.50, 0.45),
+        ("turn the volume up", 0.40, 0.50),
+        ("turn the volume down", 0.40, 0.30),
+    ]:
+        runtime = SpeakerSkillRuntime(volume=start)
+        brain, captured = _speaker_brain(runtime)
+        response = brain.handle(text=request)
+        arguments = [execution["arguments"] for execution in runtime.executions]
+        assert arguments[0] == {"action": "state"}, (request, arguments)
+        assert arguments[1] == {"action": "volume", "volume": expected}, (request, arguments)
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert response["reply"] == f"The speaker volume is now at {int(expected * 100)}%.", (request, response["reply"])
+        assert "init" not in captured, request
+
+
+def test_a_spoken_volume_change_reports_what_the_device_reports():
+    # The Dot quantises volume to its own steps, so the reply quotes the level
+    # the device actually reported rather than the fraction that was requested.
+    runtime = SpeakerSkillRuntime(volume=0.55, step=1 / 15)
+    brain, _captured = _speaker_brain(runtime)
+    response = brain.handle(text="increase volume by 10")
+    reported = runtime._reported()
+    assert response["reply"] == f"The speaker volume is now at {int(round(reported * 100))}%.", response["reply"]
+
+
+def test_a_spoken_volume_change_at_the_ceiling_says_so_instead_of_inventing_a_refusal():
+    runtime = SpeakerSkillRuntime(volume=1.0)
+    brain, _captured = _speaker_brain(runtime)
+    response = brain.handle(text="increase volume by 10 more")
+    assert response["reply"] == "The speaker volume is already at maximum (100%).", response["reply"]
+    assert response["details"]["skill_execution_confirmed"] is True
+    # No volume write was dispatched: the level cannot go up from the ceiling.
+    assert [execution["arguments"]["action"] for execution in runtime.executions] == ["state"]
+
+
+def test_a_spoken_volume_question_answers_with_the_speakers_own_level():
+    # Measured live: "what is it scurrent volume" was answered with the ring's
+    # brightness state, and "not the brightness, current volume" with a
+    # fabricated "Current volume is 80%." Both are reads of the speaker.
+    for request, volume in [
+        ("what is the current volume", 0.93),
+        ("what is it scurrent volume", 0.42),
+        ("not the brightness, current volume", 0.80),
+        ("current volume", 0.0),
+    ]:
+        runtime = SpeakerSkillRuntime(volume=volume)
+        brain, captured = _speaker_brain(runtime)
+        response = brain.handle(text=request)
+        assert [execution["arguments"] for execution in runtime.executions] == [{"action": "state"}], request
+        assert response["reply"] == f"The speaker volume is at {int(round(volume * 100))}%.", (request, response["reply"])
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert "init" not in captured, request
+
+
+def test_volume_wording_is_read_exactly_and_never_steals_an_absolute_level():
+    assert _speaker_volume_intent("increase volume by 10") == {"kind": "relative", "delta": 0.10}
+    assert _speaker_volume_intent("increase volume by 10 more") == {"kind": "relative", "delta": 0.10}
+    assert _speaker_volume_intent("raise the volume by 20 percent") == {"kind": "relative", "delta": 0.20}
+    assert _speaker_volume_intent("decrease volume by 5") == {"kind": "relative", "delta": -0.05}
+    assert _speaker_volume_intent("turn the volume down") == {"kind": "relative", "delta": -0.10}
+    assert _speaker_volume_intent("what is the current volume") == {"kind": "read"}
+    assert _speaker_volume_intent("current volume") == {"kind": "read"}
+    # An absolute level is grounded by _grounded_volume_level, not here.
+    assert _speaker_volume_intent("set volume to 55") is None
+    assert _speaker_volume_intent("turn the volume up to 55") is None
+    # Any other mention of the speaker's volume is a read, so a level the user
+    # asks about is answered from the device instead of left to the model.
+    assert _speaker_volume_intent("the volume is loud") == {"kind": "read"}
+    # Nothing about the speaker's volume at all is left alone.
+    assert _speaker_volume_intent("play some music") is None
+    assert _speaker_volume_intent("turn on the ring light") is None
+
+
+def test_a_compound_request_is_not_answered_as_volume_alone():
+    # "set the volume to 55 and turn on the ring light" names two device
+    # actions; the volume handler must not swallow it as volume alone.
+    runtime = SpeakerSkillRuntime(volume=0.5)
+    brain, _captured = _speaker_brain(runtime)
+    response = brain.handle(text="set the volume to 55 and turn on the ring light")
+    assert "speaker_volume" not in response["details"], response["details"]
+    assert runtime.executions == []
+
+
+def test_a_brightness_request_is_never_read_as_volume():
+    # The two levels share a device and a notation, so the wording has to keep
+    # them apart in both directions.
+    for request in (
+        "increase the brightness by 10",
+        "turn the brightness up",
+        "set brightness to 55",
+        "dim the light",
+    ):
+        assert _speaker_volume_intent(request) is None, request
+    for request in (
+        "increase volume by 10",
+        "turn the volume up",
+        "set volume to 55",
+    ):
+        assert _grounded_brightness_level(request) is None, request
