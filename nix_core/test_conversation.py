@@ -3163,6 +3163,194 @@ def test_a_voice_or_compound_request_is_never_read_as_music_transport(monkeypatc
     assert dispatched == []
 
 
+# ── A pronoun play and a question about the chat ──────────────────────────
+# Measured live, in one conversation: the assistant said it loved “I Will Always
+# Love You”, "can you play that song on nix" came back as "the dedicated skill
+# planner did not produce a valid, safe plan" (it had been cleansed to "play the
+# song on nix", which names no track), and the three follow-up questions ("what
+# song did I ask you to play") were cleansed into imperatives and answered with
+# the same failure sentence.
+def _favourite_song_history():
+    return [
+        {"role": "user", "content": "hey"},
+        {"role": "assistant", "content": "hey, how's it going?"},
+        {"role": "user", "content": "what's you favourite song you said"},
+        {"role": "assistant", "content": 'oh, I love “I Will Always Love You” by Whitney Houston'},
+    ]
+
+
+def test_a_pronoun_play_uses_the_track_the_conversation_named(monkeypatch):
+    import music_api
+
+    asked: list[tuple[str, dict]] = []
+    handed: list[dict] = []
+
+    def fake_provider_call(key, extra=None):
+        asked.append((key, extra))
+        return "github:example:opendeck", {
+            "ok": True, "action": "play",
+            "message": "Playing “I Will Always Love You” by Whitney Houston on OpenDeck.",
+            "video_id": "abc12345678", "title": "I Will Always Love You",
+            "artist": "Whitney Houston", "duration_sec": 200, "artwork_url": "",
+            "mime_type": "audio/mp4", "play_url": "http://speaker/stream",
+        }
+
+    def fake_start_playback(result, skill_id, *, queue=None):
+        handed.append({"result": result, "skill_id": skill_id})
+        return {"handoff": {"supported": True, "skill_id": skill_id, "result": {"ok": True}}}
+
+    monkeypatch.setattr(music_api, "_provider_call", fake_provider_call)
+    monkeypatch.setattr(music_api, "_start_playback", fake_start_playback)
+    brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+    response = brain.handle(text="can you play that song on nix", session_context=_favourite_song_history())
+
+    assert asked == [("play", {"query": "I Will Always Love You"})]
+    assert len(handed) == 1
+    assert response["reply"] == "Playing “I Will Always Love You” by Whitney Houston on OpenDeck."
+    assert response["details"]["music_play_followup"]["source"] == "conversation"
+    assert response["details"]["skill_planner_called"] is False
+    assert "init" not in captured
+
+
+def test_a_pronoun_play_resolves_against_the_question_already_asked(monkeypatch):
+    import music_api
+    import puca_panel
+
+    puca_panel.ask_choice(
+        "“senorita” matches 2 tracks.",
+        [
+            {"video_id": "a", "title": "Senorita (Torero)", "artist": "X"},
+            {"video_id": "b", "title": "Namaste Senorita", "artist": "Y"},
+        ],
+        source="play",
+        query="senorita",
+    )
+    asked: list[str] = []
+    try:
+        monkeypatch.setattr(music_api, "_provider_call", lambda key, extra=None: asked.append(key) or ("skill", {}))
+        brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+        response = brain.handle(text="play that")
+        # The open question is the answer: search again and it matches the same
+        # two tracks, so no search runs and nothing is guessed at.
+        assert asked == []
+        assert response["rule"] == "nix_music_play_choice_waiting"
+        assert "Senorita (Torero)" in response["reply"] and "Namaste Senorita" in response["reply"]
+        assert puca_panel.pending_question() is not None
+    finally:
+        puca_panel.clear_question()
+
+
+def test_a_pronoun_play_with_nothing_to_refer_to_asks_for_a_name(monkeypatch):
+    import brain as brain_module
+    import music_api
+
+    monkeypatch.setattr(
+        music_api, "_provider_call",
+        lambda key, extra=None: pytest.fail("a pronoun play with no track must not search"),
+    )
+    # No track named in the chat, and an idle speaker whose remembered track is
+    # not a reference to anything.
+    for track, player in (({}, {"state": "idle"}), ({"title": "Run It"}, {"state": "off"})):
+        monkeypatch.setattr(brain_module, "_music_now_state", lambda track=track, player=player: (track, player))
+        brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+        response = brain.handle(text="play that")
+        assert response["rule"] == "nix_music_play_reference_unknown", (track, player)
+        assert "name the track" in response["reply"]
+
+
+def test_a_pronoun_play_can_replay_the_track_the_speaker_has(monkeypatch):
+    import brain as brain_module
+    import music_api
+
+    monkeypatch.setattr(
+        brain_module, "_music_now_state",
+        lambda: ({"title": "Run It", "artist": "Jelly Roll"}, {"state": "paused"}),
+    )
+    asked: list[tuple[str, dict]] = []
+
+    def fake_provider_call(key, extra=None):
+        asked.append((key, extra))
+        return "github:example:opendeck", {
+            "ok": True, "action": "play", "message": "Playing “Run It” by Jelly Roll on OpenDeck.",
+            "video_id": "abc12345678", "title": "Run It", "artist": "Jelly Roll",
+            "duration_sec": 159, "artwork_url": "", "mime_type": "audio/mp4",
+            "play_url": "http://speaker/stream",
+        }
+
+    monkeypatch.setattr(music_api, "_provider_call", fake_provider_call)
+    monkeypatch.setattr(
+        music_api, "_start_playback",
+        lambda result, skill_id, *, queue=None: {"handoff": {"supported": True, "skill_id": skill_id, "result": {"ok": True}}},
+    )
+    brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+    response = brain.handle(text="play that song")
+
+    assert asked == [("play", {"query": "Run It"})]
+    assert response["details"]["music_play_followup"]["source"] == "speaker"
+    assert response["details"]["skill_execution_confirmed"] is True
+    assert "Run It" in response["reply"]
+    assert "init" not in captured
+
+
+def test_a_question_about_the_chat_is_answered_from_the_chat(monkeypatch):
+    import brain as brain_module
+
+    monkeypatch.setattr(
+        brain_module, "_music_now_state",
+        lambda: ({"title": "Run It", "artist": "Jelly Roll"}, {"state": "paused"}),
+    )
+    history = [
+        *_favourite_song_history(),
+        {"role": "user", "content": "can you play that song on nix"},
+        {"role": "assistant", "content": "I didn't send a device command because the plan was refused."},
+    ]
+    for request in (
+        "what song did I ask you to play",
+        "what sign did U ask you to play just now",
+        "what song did I ask you to play just now on nix",
+    ):
+        brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+        response = brain.handle(text=request, session_context=history)
+        assert response["rule"] == "nix_music_recall", request
+        assert "You asked me to play “can you play that song on nix”" in response["reply"], request
+        assert "Run It" in response["reply"] and "paused" in response["reply"], request
+        assert response["details"]["skill_planner_called"] is False, request
+        assert "init" not in captured, request
+    # Without the music noun the same question is the session recap's: it lists
+    # what the user sent, which is a straight answer to it and still never
+    # reaches the device planner.
+    brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+    response = brain.handle(text="what did I ask you to play", session_context=history)
+    assert response["rule"] == "nix_session_recap"
+    assert "can you play that song on nix" in response["reply"]
+    assert "init" not in captured
+
+
+def test_pronoun_play_and_recall_wording_is_read_exactly():
+    from brain import _music_play_reference, _music_recall_question, _single_assistant_track
+
+    assert _music_play_reference("can you play that song on nix", ["Nix Dev"]) is True
+    assert _music_play_reference("play it") is True
+    assert _music_play_reference("play the song") is True
+    # A named track is the planner's, and "some music" is not a reference at all.
+    assert _music_play_reference("play blinding lights") is False
+    assert _music_play_reference("play the song believer") is False
+    assert _music_play_reference("play some music") is False
+    assert _music_play_reference("pause") is False
+
+    assert _music_recall_question("what song did I ask you to play") is True
+    assert _music_recall_question("what sign did U ask you to play just now") is True
+    assert _music_recall_question("what did I ask you to play") is True
+    # A read of the speaker is not a question about the chat.
+    assert _music_recall_question("what's playing") is False
+    assert _music_recall_question("play blinding lights") is False
+
+    assert _single_assistant_track('oh, I love “I Will Always Love You” by Whitney Houston') == "I Will Always Love You"
+    # Two quoted names are the choices the user is being asked to pick from.
+    assert _single_assistant_track('“senorita” matches 2 tracks. “Senorita (Torero)”, “Namaste Senorita”.') is None
+    assert _single_assistant_track("I didn't send a device command.") is None
+
+
 def test_a_compound_request_is_not_answered_as_volume_alone():
     # "set the volume to 55 and turn on the ring light" names two device
     # actions; the volume handler must not swallow it as volume alone.

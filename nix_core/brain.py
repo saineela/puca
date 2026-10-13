@@ -944,19 +944,17 @@ _MUSIC_TRANSPORT_PHRASES: dict[tuple[str, ...], tuple[str, str]] = {
 }
 
 
-def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tuple[str, str] | None:
-    """The speaker command a spoken transport request names, or None.
+def _music_request_words(text: str, device_names: Sequence[str] = ()) -> list[str]:
+    """The words of a music request, with the framing and the device name gone.
 
-    Returns ``(command, wording)``: the command to run against the speaker
-    (``pause``, ``resume``, ``mute`` or ``unmute``) and the word the user used,
-    which is what the confirmation is phrased from. A named device
-    ("stop music on nix") is the speaker, so its name comes off first. Anything
-    with a second action in it ("pause the music and turn on the light") or with
-    a word that is not one of these commands is left to the normal path.
+    Every spoken music request is read the same way first: wake word and polite
+    frame off ("hey nix, can you …"), the named device off ("stop music on nix"),
+    and the articles left in place so a caller can still tell "the song" (a
+    reference) from "some music" (no reference at all).
     """
     clean = " ".join(str(text or "").casefold().split())
     if not clean:
-        return None
+        return []
     names = sorted(
         {name.strip().casefold() for name in device_names if isinstance(name, str) and name.strip()},
         key=len,
@@ -970,7 +968,24 @@ def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tupl
     # "nix" is the console's own name for the speaker) is not part of the
     # command: the preposition tells Core it is an address, not an action.
     clean = re.sub(r"\b(?:on|from|for|to)\s+[a-z0-9']+\b", " ", clean)
-    words = [word for word in re.split(r"[^a-z0-9]+", clean) if word and word not in {"the", "my", "that", "this", "some"}]
+    return [word for word in re.split(r"[^a-z0-9']+", clean) if word]
+
+
+def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tuple[str, str] | None:
+    """The speaker command a spoken transport request names, or None.
+
+    Returns ``(command, wording)``: the command to run against the speaker
+    (``pause``, ``resume``, ``mute`` or ``unmute``) and the word the user used,
+    which is what the confirmation is phrased from. A named device
+    ("stop music on nix") is the speaker, so its name comes off first. Anything
+    with a second action in it ("pause the music and turn on the light") or with
+    a word that is not one of these commands is left to the normal path.
+    """
+    words = [
+        word
+        for word in _music_request_words(text, device_names)
+        if word not in {"the", "my", "that", "this", "some"}
+    ]
     if not words or len(words) > 4:
         return None
     phrase = tuple(words)
@@ -980,6 +995,90 @@ def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tupl
     if any(word not in _MUSIC_TRANSPORT_OBJECTS for word in rest):
         return None
     return _MUSIC_TRANSPORT_COMMANDS.get(head)
+
+
+# A pronoun play ("play that song", "play it") names no track at all. Measured
+# live: the assistant said it loved “I Will Always Love You”, and "can you play
+# that song on nix" was handed to the planner as "play the song on nix" — no
+# track and no selectable action — and failed closed. The reference is Core's to
+# read, so the track the conversation just named is what gets played.
+_MUSIC_PLAY_REFERENCE_WORDS = frozenset({
+    "that", "this", "it", "one", "the", "song", "songs", "track", "tracks",
+    "tune", "tunes", "music", "again", "now", "please", "there",
+})
+_MUSIC_PLAY_REFERENCE_MARKERS = frozenset({"that", "this", "it", "one", "the"})
+# The assistant names a track in quotes: “I Will Always Love You”. Two quoted
+# names in one turn are a list of candidates — a question, not a track.
+_MUSIC_QUOTED_TRACK_RE = re.compile(r"[“\"']([^“”\"'\n]{2,80})[”\"']")
+# "what song did I ask you to play", "what did I tell you to play" — a question
+# about the conversation, not a device action.
+_MUSIC_RECALL_RE = re.compile(
+    r"\bwhat\s+(?:song|sign|track|tune|thing|music)\b[^?]{0,40}\b(?:did|do)\s+(?:i|u|you)\b|"
+    r"\bwhat\s+did\s+(?:i|u|you)\s+(?:ask|tell|want)\b",
+    re.IGNORECASE,
+)
+
+
+def _music_play_reference(text: str, device_names: Sequence[str] = ()) -> bool:
+    """True when a play request names no track, only a reference to one."""
+    words = _music_request_words(text, device_names)
+    if not words or words[0] != "play":
+        return False
+    rest = words[1:]
+    if not rest or any(word not in _MUSIC_PLAY_REFERENCE_WORDS for word in rest):
+        return False
+    return any(word in _MUSIC_PLAY_REFERENCE_MARKERS for word in rest)
+
+
+def _single_assistant_track(text: str) -> str | None:
+    """Read one track title out of a single assistant message.
+
+    One quoted name is a track; two or more are a list of candidates the user
+    was asked to choose from, which is a question rather than a track.
+    """
+    titles = [
+        " ".join(match.split()).strip(" .!?,;:-")
+        for match in _MUSIC_QUOTED_TRACK_RE.findall(str(text or ""))
+    ]
+    titles = [title for title in titles if len(title) > 1 and "http" not in title.casefold()]
+    return titles[0] if len(titles) == 1 else None
+
+
+def _recent_named_track(history: list[dict[str, Any]] | None) -> str | None:
+    """The track the immediately previous assistant turn named, or None."""
+    if not history or not isinstance(history[-1], dict) or history[-1].get("role") != "assistant":
+        return None
+    return _single_assistant_track(str(history[-1].get("content") or ""))
+
+
+def _music_recall_question(text: str) -> bool:
+    """True for "what song did I ask you to play" — a question about the chat."""
+    return bool(_MUSIC_RECALL_RE.search(str(text or "")))
+
+
+def _last_play_request(history: list[dict[str, Any]] | None) -> str | None:
+    """The most recent thing the user asked to play, in their own words."""
+    for turn in reversed(history or []):
+        if not isinstance(turn, dict) or turn.get("role") != "user":
+            continue
+        content = " ".join(str(turn.get("content") or "").split())
+        if not content or len(content) > 200 or _music_recall_question(content):
+            continue
+        if re.search(r"\b(?:play|put\s+on)\b", content, re.IGNORECASE):
+            return content
+    return None
+
+
+def _music_now_state() -> tuple[dict[str, Any], dict[str, Any]]:
+    """The track the console recorded and the speaker's reported state."""
+    try:
+        # Deferred: the media API imports the console, which imports brain.
+        from music_api import _player_status, _player_summary, _read_music_state
+    except Exception:  # pragma: no cover - import-time misconfiguration
+        return {}, {}
+    state = _read_music_state()
+    track = state.get("track") if isinstance(state.get("track"), dict) else {}
+    return track, _player_summary(_player_status())
 
 
 def _speaker_reported_volume(result: Any) -> float | None:
@@ -3036,6 +3135,21 @@ class Brain:
             self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": transport["rule"]})
             self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=transport["reply"], refs={"route": CHAT, "rule": transport["rule"]})
             return _finish(transport)
+        # A question about the conversation ("what song did I ask you to play") is
+        # answered from the conversation, before any device path can read its
+        # "play" as a command and fail closed on it.
+        recall = self._core_music_recall(clean, history)
+        if recall is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": recall["rule"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=recall["reply"], refs={"route": CHAT, "rule": recall["rule"]})
+            return _finish(recall)
+        # "play that song" names no track: the reference is resolved here, so the
+        # planner is never handed a play with nothing to play.
+        play_followup = self._core_music_play_followup(clean, history, installed_specs)
+        if play_followup is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": play_followup["rule"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=play_followup["reply"], refs={"route": CHAT, "rule": play_followup["rule"]})
+            return _finish(play_followup)
         if (
             _has_explicit_retry_failure_feedback(clean)
             and installed_specs
@@ -5103,6 +5217,176 @@ class Brain:
             "reply": reply,
             "details": details,
         }
+
+    def _core_music_play_followup(
+        self,
+        text: str,
+        history: list[dict[str, Any]] | None,
+        skill_specs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any] | None:
+        """Play the track a pronoun play request points at, or say which is meant.
+
+        Measured live: the assistant itself said it loved “I Will Always Love
+        You”, and "can you play that song on nix" was handed to the planner as
+        "play the song on nix" — the provider's play action needs a query and the
+        speaker's toolset has no play — so it failed closed with "the dedicated
+        skill planner did not produce a valid, safe plan". Core reads the
+        reference instead: a choice already parked on the panel *is* the
+        question, the track the last assistant turn named is the song, the track
+        the console recorded is the fallback, and with none of those the reply
+        asks for a name rather than guessing at one. Returns a complete response
+        dict, or None when the request names a track itself.
+        """
+        device_names = [
+            name
+            for spec in (skill_specs or [])
+            if isinstance(spec, dict)
+            for name in (spec.get("device_name"), spec.get("name"))
+            if isinstance(name, str) and name.strip()
+        ]
+        if not _music_play_reference(text, device_names):
+            return None
+        details: dict[str, Any] = {
+            "model_called": False,
+            "skill_planner_called": False,
+            "conversation_model_called": False,
+            "skill_execution_confirmed": False,
+            "music_play_followup": {},
+        }
+        try:
+            # Deferred: the media API imports the console, which imports brain.
+            import music_api
+            import puca_panel
+        except Exception:  # pragma: no cover - import-time misconfiguration
+            return None
+        parked = puca_panel.pending_question()
+        if parked:
+            options = [item for item in (parked.get("options") or []) if isinstance(item, dict)]
+            names = ", ".join(
+                f"“{item.get('title')}”" for item in options[:3] if item.get("title")
+            )
+            where = "on the PUCA Panel" if puca_panel.panel_info().get("available") else "by name"
+            details["music_play_followup"] = {"source": "pending_question", "options": len(options)}
+            return {
+                "route": CHAT,
+                "rule": "nix_music_play_choice_waiting",
+                "reply": (
+                    f"That is still the open question: {names}. Pick one {where}."
+                    if names
+                    else f"That is still the open question. Pick one {where}."
+                )[:400],
+                "details": details,
+            }
+        source = "conversation"
+        query = _recent_named_track(history)
+        if not query:
+            # The track the speaker actually has is the other real reference ("play
+            # that again" with the music paused or playing). An idle speaker has
+            # none, and an old recording is not a reference to anything, so the
+            # reply asks for a name instead of replaying what happens to be
+            # remembered.
+            track, player = _music_now_state()
+            if str((player or {}).get("state") or "") in {"playing", "paused"}:
+                source = "speaker"
+                query = str(track.get("title") or "").strip() or None
+        if not query:
+            details["music_play_followup"] = {"source": None}
+            return {
+                "route": CHAT,
+                "rule": "nix_music_play_reference_unknown",
+                "reply": "I don't have a song to play from that — name the track and I'll play it.",
+                "details": details,
+            }
+        details["music_play_followup"] = {"source": source, "query": query}
+        try:
+            skill_id, result = music_api._provider_call("play", {"query": query})
+        except music_api.MusicApiError as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_music_play_followup_unavailable",
+                "reply": str(exc),
+                "details": {**details, "skill_error": str(exc)[:200]},
+            }
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_music_play_followup_failed",
+                "reply": "I couldn't reach the music service just now; try again in a moment.",
+                "details": {**details, "skill_error": f"{type(exc).__name__}: {str(exc)[:160]}"},
+            }
+        # The hand-off is the media API's own: resolving the stream, commanding
+        # the speaker and recording now-playing stay in one implementation.
+        handoff = self._hand_over_media_playback({"outcomes": [{"skill_id": skill_id, "result": result}]})
+        message = str(result.get("message") or "").strip() or f"Playing “{query}”."
+        if handoff is None:
+            reply = message
+        elif handoff.get("ambiguous"):
+            reply = _ambiguous_play_reply(handoff)
+        else:
+            reply = _playback_reply_with_handoff(message, handoff)
+            details["music_play_followup"]["handoff"] = {
+                "supported": bool(handoff.get("supported")),
+                "error": str(handoff.get("error") or "")[:160] or None,
+            }
+        details["skill_execution_confirmed"] = bool(
+            handoff and handoff.get("supported") and not handoff.get("error")
+        )
+        return {
+            "route": CHAT,
+            "rule": f"nix_music_play_from_{source}",
+            "reply": reply,
+            "details": details,
+        }
+
+    def _core_music_recall(
+        self,
+        text: str,
+        history: list[dict[str, Any]] | None,
+    ) -> dict[str, Any] | None:
+        """Answer "what song did I ask you to play" from the conversation.
+
+        Measured live: the question was cleansed into an imperative ("open the
+        open deck and play the requested song"), routed to the music provider
+        and answered with the planner's failure sentence — three turns in a row.
+        It asks about the chat, so Core answers it from the chat: the user's own
+        last play request, and what the console actually has from it. Returns a
+        complete response dict, or None when the request is not a recall
+        question (then it is handled as before).
+        """
+        if not _music_recall_question(text):
+            return None
+        request = _last_play_request(history)
+        details: dict[str, Any] = {
+            "model_called": False,
+            "skill_planner_called": False,
+            "conversation_model_called": False,
+            "music_recall": {"request": request},
+        }
+        if request is None:
+            return {
+                "route": CHAT,
+                "rule": "nix_music_recall_empty",
+                "reply": "You haven't asked me to play anything yet.",
+                "details": details,
+            }
+        reply = f"You asked me to play “{request}”."
+        track, player = _music_now_state()
+        title = str(track.get("title") or "").strip()
+        state = str((player or {}).get("state") or "unknown")
+        details["music_recall"].update({"track": title or None, "player_state": state})
+        if not title:
+            reply += " Nothing is playing right now."
+        else:
+            artist = str(track.get("artist") or "").strip()
+            named = f"“{title}”" + (f" by {artist}" if artist else "")
+            reply += (
+                f" {named} is playing."
+                if state == "playing"
+                else f" {named} is paused."
+                if state == "paused"
+                else f" Nothing is playing from it right now — {named} is the track on the speaker."
+            )
+        return {"route": CHAT, "rule": "nix_music_recall", "reply": reply, "details": details}
 
     def _core_speaker_volume(
         self,
