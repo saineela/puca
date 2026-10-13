@@ -603,22 +603,44 @@ def music_now_playing(handler, _match=None) -> bool:
         return _fail(handler, exc)
 
 
-@_guarded
-def music_control(handler, _match=None) -> bool:
-    body = _body(handler)
-    command = _text(body.get("action") or body.get("command"), "action", 32).lower()
+# The page, the mobile app and the assistant all drive the same speaker, so one
+# implementation runs each transport command for all of them. The wording is
+# what the assistant says back: it states what the speaker confirmed, never more
+# (a paused speaker is never reported as stopped).
+TRANSPORT_MESSAGES: dict[str, str] = {
+    "play": "The speaker is playing.",
+    "pause": "Music paused.",
+    "resume": "Music resumed.",
+    # "stop" is the speaker's voice control, never the music: the assistant
+    # translates "stop the music" into pause itself.
+    "stop": "The speaker stopped.",
+    "mute": "The speaker is muted.",
+    "unmute": "The speaker is unmuted.",
+    "volume": "Speaker volume set to {percent}%.",
+}
+
+
+def apply_transport(command: str, value: Any = None) -> dict:
+    """Run one transport command against the installed speaker controls.
+
+    Resolves the declared device control for the command, commands the worker
+    once, and keeps the console's own playback bookkeeping (the position clock)
+    in step, so every caller sees the same state. Raises MusicApiError with a
+    user-facing message when nothing declares the control or the speaker
+    refuses; the caller decides how to phrase the failure.
+    """
+    command = str(command or "").strip().lower()
     if command not in TRANSPORT_ACTIONS:
-        return _fail(handler, MusicApiError(
-            f"action must be one of: {', '.join(sorted(TRANSPORT_ACTIONS))}.", 400, "validation_error"))
-    value = body.get("value", body.get("volume"))
+        raise MusicApiError(
+            f"action must be one of: {', '.join(sorted(TRANSPORT_ACTIONS))}.", 400, "validation_error")
     needs_value = command == "volume"
     found = _control_for(TRANSPORT_ACTIONS[command], {"volume"} if needs_value else None)
     if found is None:
-        return _fail(handler, MusicApiError(
+        raise MusicApiError(
             f"No installed skill declares a '{command}' player control. Install or update the skill that owns the speaker.",
             501,
             "player_action_unavailable",
-        ))
+        )
     skill_id, control, action = found
     arguments = dict(control["arguments"])
     if needs_value:
@@ -629,10 +651,7 @@ def music_control(handler, _match=None) -> bool:
         if not 0.0 <= level <= 1.0:
             raise MusicApiError("'value' must be between 0 and 1.", 400, "validation_error")
         arguments["volume"] = level
-    try:
-        result = _call_tool(skill_id, control["tool"], arguments)
-    except MusicApiError as exc:
-        return _fail(handler, exc)
+    result = _call_tool(skill_id, control["tool"], arguments)
     state = _read_music_state()
     if state:
         now = time.time()
@@ -645,14 +664,28 @@ def music_control(handler, _match=None) -> bool:
         state["updated_at"] = now
         _write_music_state(state)
     player = _player_status()
-    return _respond(handler, {
+    summary = _player_summary(player)
+    payload = {
         "ok": True,
         "command": command,
         "skill_id": skill_id,
         "control": control.get("label"),
         "result": result,
-        "player": _player_summary(player),
-    })
+        "player": summary,
+    }
+    level = summary.get("volume") if isinstance(summary, dict) else None
+    payload["message"] = TRANSPORT_MESSAGES[command].format(
+        percent=int(round(float(level) * 100)) if isinstance(level, (int, float)) else 0
+    )
+    return payload
+
+
+@_guarded
+def music_control(handler, _match=None) -> bool:
+    body = _body(handler)
+    command = _text(body.get("action") or body.get("command"), "action", 32).lower()
+    value = body.get("value", body.get("volume"))
+    return _respond(handler, apply_transport(command, value))
 
 
 # ---------------------------------------------------------------------------

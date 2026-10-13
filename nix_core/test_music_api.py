@@ -123,7 +123,7 @@ PROVIDER_MANIFEST = {
 }
 
 
-def player_manifest(upload_control=True):
+def player_manifest(upload_control=True, transport_controls=False):
     controls = [
         {"label": "Set volume", "tool": "control_ring", "arguments": {"action": "volume"}, "fields": [{"name": "volume", "label": "Volume", "widget": "number"}]},
         {"label": "Mute", "tool": "control_ring", "arguments": {"action": "mute"}, "fields": []},
@@ -133,6 +133,18 @@ def player_manifest(upload_control=True):
         controls.append(
             {"label": "Play a stream URL", "tool": "control_ring", "arguments": {"action": "play_url"}, "fields": [{"name": "url", "label": "Audio URL", "widget": "text"}, {"name": "title", "label": "Title", "widget": "text"}]}
         )
+    # A speaker that can pause and resume the music, the way Echo Connect does.
+    if transport_controls:
+        controls.extend([
+            {"label": "Pause", "tool": "control_ring", "arguments": {"action": "pause"}, "fields": []},
+            {"label": "Resume", "tool": "control_ring", "arguments": {"action": "resume"}, "fields": []},
+            {"label": "Unmute", "tool": "control_ring", "arguments": {"action": "unmute"}, "fields": []},
+        ])
+    action_enum = ["state", "volume", "mute", "stop_speaking", "play_url"]
+    zero_argument = ["state", "mute", "stop_speaking"]
+    if transport_controls:
+        action_enum.extend(["pause", "resume", "unmute"])
+        zero_argument.extend(["pause", "resume", "unmute"])
     return {
         "schema_version": 1,
         "kind": "nix-skill",
@@ -154,7 +166,7 @@ def player_manifest(upload_control=True):
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "action": {"type": "string", "enum": ["state", "volume", "mute", "stop_speaking", "play_url"]},
+                        "action": {"type": "string", "enum": action_enum},
                         "volume": {"type": "number", "minimum": 0, "maximum": 1},
                         "url": {"type": "string", "maxLength": 2048},
                         "title": {"type": "string", "maxLength": 200},
@@ -162,7 +174,7 @@ def player_manifest(upload_control=True):
                     "required": ["action"],
                     "additionalProperties": False,
                     "oneOf": [
-                        {"type": "object", "properties": {"action": {"type": "string", "enum": ["state", "mute", "stop_speaking"]}}, "required": ["action"]},
+                        {"type": "object", "properties": {"action": {"type": "string", "enum": zero_argument}}, "required": ["action"]},
                         {"type": "object", "properties": {"action": {"type": "string", "enum": ["volume"]}, "volume": {"type": "number", "minimum": 0, "maximum": 1}}, "required": ["action", "volume"]},
                         {"type": "object", "properties": {"action": {"type": "string", "enum": ["play_url"]}, "url": {"type": "string", "maxLength": 2048}, "title": {"type": "string", "maxLength": 200}}, "required": ["action", "url"]},
                     ],
@@ -469,6 +481,63 @@ def test_control_routes_volume_to_the_skill_that_declares_it(music_env, monkeypa
     assert call["arguments"] == {"action": "volume", "volume": 0.35}
     assert missing_status == 501 and missing["ok"] is False
     assert missing["code"] == "player_action_unavailable"
+
+
+def test_apply_transport_runs_the_declared_pause_and_resume_controls(music_env, monkeypatch):
+    # The page, the mobile app and the assistant all drive one speaker through
+    # this helper, so a spoken "pause" and the panel's pause button end up on
+    # the same declared control, with the console's position clock kept in step.
+    import time
+
+    runtime = FakeRuntime(player={
+        "ok": True, "action": "pause", "message": "paused", "device_name": "Light",
+        "speaker": {"volume": 0.5, "muted": False, "state": "paused"},
+        "state": {"on": True, "brightness": 1.0, "effect": "None", "rgb": [255, 255, 255]},
+    })
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest(transport_controls=True)], runtime)
+    Path(console.DATA_DIR).mkdir(parents=True, exist_ok=True)
+    Path(music_api._state_path()).write_text(json.dumps({
+        "track": {"video_id": "abc12345678", "title": "Song", "artist": "Artist", "duration_sec": 200},
+        "started_at": time.time() - 30, "paused_at": None, "paused_seconds": 0.0, "duration_sec": 200,
+    }), encoding="utf-8")
+
+    payload = music_api.apply_transport("pause")
+
+    assert payload["ok"] is True
+    assert payload["command"] == "pause"
+    assert payload["control"] == "Pause"
+    assert payload["message"] == "Music paused."
+    call = next(item for item in runtime.calls if item["arguments"].get("action") == "pause")
+    assert call["arguments"] == {"action": "pause"}
+    assert payload["player"]["state"] == "paused"
+    saved = json.loads(Path(music_api._state_path()).read_text(encoding="utf-8"))
+    assert isinstance(saved["paused_at"], (int, float))
+    assert saved["paused_seconds"] == 0.0
+
+
+def test_apply_transport_keeps_stop_meaning_the_speakers_voice(music_env, monkeypatch):
+    # A speaker pauses; it does not stop. "stop" is the speaker's own voice
+    # control, so the music never maps onto it and the confirmation says what
+    # really ran — the assistant translates "stop the music" into pause itself
+    # (see the transport tests in test_conversation.py).
+    runtime = FakeRuntime(player={
+        "ok": True, "action": "stop_speaking", "message": "quiet", "device_name": "Light",
+        "speaker": {"volume": 0.5, "muted": False, "state": "playing"},
+        "state": {"on": True, "brightness": 1.0, "effect": "None", "rgb": [255, 255, 255]},
+    })
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    payload = music_api.apply_transport("stop")
+    assert payload["message"] == "The speaker stopped."
+    call = next(item for item in runtime.calls if item["arguments"].get("action") == "stop_speaking")
+    assert call["arguments"] == {"action": "stop_speaking"}
+
+
+def test_apply_transport_reports_a_missing_speaker_rather_than_guessing(music_env, monkeypatch):
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], FakeRuntime())
+    with pytest.raises(music_api.MusicApiError) as missing:
+        music_api.apply_transport("pause")
+    assert missing.value.code == "player_action_unavailable"
+    assert "pause" in str(missing.value)
 
 
 def test_control_rejects_an_out_of_range_volume(music_env, monkeypatch):

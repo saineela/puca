@@ -2827,11 +2827,15 @@ class SpeakerSkillRuntime:
 
     skill_id = SPEAKER_SKILL_ID
 
-    def __init__(self, volume=0.5, step=None):
+    def __init__(self, volume=0.5, step=None, playback="idle", muted=False):
         self.spec = _speaker_provider_spec()
         self.volume = float(volume)
         # The Dot quantises volume to its own steps; None means an exact device.
         self.step = step
+        # What the speaker reports back: transport commands move it, so a pause
+        # the device really took reads as paused and nothing else.
+        self.playback = playback
+        self.muted = muted
         self.executions = []
         self.validations = []
 
@@ -2878,7 +2882,7 @@ class SpeakerSkillRuntime:
             raise SkillRuntimeError("undeclared tool")
         arguments = proposal.get("arguments")
         action = arguments.get("action") if isinstance(arguments, dict) else None
-        if action not in {"state", "volume"}:
+        if action not in {"state", "volume", "pause", "resume", "mute", "unmute"}:
             raise SkillRuntimeError("invalid schema")
         if action == "volume" and not isinstance(arguments.get("volume"), (int, float)):
             raise SkillRuntimeError("invalid volume")
@@ -2887,13 +2891,22 @@ class SpeakerSkillRuntime:
     def execute(self, matched):
         self.executions.append(matched)
         arguments = matched["arguments"]
-        if arguments["action"] == "volume":
+        action = arguments["action"]
+        if action == "volume":
             self.volume = float(arguments["volume"])
+        elif action == "pause":
+            self.playback = "paused"
+        elif action == "resume":
+            self.playback = "playing"
+        elif action == "mute":
+            self.muted = True
+        elif action == "unmute":
+            self.muted = False
         result = {
             "ok": True,
-            "action": arguments["action"],
+            "action": action,
             "state": {"on": True, "rgb": [0, 0, 0], "brightness": 1.0, "effect": "None"},
-            "speaker": {"volume": self._reported(), "muted": False, "state": "idle"},
+            "speaker": {"volume": self._reported(), "muted": self.muted, "state": self.playback},
             "device_connected": True,
             "device_name": "Nix Dev",
             "available_effects": ["None", "Rainbow"],
@@ -3000,6 +3013,154 @@ def test_volume_wording_is_read_exactly_and_never_steals_an_absolute_level():
     # Nothing about the speaker's volume at all is left alone.
     assert _speaker_volume_intent("play some music") is None
     assert _speaker_volume_intent("turn on the ring light") is None
+
+
+# ── Spoken music transport, driven by spoken user requests ────────────────
+# "pause" and "stop the music" are one declared speaker control each.
+# Measured live on the Android app: "pause" was planned against the music
+# provider, which declares no such action, and failed closed with "the dedicated
+# skill planner did not produce a valid, safe plan"; "stop music on nix" was
+# read as a negated device request; and a bare "stop" reached no device at all
+# while the companion model answered "Music stopped." over playing music.
+def _transport_stub(dispatched, player_state="paused", muted=False):
+    import music_api
+
+    def fake_apply_transport(command, value=None):
+        dispatched.append(command)
+        stopped, resumed, muted_state = "Music stopped.", "Music resumed.", muted
+        if command == "mute":
+            muted_state = True
+        elif command == "unmute":
+            muted_state = False
+        return {
+            "ok": True,
+            "command": command,
+            "skill_id": SPEAKER_SKILL_ID,
+            "control": command.title(),
+            "result": {"ok": True, "message": "The Echo Dot confirmed the speaker is paused."},
+            "player": {"state": player_state, "volume": 0.5, "muted": muted_state, "confirmed": True},
+            "message": resumed if command == "resume" else stopped if command == "stop" else "Music paused.",
+        }
+
+    return music_api, fake_apply_transport
+
+
+def test_spoken_pause_stop_resume_and_mute_run_the_speakers_own_control(monkeypatch):
+    # Every form a person actually says is one declared speaker control: Core
+    # picks it and drives the speaker itself, so the planner never sees a
+    # request it has no action to select.
+    expected = [
+        ("pause", "pause"),
+        ("pause music", "pause"),
+        ("pause the music", "pause"),
+        ("pause playback", "pause"),
+        ("stop", "pause"),
+        ("stop music", "pause"),
+        ("stop the music", "pause"),
+        ("stop music on nix", "pause"),
+        ("stop it", "pause"),
+        ("halt the music", "pause"),
+        ("hey nix stop the music", "pause"),
+        ("resume", "resume"),
+        ("resume the music", "resume"),
+        ("unpause", "resume"),
+        ("continue playing", "resume"),
+        ("keep playing", "resume"),
+        ("play it again", "resume"),
+        ("mute", "mute"),
+        ("mute the speaker", "mute"),
+        ("unmute", "unmute"),
+    ]
+    for request, command in expected:
+        dispatched: list[str] = []
+        music_api, fake = _transport_stub(dispatched)
+        monkeypatch.setattr(music_api, "apply_transport", fake)
+        runtime = SpeakerSkillRuntime(volume=0.5, playback="playing")
+        brain, captured = _speaker_brain(runtime)
+        response = brain.handle(text=request)
+        assert dispatched == [command], (request, dispatched)
+        assert response["details"]["skill_planner_called"] is False, request
+        assert response["details"]["skill_execution_confirmed"] is True, request
+        assert response["details"]["music_transport"]["command"] == command, request
+        # No plan was asked of the model, and no device call was dispatched
+        # through the planner's own path.
+        assert "init" not in captured, request
+        assert runtime.executions == [], request
+
+
+def test_the_transport_confirmation_states_what_the_speaker_reports(monkeypatch):
+    # "stop music" ended live with the model saying "Music stopped." over
+    # playing music. The reply now follows the speaker: a pause that the device
+    # did not take is reported as not taken.
+    for request, state, expected in [
+        ("pause the music", "paused", "Music paused."),
+        ("stop the music", "paused", "Music stopped."),
+        ("stop music on nix", "paused", "Music stopped."),
+        ("stop the music", "idle", "Nothing is playing right now."),
+        ("pause", "playing", "The speaker still reports the music playing, so it didn't pause."),
+        ("resume the music", "playing", "Music resumed."),
+        ("resume", "paused", "The speaker still reports the music paused, so it didn't resume."),
+        ("resume", "idle", "Nothing is playing right now."),
+    ]:
+        dispatched: list[str] = []
+        music_api, fake = _transport_stub(dispatched, player_state=state)
+        monkeypatch.setattr(music_api, "apply_transport", fake)
+        brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+        response = brain.handle(text=request)
+        assert response["reply"] == expected, (request, state, response["reply"])
+
+
+def test_a_pause_with_no_speaker_skill_says_which_install_is_missing(monkeypatch):
+    import music_api
+
+    def refuse(command, value=None):
+        raise music_api.MusicApiError(
+            f"No installed skill declares a '{command}' player control. "
+            "Install or update the skill that owns the speaker.",
+            501,
+            "player_action_unavailable",
+        )
+
+    monkeypatch.setattr(music_api, "apply_transport", refuse)
+    brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+    response = brain.handle(text="pause")
+    assert response["rule"] == "nix_music_transport_unavailable"
+    assert "no installed skill declares a 'pause' player control" in response["reply"].lower()
+    assert response["details"]["skill_execution_confirmed"] is False
+
+
+def test_transport_wording_is_read_exactly_and_never_steals_another_action():
+    from brain import _music_transport_intent
+
+    assert _music_transport_intent("pause") == ("pause", "pause")
+    assert _music_transport_intent("stop the music") == ("pause", "stop")
+    assert _music_transport_intent("stop music on nix", ["Nix Dev"]) == ("pause", "stop")
+    assert _music_transport_intent("resume the music") == ("resume", "resume")
+    assert _music_transport_intent("unmute") == ("unmute", "unmute")
+    # The speaker's voice is not the music, and a second action in the request
+    # keeps it out of Core's hands.
+    for request in (
+        "stop speaking",
+        "stop talking",
+        "stop the timer",
+        "stop the ring light",
+        "unmute the microphone",
+        "pause the music and turn on the ring light",
+        "play some music",
+        "shuffle the queue",
+        "set the volume to 55",
+    ):
+        assert _music_transport_intent(request) is None, request
+
+
+def test_a_voice_or_compound_request_is_never_read_as_music_transport(monkeypatch):
+    dispatched: list[str] = []
+    music_api, fake = _transport_stub(dispatched)
+    monkeypatch.setattr(music_api, "apply_transport", fake)
+    for request in ("stop speaking", "pause the music and turn on the ring light"):
+        brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
+        brain.handle(text=request)
+    assert dispatched == []
 
 
 def test_a_compound_request_is_not_answered_as_volume_alone():

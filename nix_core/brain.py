@@ -25,7 +25,7 @@ import re
 import threading
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 import requests
 
@@ -906,6 +906,80 @@ def _speaker_volume_intent(text: str) -> dict[str, Any] | None:
     # brightness, current volume", "the volume is loud") is answered from the
     # speaker's own reading rather than left to the model, which invented one.
     return {"kind": "read"}
+
+
+# Spoken music transport. Each phrase is one declared speaker control, so Core
+# drives the whole request and no model picks between actions (measured live:
+# "pause" was planned against the music provider, which declares no such action,
+# and failed closed; "stop music" was never routed to a device at all and the
+# companion model answered "Music stopped." with the music still playing).
+#
+# "stop" is the pause control: a speaker has no stop, and a person who says
+# "stop the music" means the sound should end. A phrase that is not exactly one
+# of these — a compound request, or "stop speaking", which is the speaker's
+# voice rather than the music — is not a transport command at all.
+_MUSIC_TRANSPORT_FRAMES = re.compile(
+    r"^(?:(?:hey|ok|okay|yo|um|uh)\s+)*(?:(?:nix|luna|please|can\s+you|could\s+you|"
+    r"would\s+you|will\s+you)\b[\s,]*)*",
+    re.IGNORECASE,
+)
+_MUSIC_TRANSPORT_OBJECTS = frozenset({
+    "music", "song", "songs", "track", "tracks", "tune", "tunes", "audio",
+    "playback", "playing", "speaker", "sound", "it",
+})
+_MUSIC_TRANSPORT_COMMANDS: dict[str, tuple[str, str]] = {
+    "pause": ("pause", "pause"),
+    "stop": ("pause", "stop"),
+    "halt": ("pause", "stop"),
+    "resume": ("resume", "resume"),
+    "unpause": ("resume", "resume"),
+    "continue": ("resume", "resume"),
+    "mute": ("mute", "mute"),
+    "unmute": ("unmute", "unmute"),
+}
+_MUSIC_TRANSPORT_PHRASES: dict[tuple[str, ...], tuple[str, str]] = {
+    ("play", "it", "again"): ("resume", "resume"),
+    ("play", "again"): ("resume", "resume"),
+    ("keep", "playing"): ("resume", "resume"),
+}
+
+
+def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tuple[str, str] | None:
+    """The speaker command a spoken transport request names, or None.
+
+    Returns ``(command, wording)``: the command to run against the speaker
+    (``pause``, ``resume``, ``mute`` or ``unmute``) and the word the user used,
+    which is what the confirmation is phrased from. A named device
+    ("stop music on nix") is the speaker, so its name comes off first. Anything
+    with a second action in it ("pause the music and turn on the light") or with
+    a word that is not one of these commands is left to the normal path.
+    """
+    clean = " ".join(str(text or "").casefold().split())
+    if not clean:
+        return None
+    names = sorted(
+        {name.strip().casefold() for name in device_names if isinstance(name, str) and name.strip()},
+        key=len,
+        reverse=True,
+    )
+    for name in names:
+        clean = re.sub(rf"\b(?:on|from|for|to)\s+{re.escape(name)}\b", " ", clean)
+        clean = re.sub(rf"\b{re.escape(name)}\b", " ", clean)
+    clean = _MUSIC_TRANSPORT_FRAMES.sub("", clean)
+    # A named target the device list does not carry ("stop music on nix", where
+    # "nix" is the console's own name for the speaker) is not part of the
+    # command: the preposition tells Core it is an address, not an action.
+    clean = re.sub(r"\b(?:on|from|for|to)\s+[a-z0-9']+\b", " ", clean)
+    words = [word for word in re.split(r"[^a-z0-9]+", clean) if word and word not in {"the", "my", "that", "this", "some"}]
+    if not words or len(words) > 4:
+        return None
+    phrase = tuple(words)
+    if phrase in _MUSIC_TRANSPORT_PHRASES:
+        return _MUSIC_TRANSPORT_PHRASES[phrase]
+    head, rest = words[0] if words else "", words[1:]
+    if any(word not in _MUSIC_TRANSPORT_OBJECTS for word in rest):
+        return None
+    return _MUSIC_TRANSPORT_COMMANDS.get(head)
 
 
 def _speaker_reported_volume(result: Any) -> float | None:
@@ -2952,6 +3026,16 @@ class Brain:
         followup_text = " ".join(clean.casefold().split())
         installed_specs_method = getattr(self.skill_runtime, "installed_skill_specs", None)
         installed_specs = installed_specs_method() if callable(installed_specs_method) else []
+        # "pause", "stop the music" and "resume" are one declared speaker
+        # control each, so Core runs them here instead of routing them to a
+        # planner that has no such action to select (measured live: the music
+        # provider was chosen and the request failed closed, while a bare "stop"
+        # reached no device at all and was answered as if it had).
+        transport = self._core_music_transport(clean, installed_specs)
+        if transport is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": transport["rule"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=transport["reply"], refs={"route": CHAT, "rule": transport["rule"]})
+            return _finish(transport)
         if (
             _has_explicit_retry_failure_feedback(clean)
             and installed_specs
@@ -4919,6 +5003,106 @@ class Brain:
                 ),
                 "details": details,
             }
+
+    def _core_music_transport(
+        self,
+        text: str,
+        skill_specs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any] | None:
+        """Pause, resume or mute the speaker for a request Core can read exactly.
+
+        Each of these is a single declared speaker control, so Core resolves the
+        wording and drives the installed skill itself, then phrases the answer
+        from what the speaker reports. Left to the planner, the same request went
+        to the music provider (which declares no such action) and failed closed,
+        and a bare "stop" reached no device at all while the companion model
+        answered "Music stopped." with the music still playing. Returns a
+        complete response dict, or None when the request is not a transport
+        command (then it is handled as before).
+        """
+        device_names = [
+            name
+            for spec in (skill_specs or [])
+            if isinstance(spec, dict)
+            for name in (spec.get("device_name"), spec.get("name"))
+            if isinstance(name, str) and name.strip()
+        ]
+        intent = _music_transport_intent(text, device_names)
+        if intent is None:
+            return None
+        command, wording = intent
+        details: dict[str, Any] = {
+            "model_called": False,
+            "skill_planner_called": False,
+            "conversation_model_called": False,
+            "skill_execution_confirmed": False,
+            "music_transport": {"command": command, "wording": wording},
+        }
+        try:
+            # Deferred: the media API imports the console, which imports brain.
+            from music_api import MusicApiError, apply_transport
+        except Exception as exc:  # pragma: no cover - import-time misconfiguration
+            return None
+        try:
+            payload = apply_transport(command)
+        except MusicApiError as exc:
+            # Nothing declares the control: say which install is missing rather
+            # than pretending the speaker did something.
+            return {
+                "route": CHAT,
+                "rule": "nix_music_transport_unavailable",
+                "reply": str(exc),
+                "details": {
+                    **details,
+                    "music_transport": {**details["music_transport"], "error": str(exc)},
+                },
+            }
+        except Exception as exc:
+            return {
+                "route": CHAT,
+                "rule": "nix_music_transport_failed",
+                "reply": (
+                    f"I couldn't reach the speaker to {wording} the music just now; "
+                    "try again in a moment."
+                ),
+                "details": {**details, "skill_error": f"{type(exc).__name__}: {str(exc)[:160]}"},
+            }
+        player = payload.get("player") if isinstance(payload.get("player"), dict) else {}
+        reported = str(player.get("state") or "unknown")
+        muted = player.get("muted")
+        details["music_transport"].update({
+            "skill_id": payload.get("skill_id"),
+            "control": payload.get("control"),
+            "player_state": reported,
+            "reported_muted": muted,
+        })
+        # The control call itself is the execution; the player reading only
+        # decides what Core is allowed to claim about the result.
+        details["skill_execution_confirmed"] = bool(payload.get("ok"))
+        if wording in {"pause", "stop"}:
+            if reported in {"off", "idle", "unavailable", "stopped"}:
+                reply = "Nothing is playing right now."
+            elif reported == "playing":
+                reply = "The speaker still reports the music playing, so it didn't pause."
+            else:
+                reply = "Music stopped." if wording == "stop" else "Music paused."
+        elif wording == "resume":
+            if reported == "paused":
+                reply = "The speaker still reports the music paused, so it didn't resume."
+            elif reported in {"off", "idle", "unavailable", "stopped"}:
+                reply = "Nothing is playing right now."
+            else:
+                reply = "Music resumed."
+        elif wording == "mute":
+            reply = "The speaker is muted." if muted is not False else "The speaker reports it is still unmuted."
+        else:
+            reply = "The speaker is unmuted." if muted is not True else "The speaker reports it is still muted."
+        return {
+            "route": CHAT,
+            "rule": f"nix_music_transport_{wording}",
+            "reply": reply,
+            "details": details,
+        }
 
     def _core_speaker_volume(
         self,

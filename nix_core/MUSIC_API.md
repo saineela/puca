@@ -52,7 +52,7 @@ same page against the same state.
 | --- | --- | --- |
 | `GET` | `/api/music` | Capabilities: the page, its assets, the provider skill and which player commands exist. Answers `ok:false`, `code:"no_music_provider"` when no provider is installed. |
 | `GET` | `/api/music/now-playing[?lyrics=1]` | The recorded track, the speaker's reported state, an estimated position and the hand-off result. |
-| `POST` | `/api/music/control` | `{"action":"play"\|"pause"\|"resume"\|"stop"\|"mute"\|"unmute"\|"volume","value":0..1}` — routed to the installed skill's declared control. |
+| `POST` | `/api/music/control` | `{"action":"play"\|"pause"\|"resume"\|"stop"\|"mute"\|"unmute"\|"volume","value":0..1}` — routed to the installed skill's declared control, with a plain-language `message` for the result. |
 | `GET` | `/api/music/search?q=&limit=[&refresh=1]` | Provider catalog search, answered from the console's catalog cache. |
 | `POST` | `/api/music/play` | `{"query"}` or `{"video_id"}` — resolves the stream through the provider, remembers the track, and hands the URL to a `play_url` control when one is declared. |
 | `GET` | `/api/music/queue` | The play queue as the provider holds it: `{queue:[…], index, count, message}`. |
@@ -233,6 +233,17 @@ this same `_start_playback`, which commands the speaker and records now-playing.
 The reply says so plainly when the hand-off could not happen (`"no installed
 skill can play a stream URL"`, or the speaker's refusal), instead of leaving the
 provider's `"Playing …"` sentence to read as playback that never started.
+
+A **spoken** transport command is Core's too. `"pause"`, `"stop the music"`,
+`"resume"`, `"mute"` and their forms are resolved by Core (`brain`) and run
+through this same resolution step — one declared control each, no model picks
+between actions — and the confirmation is phrased from what the speaker reports,
+so a pause the device did not take is never reported as paused. Two details are
+deliberate: `"stop the music"` maps onto the **pause** control, because the
+speaker has no stop, while `stop` itself stays the speaker's own voice control;
+and a request with a second action in it (`"pause the music and turn on the ring
+light"`) or one that means the voice (`"stop speaking"`) is not read as
+transport at all.
 
 Transport controls answer as soon as the command is accepted (tens of
 milliseconds). Pause/resume confirm by polling the speaker's reported state
