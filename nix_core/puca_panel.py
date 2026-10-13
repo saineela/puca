@@ -198,6 +198,22 @@ def _option(entry: Any) -> dict | None:
     }
 
 
+def _declared_asset_name(asset: str, declared: list[str]) -> str | None:
+    """The declared panel asset a request names, or None.
+
+    Accepts both the package path the manifest declares ("PUCA-Panel/panel.css")
+    and the bare name the page links from the root ("panel.css"); anything else —
+    a package file outside the panel folder, or a path climbing out of it — is
+    not a panel asset and stays unservable.
+    """
+    if asset in declared:
+        return asset
+    for name in declared:
+        if name.rsplit("/", 1)[-1] == asset:
+            return name
+    return None
+
+
 def ask_choice(prompt: str, options: list[Any], *, source: str = "search", query: str = "") -> dict:
     """Park a choice for the user and return the question as the panel sees it.
 
@@ -432,6 +448,13 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _names_a_panel_asset(self, asset: str) -> bool:
+        """Whether a request names one of the installed panel's own files."""
+        found = panel_skill()
+        if found is None:
+            return False
+        return _declared_asset_name(asset, list(panel_assets(found[0], found[1]))) is not None
+
     def _serve_panel_asset(self, asset: str) -> None:
         found = panel_skill()
         if found is None:
@@ -439,13 +462,15 @@ class PanelHandler(BaseHTTPRequestHandler):
                 "No installed music provider ships a PUCA-Panel page.", 404, "no_panel"
             )
         skill_id, manifest = found
-        if asset not in set(panel_assets(skill_id, manifest)):
+        declared = list(panel_assets(skill_id, manifest))
+        resolved = _declared_asset_name(asset, declared)
+        if resolved is None:
             raise PanelError("That panel asset is not declared by the skill.", 404, "not_found")
         package = os.path.realpath(os.path.abspath(console._skill_package_path(skill_id)))
-        target = os.path.realpath(os.path.join(package, *asset.split("/")))
+        target = os.path.realpath(os.path.join(package, *resolved.split("/")))
         if os.path.commonpath((package, target)) != package or not os.path.isfile(target):
             raise PanelError("Panel file not found.", 404, "not_found")
-        self._send_file(target, PANEL_EXTENSIONS[os.path.splitext(asset)[1].lower()])
+        self._send_file(target, PANEL_EXTENSIONS[os.path.splitext(resolved)[1].lower()])
 
     def _panel_page(self) -> None:
         found = panel_skill()
@@ -476,7 +501,14 @@ class PanelHandler(BaseHTTPRequestHandler):
         try:
             if asset in ("", "panel", "index.html"):
                 return self._panel_page()
-            if asset.startswith(PANEL_DIR + "/"):
+            # The page is served at the root — the URL the panel itself advertises
+            # — and it links its own files the way a page in its own folder does
+            # ("panel.css", "panel.js"), so those names have to resolve to the
+            # panel folder as well as the declared "PUCA-Panel/…" paths. Without
+            # this the root page arrived with a 404 stylesheet and a 404 script:
+            # an unstyled screen of dead elements, which is exactly how it was
+            # reported.
+            if asset.startswith(PANEL_DIR + "/") or self._names_a_panel_asset(asset):
                 return self._serve_panel_asset(asset)
             if asset == "api/panel/state":
                 return self._json(panel_state())

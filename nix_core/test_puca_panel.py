@@ -243,6 +243,29 @@ def test_the_page_comes_from_the_installed_music_provider(panel):
     assert skill_id == "opendeck"
 
 
+def test_the_page_loads_its_own_assets_wherever_it_is_served(panel):
+    # The panel advertises the root of its port as its URL, and the page links
+    # its files the way a page in its own folder does ("panel.css"). Measured
+    # live: the root served the HTML but /panel.css and /panel.js answered 404,
+    # so the display came up as an unstyled page whose script never ran — "just a
+    # random bunch of elements with no UI". Whatever the page asks for has to
+    # answer on the same origin it was served from.
+    server, _runtime = panel
+    status, _body, headers = read_raw(server, "/")
+    assert status == 200 and headers["Content-Type"].startswith("text/html")
+    skill_id, manifest = puca_panel.panel_skill()
+    declared = list(puca_panel.panel_assets(skill_id, manifest))
+    assert declared
+    for asset in declared:
+        name = asset.rsplit("/", 1)[-1]
+        status, content, headers = read_raw(server, "/" + name)
+        assert status == 200, name
+        declared_status, declared_content, declared_headers = read_raw(server, "/" + asset)
+        assert declared_status == 200, asset
+        assert content == declared_content, name
+        assert headers["Content-Type"] == declared_headers["Content-Type"], name
+
+
 def test_only_the_panel_folder_of_the_package_is_served(panel):
     server, _runtime = panel
     for asset in ("PUCA-Panel/panel.js", "PUCA-Panel/panel.css"):
