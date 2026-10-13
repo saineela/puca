@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1790917615/93d18a47-5f3a-46e1-ad71-705b2680442f_anp8f1.png" alt="NIX PUCA" width="360">
+  <img src="https://res.cloudinary.com/dh5uxc6ql/image/upload/v1790917615/93d18a47-5f3a-46e1-ad71-705b2680442f_anp8f1.png" alt="NIX PUCA" width="500" title="Puca logo">
 </p>
 
 <p align="center">
@@ -24,13 +24,15 @@
   <a href="nix_decision/README.md">Decision docs</a>
 </p>
 
+> ⚠️ **CRITICAL DISTINCTION:** **NIX PUCA is NOT a language model (LLM).** It is the underlying cognitive orchestrator and dynamic system behind the model. It functions like a human brain's memory, logic, and reasoning centers, feeding validated packets of "ground truth" data down to a separate conversational speech model (like Luna via Ollama) which simply handles natural language synthesis. 
+
 NIX PUCA is a modular software foundation for a **Personal User Companion Agent (PUCA)**: a self-hosted personal assistant built around explicit boundaries between conversation, durable memory, temporal interpretation, and scheduled actions. It is a Python project with local SQLite persistence and optional local or separately operated model backends.
 
 The design is intentionally more structured than a single prompt wrapped around an LLM. NIX Core routes and composes requests; NIX Knowledge stores and retrieves personal records; NIX Actions manages scheduled work. A configured conversational model produces natural-language responses, while application code validates and manages persistence and scheduling.
 
 **Project identity:** the user-facing assistant identity is **Casper**, created and built by Sai Neela in NIX. Casper is separate from the model adapters: the local Transformers selector currently defaults to **Luna V6**, and any supported backend can be selected through configuration.
 
-> **Project status:** this repository is a development foundation, not a certified or hosted product. Model quality, device compatibility, latency, VRAM use, and privacy behavior depend on local configuration and require deployment-specific validation. No license file has been added yet — see [License and contributions](#license-and-contributions).
+> **Project status:** This repository is a development foundation, not a claim of a certified, production-ready, or hosted AI product. Model quality, device compatibility, latency, VRAM use, privacy behavior, and service exposure depend on local configuration and require deployment-specific validation.
 
 ## What is a PUCA?
 
@@ -367,6 +369,18 @@ testing-echo-connect/           Optional isolated integration prototype
 Nix-skills-repo/                Skill packaging guide and example skill
 data/                           Local SQLite/runtime state (Git-ignored)
 ```
+## Roadmap
+
+### NIX Build Features Plan
+All upcoming skills are operated by the **Nix-Actions** system's underlying layer called **Nix-Skills**. (Will release instructions on how to create a new custom skill aswell! :))
+
+- [ ] **Nix App Access Skill:** Use NIX on your phone natively via the official *NIX PUCA App* on the Google Play Store.
+- [ ] **Web Search:** Integrates open-source search engines to enable real-time internet search capabilities for NIX PUCA.
+- [ ] **Presence Detection:** Uses ESP32 microcontrollers to let NIX PUCA detect exactly when the user enters or leaves a room.
+- [ ] **EchoDot Connect:** Connects NIX PUCA directly to Echo Dot (2nd Gen) hardware to give the assistant a physical home audio footprint (leveraging local methods similar to the open-source `echolocal` GitHub project).
+- [ ] **Voice System:** Enables real-time, low-latency voice conversations with your configured model, including fully customizable UI/UX design controls.
+- [ ] **Geolocation Access:** Integrates with open-source timeline software like *Reitti* to sync device location data safely. *(Requires Nix App Access Skill; only activates dynamically when the user connects to home Wi-Fi via the DNS skill).*
+- [ ] **OPNsense DNS Presence Detection Skill:** Monitors your home network via your OPNsense DNS service to automatically log when your phone connects to the local home Wi-Fi where NIX PUCA runs.
 
 ## Documentation
 
@@ -384,6 +398,24 @@ data/                           Local SQLite/runtime state (Git-ignored)
 - [`model_cards/luna-v6/`](model_cards/luna-v6/) and [`model_cards/casper-v5/`](model_cards/casper-v5/) — draft Hugging Face model cards.
 - [`NIX-Modeldev/index.html`](NIX-Modeldev/index.html) — model lineage, dataset provenance, and research archive.
 
-## License and contributions
+## License
 
-No repository-level `LICENSE` file is currently present. Until a license is chosen and added, do not assume this repository grants permission to reuse or redistribute its code. Model and dataset licenses are separate and must be reviewed independently. Contributions should include focused tests and validation notes and must not add secrets, personal data, model weights, or generated datasets to Git.
+NIX PUCA is licensed under the **Apache License 2.0**; the full text is in [`LICENSE`](LICENSE). Model and dataset licenses are separate and must be reviewed independently. Contributions should include focused tests and validation notes and must not add secrets, personal data, model weights, or generated datasets to Git.
+
+Any modifications, distributions, or derivative works of this repository **must include prominent attribution and credit to the original creator, Sai Neela,** in accordance with Section 4(c) of the license text.
+
+```text
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://apache.org
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Copyright (c) 2026 Sai Neela. All rights reserved.
+```
