@@ -466,6 +466,30 @@ def test_play_hands_the_stream_url_to_the_declared_play_url_control(music_env, m
     assert handoff["arguments"]["title"] == "Song"
 
 
+def test_a_stream_the_speaker_refused_is_not_recorded_as_a_successful_handoff(music_env, monkeypatch):
+    # The play_url control can match and the call can still come back ok:false
+    # (the Dot refusing the stream). Reporting that as playback is exactly the
+    # "Playing …" reply with nothing on the speaker that was measured live, so
+    # the refusal travels with the handoff and the reply has to say so.
+    runtime = FakeRuntime(results={"opendeck_music": {
+        "ok": True, "action": "play", "message": "serving", "video_id": "abc12345678", "title": "Song",
+        "artist": "Artist", "duration_sec": 200, "artwork_url": "", "mime_type": "audio/mp4",
+        "play_url": "http://192.168.0.152:4100/api/media/stream?url=x", "tracks": [], "playlists": [], "count": 1,
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "", "lyrics_source": "",
+    }, "control_ring": {"ok": False, "error": "the Dot could not decode that stream"}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/play", {"query": "Song"})
+    finally:
+        server.shutdown()
+    assert status == 200
+    assert payload["handoff"]["supported"] is True
+    assert "could not decode" in payload["handoff"]["error"]
+    saved = json.loads(Path(music_api._state_path()).read_text(encoding="utf-8"))
+    assert saved["handoff"]["error"], saved["handoff"]
+
+
 def test_control_routes_volume_to_the_skill_that_declares_it(music_env, monkeypatch):
     runtime = FakeRuntime()
     install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
@@ -1063,6 +1087,9 @@ def test_now_playing_auto_advances_a_finished_queued_track(music_env, monkeypatc
         server.shutdown()
     assert status == 200
     assert payload["track"]["title"] == "Second"
+    # The hand-over is reported as such, so a reader watching the end of a song
+    # (the wall display) knows the queue follows this track.
+    assert payload["queue_active"] is True
     # ``auto`` marks a track that ended by itself, which is what repeat-one keys
     # off; a skip from the page never sends it.
     assert queue_calls(runtime) == [{"action": "queue", "op": "next", "auto": True}]
@@ -1083,6 +1110,7 @@ def test_now_playing_leaves_a_one_off_play_alone(music_env, monkeypatch):
         server.shutdown()
     assert status == 200
     assert payload["track"]["title"] == "First"
+    assert payload["queue_active"] is False, "a song played on its own is followed by nothing"
     assert queue_calls(runtime) == []
 
 

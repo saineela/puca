@@ -106,6 +106,44 @@
     return request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
   }
 
+  /* Snapshot storage.
+
+     The shell already de-duplicates its reads and backs its poll off; what it did
+     not do was survive being reloaded. The Music page's own caching technique is
+     applied to the snapshot itself: the last answer is written through to
+     localStorage, handed to a page the moment it subscribes — so a page paints
+     the track it had rather than an empty card while its first read is on the
+     wire — and used as the answer when a read fails, so a console that is
+     restarting (or a phone that lost the wifi) keeps showing what was playing
+     instead of emptying out. A remembered snapshot is always marked, and one too
+     old to be true is dropped rather than painted. */
+  const SNAPSHOT_STORE_KEY = "nix.music.snapshot.v1";
+  const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+  function storedSnapshot() {
+    try {
+      const raw = window.localStorage.getItem(SNAPSHOT_STORE_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (!saved || typeof saved !== "object") return null;
+      const savedAt = Number(saved.saved_at);
+      if (!isFinite(savedAt) || Date.now() - savedAt > SNAPSHOT_MAX_AGE_MS) return null;
+      if (!saved.payload || typeof saved.payload !== "object") return null;
+      return Object.assign({}, saved.payload, {
+        cached: true,
+        cached_age_sec: Math.max(0, Math.round((Date.now() - savedAt) / 1000)),
+      });
+    } catch (_error) {
+      return null; // unreadable, or a browser with no storage at all
+    }
+  }
+
+  function rememberSnapshot(payload) {
+    if (!payload || typeof payload !== "object") return;
+    try {
+      window.localStorage.setItem(SNAPSHOT_STORE_KEY, JSON.stringify({ saved_at: Date.now(), payload: payload }));
+    } catch (_error) { /* a shell that cannot store is still a shell */ }
+  }
+
   const NixMusic = {
     base: API,
     state,
@@ -130,6 +168,13 @@
     artwork: (url) => localArtwork(url),
     poll(handler) {
       listeners.add(handler);
+      // The page that has just mounted is handed the last snapshot straight away:
+      // its own first read is on the wire, and until it answers the alternative
+      // is an empty card for music that is still playing.
+      const remembered = storedSnapshot();
+      if (remembered) {
+        try { handler(remembered); } catch (_error) { /* a page handler must not break the shell */ }
+      }
       return () => listeners.delete(handler);
     },
     broadcast(snapshot) { listeners.forEach((handler) => { try { handler(snapshot); } catch (_error) { /* a page handler must not break the shell */ } }); },
@@ -196,10 +241,19 @@
   function readSnapshot() {
     if (snapshotInFlight) return snapshotInFlight;
     snapshotInFlight = NixMusic.nowPlaying().then((snapshot) => {
+      rememberSnapshot(snapshot);
       state.player = snapshot.player;
       state.track = snapshot.track;
       NixMusic.broadcast(snapshot);
       return snapshot;
+    }).catch((error) => {
+      // The console did not answer: a restart, a dropped connection, a reply the
+      // page could not read. What it last said stays on the page, and the page's
+      // own notes/reads carry on from there.
+      const remembered = storedSnapshot();
+      if (!remembered) throw error;
+      NixMusic.broadcast(remembered);
+      return remembered;
     });
     snapshotInFlight.catch(() => {}).then(() => { snapshotInFlight = null; });
     return snapshotInFlight;

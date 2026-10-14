@@ -82,11 +82,12 @@ const answers = {
   },
 };
 
-window.fetch = async (url) => {
+async function consoleFetch(url) {
   const body = answers[String(url)];
   if (!body) return { ok: false, status: 404, text: async () => '{"ok":false}' };
   return { ok: true, status: 200, text: async () => JSON.stringify(body) };
-};
+}
+window.fetch = consoleFetch;
 
 window.eval(source);
 const api = window.NixMusic;
@@ -111,8 +112,79 @@ check("api.artwork builds the same local URL", api.artwork(COVER) === LOCAL);
 check("artwork that is not an http URL is left alone", api.artwork("") === "" && api.artwork("data:image/png;base64,AA") === "data:image/png;base64,AA");
 check("a payload without artwork is unchanged", JSON.stringify(await api.capabilities()) === JSON.stringify(answers["/api/music"]));
 
+/* ── the last snapshot survives a reload ─────────────────────────────────
+
+   The console's own Music page caches its lists; the shell applies the same
+   technique to the snapshot it polls, so a reload paints the track that was
+   playing and a console that is restarting does not empty the page. */
+const STORE_KEY = "nix.music.snapshot.v1";
+
+const live = await api.refresh();
+check(
+  "a live read is the console's own answer",
+  live && live.cached !== true && live.track.video_id === "a1",
+  JSON.stringify(live || null),
+);
+check("the last answer is written through to storage", Boolean(window.localStorage.getItem(STORE_KEY)));
+
+// A page that has just subscribed paints before its own first read answers.
+const seen = [];
+api.poll((snapshot) => seen.push(snapshot));
+check(
+  "a page that has just subscribed is handed the last snapshot",
+  seen.length === 1 && seen[0].cached === true && seen[0].track.video_id === "a1",
+  JSON.stringify(seen),
+);
+check(
+  "the remembered snapshot says how old it is",
+  seen.length === 1 && Number.isFinite(seen[0].cached_age_sec) && seen[0].cached_age_sec >= 0,
+  seen.length ? String(seen[0].cached_age_sec) : "no snapshot",
+);
+
+// A console that has gone away keeps what it last said on the page.
+window.fetch = async () => ({ ok: false, status: 500, text: async () => "" });
+const offline = await api.refresh();
+check(
+  "a read that fails falls back to the remembered snapshot",
+  offline && offline.cached === true && offline.track.video_id === "a1",
+  JSON.stringify(offline || null),
+);
+
+// A snapshot too old to be true is dropped rather than painted, and the failure
+// is reported the way it always was.
+window.localStorage.setItem(
+  STORE_KEY,
+  JSON.stringify({ saved_at: Date.now() - 25 * 60 * 60 * 1000, payload: answers["/api/music/now-playing"] }),
+);
+const replayed = [];
+api.poll((snapshot) => replayed.push(snapshot));
+check("a snapshot older than a day is not replayed", replayed.length === 0, JSON.stringify(replayed));
+let reported = null;
+try {
+  await api.refresh();
+} catch (error) {
+  reported = error;
+}
+check("a read that cannot be answered anywhere is reported as an error", reported !== null, String(reported));
+
+// Storage being unavailable at all (a private window, a full quota) must not
+// stop the shell from reading or painting.
+window.fetch = consoleFetch;
+window.localStorage.setItem = () => { throw new Error("the storage is full"); };
+window.localStorage.getItem = () => { throw new Error("the storage is blocked"); };
+const unstoreable = await api.refresh();
+check(
+  "with no storage at all the shell still reads",
+  unstoreable && unstoreable.cached !== true && unstoreable.track.video_id === "a1",
+  JSON.stringify(unstoreable || null),
+);
+
 if (failures.length) {
   process.stdout.write(`\n${failures.length} music shell check(s) failed\n`);
   process.exit(1);
 }
 process.stdout.write("\nmusic shell checks passed\n");
+// The shell re-arms its poll forever once a read is asked for (that is how it
+// follows the speaker), so the check ends the process explicitly instead of
+// waiting for an event loop that is deliberately never empty.
+process.exit(0);

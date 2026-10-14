@@ -57,7 +57,7 @@ same page against the same state.
 | `POST` | `/api/music/play` | `{"query"}` or `{"video_id"}` — resolves the stream through the provider, remembers the track, and hands the URL to a `play_url` control when one is declared. |
 | `GET` | `/api/music/queue` | The play queue as the provider holds it: `{queue:[…], index, count, message}`. |
 | `POST` | `/api/music/queue` | `{"action":"add"\|"remove"\|"move"\|"front"\|"next_up"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. |
-| `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `stats`), answered from the console's catalog cache. |
+| `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `frequent`, `stats`), answered from the console's catalog cache. |
 | `POST` | `/api/music/save` | `{"kind":"like"\|"unlike"\|"playlist_add"\|"playlist_create", …}` — writes to the user's own library through the declared `save` provider action. |
 | `GET` | `/api/music/lyrics[?video_id=|title=|artist=|album=|duration_sec=]` | Synchronized lyrics for the current or named track, plus the same position estimate. |
 | `GET` | `/api/music/artwork?src=<image url>` | One cover, from the console's own artwork cache: served from disk, fetched and stored on a miss, safe to keep for a month (`ETag`, `304`). |
@@ -68,6 +68,13 @@ fetched whole, the player skill prepares it for its own speaker, and the console
 returns one payload — there is no job to poll and no second round trip to start
 the music. The play queue below is a different thing: a list of tracks the user
 lined up, not an asynchronous job.
+
+**What the account plays most is the provider's too.** `kind=frequent` asks the
+provider for the songs this account plays most often, ranked by play count, each
+track carrying that count as `plays` (`history` is the same log in the order it
+happened, and `stats` is the provider's own summary). The OpenDeck provider
+ranks them from its play log, so a wall display can offer "Frequently played"
+as a row of its own instead of guessing at a recommendation.
 
 **What a playlist is belongs to the provider.** `kind=playlists` returns whatever
 the installed provider calls a playlist; the OpenDeck provider reads the linked
@@ -307,7 +314,8 @@ choose them. A question expires after 15 minutes.
 
 `GET /api/panel` reports the question and where the display lives. The panel's own
 routes are on its own origin: `GET /api/panel/state` (theme, question, now
-playing and the queue in one round trip), `POST /api/panel/answer` with
+playing, the queue and the `build` of the panel being served in one round trip),
+`POST /api/panel/answer` with
 `{"index": 0}` (plays that option and closes the question), `POST
 /api/panel/dismiss`, and `POST /api/panel/question`.
 
@@ -324,14 +332,92 @@ needs no cross-origin setup.
   the console's own timezone), not the screen's.
 - The lyrics of whatever is playing open by themselves and stay open until the
   user closes them; the next track opens them again.
-- Spoken requests use the browser's own speech recognition: a phrase that names a
-  command (`pause`, `next`, `volume up`) is obeyed, `play <song>` is the same
-  `play` call the assistant makes — including the unclear case above — and
+- Spoken requests are transcribed on the box (see *Hearing* below): a phrase that
+  names a command (`pause`, `next`, `volume up`) is obeyed, `play <song>` is the
+  same `play` call the assistant makes — including the unclear case above — and
   anything else becomes a search the user picks from.
+- The playlists row ends in the **library page**: every playlist the provider
+  lists, each wearing its own cover, and a tap opens that playlist's **whole song
+  list** — `kind=playlist` with the reader's own `limit`, which is why the library
+  read is capped at 200 rather than at a search page's 12.
+- A search answers with more than songs: the page matches the playlists it already
+  holds by name and the artists the songs on it are by, so “Miles” offers the
+  artist as a doorway (a tap searches the catalog for them) and any playlist that
+  goes by the word, alongside the songs `GET /api/music/search` returned.
+- Every song row carries a **queue** control beside it — `POST /api/music/queue`
+  `{"action":"add","video_id":…}` — so a list can be lined up behind what is
+  playing, not only sent to the speaker.
+- After a minute of nobody touching it the wall hands itself over to the package's
+  own idle page (`PUCA-Panel/screensaver.html`, in an iframe so its stylesheet stays
+  out of the panel's), and any touch brings the panel back to what it was showing.
+  `?saver=off` and `?saverAfter=<seconds>` change that. What counts as somebody
+  being there is deliberately narrow — music playing, a question waiting for an
+  answer, the lyrics (while a song is playing, or when they were opened by hand)
+  and a list opened within that same minute; a wall left on the last song's
+  auto-opened lyrics is idle, which is the state a live panel sat in for days.
+  `window.__puca.idle()` on the page reports the decision (`saving`, `idle_ms`,
+  `something_to_show`, `lyrics_open`, `lyrics_by_user`, `sheet_open`) so a wall
+  nobody can stand in front of can still be asked why it is awake.
 
 Only the panel folder is servable from that listener, path-normalised inside the
 package; a package's other files (`skill.json`, the worker, the Music page's own
 assets) are not reachable there.
+
+### The display keeps itself current
+
+A wall display is pointed at its port once and never reloaded by hand, so the
+page that is open is the page that stays open: measured live, the glass kept
+drawing an older panel for hours after the console had started serving the next
+one, and what the served page did have (the size chips on the lyrics page, the
+card folding away as the music is scrolled) was reported as *missing*, because
+the page in memory predated it. (That fold is the music column's own scrolling —
+the card is the first thing in the column's scroller, so it goes away on the
+compositor with no height to lay out per frame; `?fold=0` pins the card and
+scrolls the music underneath it instead, and `window.__puca.scroll()` reports
+where the column is.) The console therefore reports **`build`** in
+`panel_info()` — and so in every `GET /api/panel/state` a display polls —
+computed from the size and write time of the panel files it is serving (a stat
+per file, read fresh, so re-deploying the skill changes it and nothing else
+does). The page compares it with the build it booted into — the first state a
+page sees is by definition its own — and reloads itself once per build per
+browsing session when they differ, so a console that keeps changing its answer,
+or a reload that does not take, cannot turn the wall into a reload loop. The
+music carries on: the panel seeks back to the console's position as soon as it
+is up. `?refresh=0` pins a page where it is, and `window.__puca.builds()` on the
+page reports `{page, served, reload_asked}`.
+
+### Over https, for the microphone
+
+The same display is served over TLS on `49171` (`NIX_PANEL_TLS_PORT`), because a
+browser only lends a page a microphone on a **secure** origin — over plain http on
+a LAN address the mic button can only say where the working address is. The
+certificate is self-signed, generated once into the console's data directory
+(`panel-cert.pem`, `panel-key.pem`) and regenerated when the names and addresses
+it has to be valid for change; the browser asks to be trusted once. `GET
+/api/panel` reports both addresses (`port`/`url` and `tls_port`/`url_https`).
+
+## Hearing
+
+Speech to text on this machine (`voice.py`). The page records through the
+browser's microphone and posts the samples to its own origin; nothing is uploaded
+to a speech service, and the audio is discarded when the answer is written.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/voice` | Whether this console can hear: `{available, engine, model, device, loaded, max_seconds}`. The model is warmed in the background when a page asks. |
+| `POST` | `/api/voice/transcribe` | A raw WAV body (`audio/wav`, 16-bit PCM, mono or stereo, up to 8 MB / 30 s) → `{"ok":true,"text":"play Bohemian Rhapsody","seconds":2.1,"silent":false}`. |
+
+The model is Whisper (`NIX_STT_MODEL`, default `openai/whisper-small.en`) on
+`NIX_STT_DEVICE` (`auto` uses the graphics card only when it has ~2 GB free, so
+recognising does not evict the chat model), and the clip is resampled to 16 kHz on
+numpy/scipy. A clip that is only room noise is answered with `silent: true` and
+empty text rather than a hallucinated phrase, and a malformed body is refused
+before the model is touched. Both routes are served by the console **and** by the
+panel's own listener: the page that records the audio has to post it back to the
+origin that asked for the microphone.
+
+The Music page uses the same two routes with the same helper, and falls back to
+the browser's own recogniser when no recogniser is installed here.
 
 ## Security notes
 

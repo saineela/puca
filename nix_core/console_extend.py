@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import re
 import socket
+import ssl
 import sys
 import threading
 from dataclasses import dataclass
@@ -30,6 +31,8 @@ import console as base_console
 import mobile_app_api
 import music_api
 import puca_panel
+import voice
+import voice_api
 
 
 ExtensionCallback = Callable[[BaseHTTPRequestHandler, re.Match[str]], bool]
@@ -97,6 +100,12 @@ register_route("GET", r"/api/music/lyrics", music_api.music_lyrics)
 # CDN round trip; the source image URL travels in the query string.
 register_route("GET", r"/api/music/artwork", music_api.music_artwork)
 register_route("GET", r"/api/skills/([^/]+)/page/([A-Za-z0-9][^?]*)", music_api.music_page_asset)
+
+# Speech to text on this machine (nix_core/voice.py). The pages that record audio
+# — the PUCA Panel, and the Music page through the same helper — post the clip to
+# their own origin, so the panel origin serves these too (see puca_panel._ROUTES).
+register_route("GET", r"/api/voice", voice_api.voice_index)
+register_route("POST", r"/api/voice/transcribe", voice_api.voice_transcribe)
 
 # Mobile aliases: the NIX Home app mounts the same music page and calls the
 # same operations under the versioned mobile prefix.
@@ -208,11 +217,12 @@ def main() -> int:
     # at its fixed port once and left there, and it serves the same music API, so
     # the display never needs the console tab. A port already taken is reported
     # and the console still starts without it.
+    panel_host = os.environ.get("NIX_PANEL_HOST", puca_panel.PANEL_HOST)
     panel_server = None
     panel_note = "disabled (port unavailable)"
     try:
         panel_server, panel_port = puca_panel.start_in_thread(
-            host=os.environ.get("NIX_PANEL_HOST", puca_panel.PANEL_HOST),
+            host=panel_host,
             port=int(os.environ.get("NIX_PANEL_PORT", puca_panel.PANEL_PORT)),
         )
         panel_skill = puca_panel.panel_skill()
@@ -223,6 +233,19 @@ def main() -> int:
         )
     except OSError as exc:
         panel_note = f"disabled ({type(exc).__name__}: {exc})"
+    # The same display over TLS. A browser only allows a microphone on a secure
+    # origin, so the http URL above can show everything and hear nothing; this one
+    # records. It is self-signed, so the browser asks to be trusted once.
+    panel_tls_server = None
+    panel_tls_note = "disabled (port unavailable)"
+    try:
+        panel_tls_server, panel_tls_port = puca_panel.start_tls_in_thread(
+            host=panel_host,
+            port=int(os.environ.get("NIX_PANEL_TLS_PORT", puca_panel.PANEL_TLS_PORT)),
+        )
+        panel_tls_note = f"https://{lan}:{panel_tls_port}/ (same display, microphone allowed)"
+    except (OSError, ssl.SSLError) as exc:
+        panel_tls_note = f"disabled ({type(exc).__name__}: {exc})"
     try:
         print()
         print("  NIX TEST CONSOLE (extended)")
@@ -230,6 +253,8 @@ def main() -> int:
         print(f"  LAN   : http://{lan}:{port}   (from any device on your network)")
         print(f"  ports : {port} console (Knowledge/Actions run in-process)")
         print(f"          {panel_note} - PUCA Panel")
+        print(f"          {panel_tls_note}")
+        print(f"  hearing: {voice.available()['model']} on {voice.device_name()} (local, no cloud)")
         print(f"  chat backend : {base_console.CASPER_BACKEND} ({base_console.OLLAMA_MODEL} / {base_console.TABBY_MODEL})")
         print(f"  timezone   : {base_console.TIMEZONE}")
         print("  Ctrl+C to stop")
@@ -238,9 +263,10 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nconsole stopped.")
     finally:
-        if panel_server is not None:
-            panel_server.shutdown()
-            panel_server.server_close()
+        for running in (panel_server, panel_tls_server):
+            if running is not None:
+                running.shutdown()
+                running.server_close()
     return 0
 
 

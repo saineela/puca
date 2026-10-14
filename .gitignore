@@ -182,3 +182,7 @@ nix_core/ring_light_package/
 
 # Local NIX skill packages under development (own repositories)
 /opendeck-skill/
+
+# Gesture controlled automation: a separate project with its own repository,
+# unrelated to NIX. NIX only reads the JSON it writes in its output/ folder.
+/gesture-controlled-automation/

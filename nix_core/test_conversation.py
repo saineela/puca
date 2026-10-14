@@ -2759,6 +2759,33 @@ def test_a_play_that_cannot_reach_the_speaker_is_reported_honestly(monkeypatch):
     assert response["details"]["playback_handoff"]["supported"] is False
 
 
+def test_a_speaker_that_refused_the_stream_is_not_reported_as_playing(monkeypatch):
+    # The control matched and the call even came back, but with ok:false (the
+    # Dot refusing the stream). The handoff carries that refusal, so the reply
+    # must not repeat the provider's "Playing …" sentence.
+    import music_api
+
+    runtime = MusicSkillRuntime()
+    planner = ScriptedMusicPlanner({"action": "play", "query": "fate of ophelia by taylor swift"})
+    brain, _captured = _music_brain(runtime, planner)
+
+    def fake_start_playback(result, skill_id, *, queue=None):
+        return {
+            "handoff": {
+                "supported": True,
+                "skill_id": "github:example:echo-connect",
+                "result": {"ok": False, "error": "the Dot could not decode the stream"},
+                "error": "the Dot could not decode the stream",
+            }
+        }
+
+    monkeypatch.setattr(music_api, "_start_playback", fake_start_playback)
+    response = brain.handle(text="play fate of ophelia by taylor swift")
+    assert "nothing is playing" in response["reply"]
+    assert "refused the stream" in response["reply"]
+    assert response["details"]["playback_handoff"]["error"]
+
+
 def test_a_like_of_a_song_the_user_names_is_left_to_the_planner():
     # "like this song" is the track that is playing, but "save Believer to my
     # Focus playlist" names another track: the provider has to search for it
@@ -3161,6 +3188,118 @@ def test_a_voice_or_compound_request_is_never_read_as_music_transport(monkeypatc
         brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5))
         brain.handle(text=request)
     assert dispatched == []
+
+
+def test_a_filler_word_or_verb_typo_never_loses_a_transport_command():
+    # Measured live on the Android app: "dude pause the song" and "resume the
+    # song bro" were handed to the planner (which declares no transport action)
+    # and failed closed, while "reune the song bro" was answered "music resumed"
+    # by the chat model with the speaker untouched. Neither the interjection nor
+    # the misspelling is part of the command.
+    from brain import _music_transport_intent
+
+    assert _music_transport_intent("dude pause the song") == ("pause", "pause")
+    assert _music_transport_intent("resume the song bro") == ("resume", "resume")
+    assert _music_transport_intent("reune the song bro") == ("resume", "resume")
+    assert _music_transport_intent("pause it please") == ("pause", "pause")
+    # The known phrases and every guard are untouched.
+    assert _music_transport_intent("play it again") == ("resume", "resume")
+    for request in (
+        "stop speaking",
+        "unmute the microphone",
+        "pause the music and turn on the ring light",
+        "play some music",
+    ):
+        assert _music_transport_intent(request) is None, request
+
+
+def test_a_filler_word_transport_command_still_runs_the_speakers_control(monkeypatch):
+    for request, command in [
+        ("resume the song bro", "resume"),
+        ("dude pause the song", "pause"),
+        ("reune the song bro", "resume"),
+    ]:
+        dispatched: list[str] = []
+        music_api, fake = _transport_stub(dispatched, player_state="playing")
+        monkeypatch.setattr(music_api, "apply_transport", fake)
+        brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5, playback="playing"))
+        response = brain.handle(text=request)
+        assert dispatched == [command], (request, dispatched)
+        assert response["details"]["skill_planner_called"] is False, request
+        assert response["details"]["music_transport"]["command"] == command, request
+        assert "init" not in captured, request
+
+
+def test_is_it_on_repeat_is_answered_from_the_player_not_played(monkeypatch):
+    # Measured live: "is it on repeat?" became "Playing “repeat” by anees on
+    # OpenDeck." while the music never changed. The queue's flags are the
+    # provider's, so the question is answered from them.
+    import music_api
+
+    from brain import _music_preference_question
+
+    assert _music_preference_question("is it on repeat?") == "repeat"
+    assert _music_preference_question("is shuffle on") == "shuffle"
+    assert _music_preference_question("am i on repeat") == "repeat"
+    # Commands and unrelated questions stay out of it.
+    assert _music_preference_question("repeat this song") is None
+    assert _music_preference_question("shuffle the queue") is None
+    assert _music_preference_question("what's playing") is None
+
+    asked: list[str] = []
+
+    def fake_provider_call(key, extra=None):
+        asked.append(key)
+        return MUSIC_SKILL_ID, {
+            "ok": True, "action": "queue", "repeat": "one", "shuffle": True,
+            "queue": [], "queue_index": -1, "count": 0,
+        }
+
+    monkeypatch.setattr(music_api, "_provider_call", fake_provider_call)
+    brain, captured = _music_brain(MusicSkillRuntime())
+    response = brain.handle(text="is it on repeat?")
+    assert asked == ["queue"], asked
+    assert response["rule"] == "nix_music_repeat_status"
+    assert response["reply"] == "Repeat is on for the current track."
+    assert response["details"]["skill_planner_called"] is False
+    assert "init" not in captured
+
+    for request, expected in [
+        ("is repeat off", "Repeat is off."),
+        ("is it repeating everything", "Repeat is off."),
+    ]:
+        monkeypatch.setattr(
+            music_api, "_provider_call",
+            lambda key, extra=None: (MUSIC_SKILL_ID, {"ok": True, "repeat": "off", "shuffle": False}),
+        )
+        brain, _captured = _music_brain(MusicSkillRuntime())
+        assert brain.handle(text=request)["reply"] == expected, request
+
+
+def test_the_opposite_of_play_is_answered_or_performed(monkeypatch):
+    # Both failed live with "the dedicated skill planner did not produce a valid,
+    # safe plan": one asks what the opposite is, the other asks for it.
+    from brain import _music_opposite_intent
+
+    assert _music_opposite_intent("what is the opposite of play") == ("pause", True)
+    assert _music_opposite_intent("perform the opposite of playing the song") == ("pause", False)
+    assert _music_opposite_intent("opposite of pause") == ("resume", True)
+    assert _music_opposite_intent("what's playing") is None
+
+    brain, captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5, playback="playing"))
+    response = brain.handle(text="what is the opposite of play")
+    assert response["rule"] == "nix_music_opposite_question"
+    assert "pause" in response["reply"].lower()
+    assert "init" not in captured
+
+    dispatched: list[str] = []
+    music_api, fake = _transport_stub(dispatched, player_state="paused")
+    monkeypatch.setattr(music_api, "apply_transport", fake)
+    brain, _captured = _speaker_brain(SpeakerSkillRuntime(volume=0.5, playback="playing"))
+    response = brain.handle(text="perform the opposite of playing the song")
+    assert dispatched == ["pause"], dispatched
+    assert response["rule"] == "nix_music_transport_pause"
+    assert response["details"]["music_opposite"]["command"] == "pause"
 
 
 # ── A pronoun play and a question about the chat ──────────────────────────

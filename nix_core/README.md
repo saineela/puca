@@ -167,7 +167,7 @@ See [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for exact model paths, adapter
 | Knowledge API | `nix_knowledge` HTTP service, commonly port `8100` |
 | Actions API | `nix_actions` HTTP service, commonly port `8200` |
 | Console | Browser test dashboard; its own fixed port (`49117`) |
-| PUCA Panel | Wall display for the music NIX plays; its own fixed port (`49170`) |
+| PUCA Panel | Wall display for the music NIX plays; its own fixed ports (`49170` http, `49171` https for the microphone) |
 | Websocket gateway | Voice/client interface, commonly port `9000` |
 
 Start the console:
@@ -180,13 +180,14 @@ The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict
 
 Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens one listening socket for the console itself — a browser needs only the console URL. The optional Testing-page runner is an exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
 
-The console also starts the **PUCA Panel** (`puca_panel.py`) on its own fixed port, `49170` by default (`NIX_PANEL_PORT`, `NIX_PANEL_HOST`). It is the wall display for the music an installed provider serves: one large now-playing card, large library tiles, the queue, the volume, the lyrics of whatever is playing, and the browser's own speech recognition for spoken requests. It serves the panel page from the installed provider's package (`PUCA-Panel/`) and the same `/api/music` handlers as the console, from its own origin, so the display never needs the console tab. A port already in use is reported and the console keeps running without the panel. See [`MUSIC_API.md`](MUSIC_API.md).
+The console also starts the **PUCA Panel** (`puca_panel.py`) on its own fixed port, `49170` by default (`NIX_PANEL_PORT`, `NIX_PANEL_HOST`), and the same display over TLS on `49171` (`NIX_PANEL_TLS_PORT`). It is the wall display for the music an installed provider serves: one large now-playing card, playlist shelves and a **library page** of every playlist with its cover, the queue, the volume, and the lyrics of whatever is playing. Spoken requests are transcribed **on this machine** by `voice.py` (Whisper, served at `/api/voice`), not by a speech service: the page records through the browser's microphone and posts the clip to its own origin. A browser only allows a microphone on a secure origin, which is what the TLS listener is for, and its certificate is self-signed and generated once into the console's data directory. The panel serves the page from the installed provider's package (`PUCA-Panel/`) and the same `/api/music` handlers as the console, from its own origin, so the display never needs the console tab. A port already in use is reported and the console keeps running without the panel. A display left open is never reloaded by hand, so the state it polls reports the **build** of the panel the console is serving (the size and write time of the provider's panel files) and the page reloads itself once when that no longer matches the build it booted into; a page that is holding an older panel therefore updates itself instead of drawing it for as long as the wall is on. See [`MUSIC_API.md`](MUSIC_API.md).
 
 Useful console endpoints:
 
 - `GET /api/mobile/v1` and `GET /api/mobile/v1/home-copy` — Mobile App category index and randomized home-copy prototype, available only when started with `console_extend.py`; the full mobile API is not implemented. See [`MOBILE_APP_API.md`](MOBILE_APP_API.md).
 
-- `GET /api/panel` — the PUCA Panel's URL, providing skill, and any question it is waiting on
+- `GET /api/panel` — the PUCA Panel's URL (http and https), providing skill, and any question it is waiting on
+- `GET /api/voice` and `POST /api/voice/transcribe` — whether this console can hear, and the speech-to-text behind the music microphone
 - `GET /api/health` — service, model, GPU, and timezone status
 - `GET /api/feed` — trace, turns, actions, and Knowledge summaries
 - `GET /api/sessions` — grouped live chat sessions

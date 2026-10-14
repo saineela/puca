@@ -340,6 +340,12 @@ def _now_playing_payload(include_lyrics: bool = False) -> dict:
         "handoff": state.get("handoff") if isinstance(state.get("handoff"), dict) else None,
         "updated_at": state.get("updated_at"),
         "source": state.get("source"),
+        # Whether this track came out of the queue and may therefore be followed
+        # by the next one when it ends. A reader that is watching the end of a
+        # song (the wall display) has to know the difference between "the queue
+        # moves on by itself" and "this song was all there was": one is waiting,
+        # the other is finished.
+        "queue_active": bool(state.get("queue_active")),
     }
     if include_lyrics and track:
         try:
@@ -787,7 +793,27 @@ def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -
             state["started_at"] = time.time()
             try:
                 handoff_result = _call_tool(handoff_skill, handoff_control["tool"], handoff_arguments)
-                state["handoff"] = {"supported": True, "skill_id": handoff_skill, "result": handoff_result}
+                # The control matched and the call came back, but a speaker that
+                # refused the stream reports ok:false. Treating that as success is
+                # exactly how a reply claimed "Playing …" while nothing reached the
+                # device (measured live), so a refusal is recorded as the error it
+                # is and the reply says so.
+                refused = (
+                    isinstance(handoff_result, dict)
+                    and handoff_result.get("ok") is False
+                )
+                if refused:
+                    state["handoff"] = {
+                        "supported": True,
+                        "skill_id": handoff_skill,
+                        "result": handoff_result,
+                        "error": str(
+                            handoff_result.get("error")
+                            or "the speaker refused the stream"
+                        )[:200],
+                    }
+                else:
+                    state["handoff"] = {"supported": True, "skill_id": handoff_skill, "result": handoff_result}
             except MusicApiError as exc:
                 state["handoff"] = {"supported": True, "skill_id": handoff_skill, "error": str(exc)}
     _write_music_state(state)
@@ -876,6 +902,11 @@ QUEUE_OPS = {
     "shuffle", "repeat",
 }
 REPEAT_MODES = ("off", "all", "one")
+
+# How many songs one library read may hand over. This is the reader's ceiling,
+# not the provider's page size: a wall display listing a playlist asks for as
+# many as it will show, and the provider answers with the list it holds.
+LIBRARY_LIMIT_MAX = 200
 
 
 def _queue_payload(skill_id: str, result: dict) -> dict:
@@ -997,7 +1028,11 @@ def music_library(handler, _match=None) -> bool:
     query = _query(handler)
     kind = _text(query.get("kind") or "playlists", "kind", 32).lower()
     arguments: dict = {"kind": kind}
-    limit = _int(query.get("limit"), "limit", 1, 50)
+    # A library read is a list to browse rather than a page of answers: the wall
+    # display lists a playlist's songs, and a playlist is not twelve songs long.
+    # The provider caps this where it has to (history at 50); what it hands over
+    # is what the reader gets.
+    limit = _int(query.get("limit"), "limit", 1, LIBRARY_LIMIT_MAX)
     playlist_id = _text(query.get("playlist_id"), "playlist_id", 100)
     if limit:
         arguments["limit"] = limit

@@ -623,8 +623,14 @@ class SkillPlanner:
         if save_request is not None:
             groups.add("save")
         elif re.search(
-            r"\b(?:what(?:'s|\s+song\s+is|\s+tune\s+is|\s+is)?\s+playing|"
-            r"what\s+(?:song|tune)\s+is\s+this|now\s+playing|currently\s+playing|"
+            # "playing" as speech-to-text often writes it ("what is it currently
+            # playign" was measured live): read as the same question so the
+            # provider's own state is what answers, not the chat model.
+            r"\b(?:what(?:'s|\s+song\s+is|\s+tune\s+is|\s+is)?\s+"
+            r"(?:playing|playign|playin|playng)|"
+            r"what\s+(?:song|tune)\s+is\s+this|now\s+"
+            r"(?:playing|playign|playin|playng)|currently\s+"
+            r"(?:playing|playign|playin|playng)|"
             r"what\s+am\s+i\s+listening\s+to)\b",
             text,
         ):

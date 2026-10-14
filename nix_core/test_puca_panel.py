@@ -7,7 +7,11 @@ follows the console's clock, and a play request Nix cannot decide on is asked as
 a question instead of being played as a guess.
 """
 import json
+import os
+import ssl
+import stat
 from datetime import datetime, timezone
+from threading import Thread
 
 import pytest
 
@@ -15,7 +19,21 @@ import brain
 import console
 import music_api
 import puca_panel
-from test_music_api import FakeRuntime, PROVIDER_MANIFEST, install, music_env, read_json, read_raw  # noqa: E402
+from test_music_api import (  # noqa: E402
+    FakeRuntime,
+    PROVIDER_MANIFEST,
+    finished_queue_state,
+    idle_player,
+    install,
+    music_env,
+    player_manifest,
+    queue_calls,
+    queue_result,
+    queue_track,
+    read_json,
+    read_raw,
+    write_state,
+)
 
 
 PANEL_FILES = ["PUCA-Panel/panel.html", "PUCA-Panel/panel.css", "PUCA-Panel/panel.js"]
@@ -297,6 +315,39 @@ def test_the_panel_says_so_when_no_provider_ships_a_page(music_env, monkeypatch)
         server.server_close()
 
 
+def test_the_console_says_which_build_of_the_panel_it_is_serving(panel):
+    # A wall display is never reloaded by hand, so the page it is holding has to
+    # be able to tell that the console has moved on: the state it polls carries
+    # the build, the build stays put while nothing is re-deployed, and writing
+    # the page again is what changes it.
+    server, _runtime = panel
+    status, payload, _headers = read_json(server, "/api/panel/state")
+    assert status == 200
+    build = payload["panel"]["build"]
+    assert isinstance(build, str) and len(build) >= 8, build
+    assert build == puca_panel.panel_build()
+
+    _status, again, _headers = read_json(server, "/api/panel/state")
+    assert again["panel"]["build"] == build, "reading the state does not change the build"
+
+    skill_id, manifest = puca_panel.panel_skill()
+    entry = puca_panel.panel_page_path(skill_id, manifest)
+    stats = os.stat(entry)
+    os.utime(entry, (stats.st_atime, stats.st_mtime + 5))
+    try:
+        assert puca_panel.panel_build() != build, "a re-deployed page is a new build"
+    finally:
+        os.utime(entry, (stats.st_atime, stats.st_mtime))
+    assert puca_panel.panel_build() == build, "and the page back as it was is the old one"
+
+
+def test_a_provider_without_a_panel_has_no_build(music_env, monkeypatch):
+    # No page, nothing to be stale: the display gets an empty build rather than
+    # the build of some other package, so the self-refresh stays quiet.
+    install(monkeypatch, music_env, [{**PROVIDER_MANIFEST, "files": PROVIDER_MANIFEST["files"]}], FakeRuntime())
+    assert puca_panel.panel_build() == ""
+
+
 # ── the music API on the panel's own origin ──────────────────────────────
 
 
@@ -333,6 +384,78 @@ def test_the_state_call_carries_what_one_paint_needs(panel):
     assert payload["panel"]["skill_id"] == "opendeck"
     assert payload["question"] is None
     assert payload["queue"]["queue"] == []
+
+
+def test_the_panel_offers_https_because_a_microphone_needs_it():
+    """The display is opened on a LAN address, where no browser lends a microphone.
+
+    A browser only hands a page a microphone on a secure origin, so the panel
+    listens on a second port over TLS — the same page, the same music API and the
+    console's own recogniser — and the display pointed there can use its voice.
+    The certificate is self-signed (a home LAN has no authority to ask) and lives
+    in the console's data directory.
+    """
+    certificate = puca_panel.ensure_certificate()
+    assert certificate is not None, "a certificate is created for the panel"
+    cert_path, key_path = certificate
+    assert os.path.isfile(cert_path) and os.path.isfile(key_path)
+    assert stat.S_IMODE(os.stat(key_path).st_mode) == 0o600, "the key stays private"
+    assert puca_panel.ensure_certificate() == certificate, "and is reused, not remade on every boot"
+
+    # The addresses the display is reached by are in the certificate, so pointing
+    # at the hub's address is not a name mismatch on top of the self-signed note.
+    decoded = ssl._ssl._test_decode_cert(cert_path)  # noqa: SLF001 - the stdlib's own reader
+    names = [value for _kind, value in decoded.get("subjectAltName", [])]
+    assert "localhost" in names, names
+    assert puca_panel._lan_ip() in names, names
+
+    server = puca_panel.create_tls_server("127.0.0.1", 0)
+    port = int(server.server_address[1])
+    Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        status, payload = read_json_over_tls(port, "/api/panel", context)
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert status == 200 and payload["ok"] is True
+    assert payload["url_https"].startswith("https://"), "the console can say where the microphone works"
+
+
+def read_json_over_tls(port: int, path: str, context) -> tuple[int, dict]:
+    import urllib.request
+
+    with urllib.request.urlopen(f"https://127.0.0.1:{port}{path}", context=context, timeout=30) as response:
+        return response.status, json.loads(response.read() or b"{}")
+
+
+def test_a_panel_state_read_advances_a_finished_queued_track(music_env, monkeypatch):
+    """The wall display is often the only thing reading the console.
+
+    The console hands a queue-sourced track over to the next one once its speaker
+    goes idle, but only when somebody asks for the state — and on a wall-mounted
+    display the panel's own poll is that somebody. Without it the screen sat on
+    the last song of the queue for as long as it was left switched on.
+    """
+    items = [queue_track("a1", "First"), queue_track("b2", "Second")]
+    runtime = install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], FakeRuntime(
+        results={"opendeck_music": lambda _matched: queue_result(
+            items, index=1, message="Playing Second.",
+            play_url="http://192.168.0.152:4100/api/media/stream?url=z")},
+        player=idle_player(),
+    ))
+    write_state(**finished_queue_state())
+
+    state = puca_panel.panel_state()
+
+    assert state["now_playing"]["track"]["title"] == "Second"
+    assert state["now_playing"]["queue_active"] is True
+    # The advance comes before the queue the same paint reads, so one round trip
+    # both moves the music on and says what is up next.
+    assert queue_calls(runtime)[0] == {"action": "queue", "op": "next", "auto": True}
+    assert [item["video_id"] for item in state["queue"]["queue"]] == ["a1", "b2"]
 
 
 def test_a_hardware_hiccup_does_not_blank_the_display(monkeypatch, panel):

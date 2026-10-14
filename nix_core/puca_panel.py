@@ -29,22 +29,36 @@ startup file survive console restarts.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import ssl
+import subprocess
 import threading
 import time
 import urllib.parse
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import console
 import music_api
+import voice
+import voice_api
 
 PANEL_NAME = "PUCA Panel"
 PANEL_HOST = os.environ.get("NIX_PANEL_HOST", "0.0.0.0")
 PANEL_PORT = int(os.environ.get("NIX_PANEL_PORT", "49170"))
+# The same display, over TLS. A browser only hands a page a microphone on a
+# secure origin, and the panel is normally opened at http://<hub-ip>:49170/ —
+# which is not one, so the microphone button could never do anything there. The
+# page itself, the music API and the recogniser are all on this port too, so a
+# display pointed here is a display with a working voice and nothing else moved.
+PANEL_TLS_PORT = int(os.environ.get("NIX_PANEL_TLS_PORT", "49171"))
+PANEL_CERT_NAME = "panel-cert.pem"
+PANEL_KEY_NAME = "panel-key.pem"
+PANEL_CERT_NOTE = "panel-cert-addresses.json"
 
 # The page's folder inside the music provider's package. The name is fixed by
 # convention rather than by a manifest field: a manifest may not invent new keys,
@@ -147,15 +161,54 @@ def panel_page_path(skill_id: str, manifest: dict | None = None) -> str | None:
     return None
 
 
+def panel_build() -> str:
+    """A short id for the panel exactly as it is on disk right now.
+
+    A wall display is never reloaded by hand, so the page that is open is the
+    page that stays open: measured live, the glass kept drawing a panel from
+    before the console had started serving the next one, and what the served page
+    had — the size chips on the lyrics page, the player folding away as the music
+    is scrolled — was reported as missing because the page in memory simply did
+    not have it. A page cannot know which build it is running unless the console
+    tells it, and the honest identity is the one the files carry themselves:
+    their size and the moment they were written, read fresh (a stat, not the
+    bytes), so re-deploying the skill changes it and nothing else does.
+    """
+    found = panel_skill()
+    if found is None:
+        return ""
+    skill_id, manifest = found
+    package = os.path.realpath(os.path.abspath(console._skill_package_path(skill_id)))
+    names = sorted({path for path in (manifest.get("files") or []) if isinstance(path, str)})
+    digest = hashlib.sha256()
+    for name in names:
+        target = os.path.realpath(os.path.join(package, *name.split("/")))
+        if os.path.commonpath((package, target)) != package:
+            continue
+        try:
+            info = os.stat(target)
+        except OSError:
+            continue
+        digest.update(f"{name}:{info.st_size}:{int(info.st_mtime)}\n".encode("utf-8"))
+    return digest.hexdigest()[:12]
+
+
 def panel_info() -> dict:
     """What the console can say about the panel without starting it."""
     found = panel_skill()
     entry = panel_page_path(found[0], found[1]) if found else None
     return {
         "name": PANEL_NAME,
+        # Which panel this console is serving, so an open display can tell that
+        # the page it is running is no longer the page it would be given.
+        "build": panel_build(),
         "host": PANEL_HOST,
         "port": PANEL_PORT,
         "url": f"http://{_lan_ip()}:{PANEL_PORT}/",
+        # The same display over TLS: the URL to use when the microphone matters,
+        # because a browser only hands a page a microphone on a secure origin.
+        "tls_port": PANEL_TLS_PORT,
+        "url_https": f"https://{_lan_ip()}:{PANEL_TLS_PORT}/",
         "skill_id": found[0] if found else None,
         "skill_name": found[1].get("name", found[0]) if found else None,
         "page": PANEL_PAGE,
@@ -340,6 +393,12 @@ def panel_state() -> dict:
         "server_time": datetime.now(tz=_timezone()).isoformat(timespec="seconds"),
     }
     try:
+        # The console hands a queue-sourced track over to the next one once its
+        # speaker goes idle — but only when somebody asks for the state, and on
+        # a wall-mounted display the panel is often the only thing asking. So a
+        # panel poll counts as somebody: without this the wall sat on the last
+        # song of a queue for as long as it was left switched on.
+        music_api._maybe_advance_queue()
         payload["now_playing"] = music_api._now_playing_payload()
     except Exception as exc:  # a device hiccup must not blank the display
         payload["now_playing"] = None
@@ -358,21 +417,28 @@ def panel_state() -> dict:
 # ---------------------------------------------------------------------------
 
 
-# The music endpoints the display uses, mapped to the same handlers the console
-# registers. Keeping the table here means the panel can never serve a route the
-# console does not, and a new console route is added in one place.
-_MUSIC_ROUTES: dict[str, str] = {
-    "GET /api/music": "music_index",
-    "GET /api/music/now-playing": "music_now_playing",
-    "POST /api/music/control": "music_control",
-    "GET /api/music/search": "music_search",
-    "POST /api/music/play": "music_play",
-    "GET /api/music/queue": "music_queue",
-    "POST /api/music/queue": "music_queue",
-    "GET /api/music/library": "music_library",
-    "POST /api/music/save": "music_save",
-    "GET /api/music/lyrics": "music_lyrics",
-    "GET /api/music/artwork": "music_artwork",
+# Every route the display calls, mapped to the console's own handler. Keeping
+# the table here means the panel can never serve a route the console does not,
+# and a new console route is added in one place.
+#
+# Hearing is on this list for a reason: the page that records the audio is the
+# panel, and a microphone answer has to come back on the origin that asked for
+# it. The recogniser itself is the console's (nix_core/voice.py), so the display
+# does not need the console tab for anything.
+_ROUTES: dict[str, Callable[..., bool]] = {
+    "GET /api/music": music_api.music_index,
+    "GET /api/music/now-playing": music_api.music_now_playing,
+    "POST /api/music/control": music_api.music_control,
+    "GET /api/music/search": music_api.music_search,
+    "POST /api/music/play": music_api.music_play,
+    "GET /api/music/queue": music_api.music_queue,
+    "POST /api/music/queue": music_api.music_queue,
+    "GET /api/music/library": music_api.music_library,
+    "POST /api/music/save": music_api.music_save,
+    "GET /api/music/lyrics": music_api.music_lyrics,
+    "GET /api/music/artwork": music_api.music_artwork,
+    "GET /api/voice": voice_api.voice_index,
+    "POST /api/voice/transcribe": voice_api.voice_transcribe,
 }
 
 
@@ -481,14 +547,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             )
         self._send_file(entry, PANEL_EXTENSIONS[".html"])
 
-    def _dispatch_music(self, method: str, path: str) -> bool:
-        name = _MUSIC_ROUTES.get(f"{method} {path}")
-        if name is None:
+    def _dispatch_route(self, method: str, path: str) -> bool:
+        handler = _ROUTES.get(f"{method} {path}")
+        if handler is None:
             return False
-        handler = getattr(music_api, name)
         try:
             handled = handler(self, None)
-        except music_api.MusicApiError as exc:
+        except (music_api.MusicApiError, voice.VoiceError) as exc:
             handled = music_api._fail(self, exc)
         if not handled:
             self._json({"ok": False, "error": "That music route did not answer."}, 500)
@@ -514,7 +579,7 @@ class PanelHandler(BaseHTTPRequestHandler):
                 return self._json(panel_state())
             if asset == "api/panel":
                 return self._json({"ok": True, **panel_info(), "question": pending_question()})
-            if asset.startswith("api/music") and self._dispatch_music("GET", path):
+            if asset.startswith(("api/music", "api/voice")) and self._dispatch_route("GET", path):
                 return None
             raise PanelError("No such panel route.", 404, "not_found")
         except PanelError as exc:
@@ -525,7 +590,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         asset = urllib.parse.unquote(path.lstrip("/"))
         try:
-            if asset.startswith("api/music") and self._dispatch_music("POST", path):
+            if asset.startswith(("api/music", "api/voice")) and self._dispatch_route("POST", path):
                 return None
             if asset == "api/panel/answer":
                 body = self._body()
@@ -554,6 +619,112 @@ def create_server(host: str = PANEL_HOST, port: int = PANEL_PORT) -> ThreadingHT
     server = ThreadingHTTPServer((host, port), PanelHandler)
     server.daemon_threads = True
     return server
+
+
+# ---------------------------------------------------------------------------
+# The same display over https
+# ---------------------------------------------------------------------------
+
+
+def _certificate_paths() -> tuple[str, str]:
+    return (
+        os.path.join(console.DATA_DIR, PANEL_CERT_NAME),
+        os.path.join(console.DATA_DIR, PANEL_KEY_NAME),
+    )
+
+
+def _certificate_addresses() -> list[str]:
+    """The names and addresses the certificate has to be valid for."""
+    import socket
+
+    addresses = ["DNS:localhost", "IP:127.0.0.1", "IP:::1"]
+    hostname = socket.gethostname()
+    if hostname:
+        addresses.append(f"DNS:{hostname}")
+    lan = _lan_ip()
+    if lan and lan != "127.0.0.1":
+        addresses.append(f"IP:{lan}")
+    return addresses
+
+
+def ensure_certificate() -> tuple[str, str] | None:
+    """Create the panel's own certificate once, and reuse it afterwards.
+
+    Self-signed, and the browser will say so once — a home display on a LAN has
+    no certificate authority to ask, and the alternative is no microphone at all.
+    The key never leaves this machine and the file is the only copy the console
+    reads. Regenerated when the addresses the display is reached by change, so
+    pointing at the box's new IP does not produce a name mismatch on top of the
+    self-signed warning.
+    """
+    cert_path, key_path = _certificate_paths()
+    note_path = os.path.join(console.DATA_DIR, PANEL_CERT_NOTE)
+    addresses = _certificate_addresses()
+    try:
+        with open(note_path, "r", encoding="utf-8") as handle:
+            recorded = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        recorded = None
+    if (
+        isinstance(recorded, list)
+        and sorted(recorded) == sorted(addresses)
+        and os.path.isfile(cert_path)
+        and os.path.isfile(key_path)
+    ):
+        return cert_path, key_path
+    os.makedirs(console.DATA_DIR, exist_ok=True)
+    openssl = _which_openssl()
+    if openssl is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [
+                openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-days", "3650", "-nodes",
+                "-keyout", key_path, "-out", cert_path,
+                "-subj", "/CN=NIX PUCA Panel",
+                "-addext", "subjectAltName=" + ",".join(addresses),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0 or not os.path.isfile(cert_path) or not os.path.isfile(key_path):
+        return None
+    try:
+        os.chmod(key_path, 0o600)
+        with open(note_path, "w", encoding="utf-8") as handle:
+            json.dump(addresses, handle)
+    except OSError:
+        pass
+    return cert_path, key_path
+
+
+def _which_openssl() -> str | None:
+    import shutil
+
+    return shutil.which("openssl")
+
+
+def create_tls_server(host: str = PANEL_HOST, port: int = PANEL_TLS_PORT) -> ThreadingHTTPServer:
+    """The panel listener, wrapped in TLS, so the microphone is allowed."""
+    certificate = ensure_certificate()
+    if certificate is None:
+        raise OSError("no certificate could be created (openssl is unavailable)")
+    server = create_server(host, port)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certificate[0], certificate[1])
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    return server
+
+
+def start_tls_in_thread(host: str = PANEL_HOST, port: int = PANEL_TLS_PORT) -> tuple[ThreadingHTTPServer, int]:
+    server = create_tls_server(host, port)
+    resolved = int(server.server_address[1])
+    thread = threading.Thread(target=server.serve_forever, name="puca-panel-tls", daemon=True)
+    thread.start()
+    return server, resolved
 
 
 def start_in_thread(host: str = PANEL_HOST, port: int = PANEL_PORT) -> tuple[ThreadingHTTPServer, int]:

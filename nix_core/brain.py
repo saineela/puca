@@ -942,6 +942,35 @@ _MUSIC_TRANSPORT_PHRASES: dict[tuple[str, ...], tuple[str, str]] = {
     ("play", "again"): ("resume", "resume"),
     ("keep", "playing"): ("resume", "resume"),
 }
+# An interjection is not part of a command. Measured live, "dude pause the song"
+# and "resume the song bro" were both handed to the planner — which has no
+# transport action — and failed closed with "the dedicated skill planner did not
+# produce a valid, safe plan", while the same request without the filler word
+# worked. The filler comes off wherever it lands, but only after the known
+# phrases ("play it again") have been matched, so a filler that is really part
+# of a phrase is never dropped.
+_MUSIC_TRANSPORT_FILLER = frozenset({
+    "bro", "bruh", "dude", "man", "buddy", "mate", "fam", "sis",
+    "pls", "plz", "please", "thanks", "thank", "just", "now", "yo", "ok", "okay",
+    "hey", "hmm", "uh", "um",
+})
+# Speech-to-text misspellings of the transport verbs themselves ("reune the
+# song" was measured live): each is corrected to the word the speaker meant
+# before the command word is read.
+_MUSIC_TRANSPORT_TYPOS = {
+    "reune": "resume",
+    "reusme": "resume",
+    "resum": "resume",
+    "rsume": "resume",
+    "resme": "resume",
+    "resuem": "resume",
+    "pasue": "pause",
+    "paws": "pause",
+    "paus": "pause",
+    "stpo": "stop",
+    "stopp": "stop",
+    "halp": "halt",
+}
 
 
 def _music_request_words(text: str, device_names: Sequence[str] = ()) -> list[str]:
@@ -991,10 +1020,90 @@ def _music_transport_intent(text: str, device_names: Sequence[str] = ()) -> tupl
     phrase = tuple(words)
     if phrase in _MUSIC_TRANSPORT_PHRASES:
         return _MUSIC_TRANSPORT_PHRASES[phrase]
-    head, rest = words[0] if words else "", words[1:]
+    # Neither an interjection nor a misspelled verb is part of the command, so
+    # both come off before the words are read (measured live).
+    words = [
+        _MUSIC_TRANSPORT_TYPOS.get(word, word)
+        for word in words
+        if word not in _MUSIC_TRANSPORT_FILLER
+    ]
+    if not words or len(words) > 4:
+        return None
+    head, rest = words[0], words[1:]
     if any(word not in _MUSIC_TRANSPORT_OBJECTS for word in rest):
         return None
     return _MUSIC_TRANSPORT_COMMANDS.get(head)
+
+
+# "is it on repeat?" is a question about the player's own queue preference, not
+# a play command. Measured live, it was read as a play of a track called
+# "repeat" ("Playing “repeat” by anees on OpenDeck.") while the music never
+# changed. A question is answered from the provider's own queue state.
+_MUSIC_PREFERENCE_QUESTION_LEAD = re.compile(
+    r"^(?:is|are|am|was|were|do|does|did|has|have|isn'?t|aren'?t|dont|don'?t)\b",
+    re.IGNORECASE,
+)
+_MUSIC_REPEAT_STATUS_WORD = re.compile(r"\b(?:repeat(?:ing|s)?|loop(?:ing)?)\b", re.IGNORECASE)
+_MUSIC_SHUFFLE_STATUS_WORD = re.compile(r"\b(?:shuffl\w*|randomi[sz]\w*)\b", re.IGNORECASE)
+_MUSIC_PREFERENCE_ON_PHRASE = re.compile(
+    r"\bon\s+(?:repeat|loop|shuffle|random)\b", re.IGNORECASE
+)
+
+
+def _music_preference_question(text: str) -> str | None:
+    """True when the request asks whether shuffle or repeat is on.
+
+    Returns ``"repeat"`` or ``"shuffle"`` for a question about that queue
+    preference, and None for anything else — including the commands
+    ("repeat this song", "shuffle the queue"), which lead with the verb rather
+    than a question word.
+    """
+    normalized = " ".join(str(text or "").casefold().split()).strip(" ?!.")
+    if not normalized:
+        return None
+    asks = (
+        _MUSIC_PREFERENCE_QUESTION_LEAD.match(normalized) is not None
+        or _MUSIC_PREFERENCE_ON_PHRASE.search(normalized) is not None
+    )
+    if not asks:
+        return None
+    if _MUSIC_REPEAT_STATUS_WORD.search(normalized) is not None:
+        return "repeat"
+    if _MUSIC_SHUFFLE_STATUS_WORD.search(normalized) is not None:
+        return "shuffle"
+    return None
+
+
+# "what is the opposite of play" / "perform the opposite of playing the song".
+# Measured live, both failed closed with the planner's refusal sentence. The
+# question is answered in words; the imperative performs the inverse transport.
+_MUSIC_OPPOSITE_WORD = re.compile(r"\bopposite\b", re.IGNORECASE)
+_MUSIC_OPPOSITE_IMPERATIVE_LEAD = frozenset({
+    "do", "does", "perform", "please", "can", "could", "would", "will",
+    "go", "make", "just", "now", "then",
+})
+
+
+def _music_opposite_intent(text: str) -> tuple[str, bool] | None:
+    """The inverse transport command a "the opposite of play" request means.
+
+    Returns ``(command, asks_only)``: the command to run against the speaker and
+    whether the request is only asking what the opposite is (then it is answered
+    in words, with no device action). None for anything that is not an
+    opposite-of-play/pause request.
+    """
+    normalized = " ".join(str(text or "").casefold().split())
+    if _MUSIC_OPPOSITE_WORD.search(normalized) is None:
+        return None
+    if re.search(r"\bpaus\w*\b", normalized) is not None:
+        base = "pause"
+    elif re.search(r"\b(?:resum\w*|unpaus\w*|play\w*)\b", normalized) is not None:
+        base = "play"
+    else:
+        return None
+    command = "pause" if base == "play" else "resume"
+    first = normalized.split()[0] if normalized.split() else ""
+    return command, first not in _MUSIC_OPPOSITE_IMPERATIVE_LEAD
 
 
 # A pronoun play ("play that song", "play it") names no track at all. Measured
@@ -3135,6 +3244,20 @@ class Brain:
             self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": transport["rule"]})
             self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=transport["reply"], refs={"route": CHAT, "rule": transport["rule"]})
             return _finish(transport)
+        # "is it on repeat?" is a read of the player's queue preference, never a
+        # play of a track called "repeat" (measured live).
+        preference = self._core_music_preference_status(clean)
+        if preference is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": preference["rule"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=preference["reply"], refs={"route": CHAT, "rule": preference["rule"]})
+            return _finish(preference)
+        # "what is the opposite of play" / "perform the opposite of playing the
+        # song" failed closed with the planner's refusal sentence (measured live).
+        opposite = self._core_music_opposite(clean, installed_specs)
+        if opposite is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": opposite["rule"]})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=opposite["reply"], refs={"route": CHAT, "rule": opposite["rule"]})
+            return _finish(opposite)
         # A question about the conversation ("what song did I ask you to play") is
         # answered from the conversation, before any device path can read its
         # "play" as a command and fail closed on it.
@@ -5217,6 +5340,100 @@ class Brain:
             "reply": reply,
             "details": details,
         }
+
+    def _core_music_preference_status(
+        self,
+        text: str,
+    ) -> dict[str, Any] | None:
+        """Answer "is it on repeat?" from the player's own queue state.
+
+        Measured live: the question was read as a play of a track called
+        "repeat" ("Playing “repeat” by anees on OpenDeck.") and the music never
+        changed. The queue's repeat/shuffle flags are the provider's, so Core
+        reads them and states them. Returns a complete response dict, or None
+        when the request is not a preference question (or the provider cannot
+        be read, in which case the request falls through to the normal path).
+        """
+        which = _music_preference_question(text)
+        if which is None:
+            return None
+        details: dict[str, Any] = {
+            "model_called": False,
+            "skill_planner_called": False,
+            "conversation_model_called": False,
+            "skill_execution_confirmed": False,
+            "music_preference": {"which": which},
+        }
+        try:
+            # Deferred: the media API imports the console, which imports brain.
+            import music_api
+            _skill_id, result = music_api._provider_call("queue", {})
+        except Exception as exc:
+            details["skill_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            return None
+        if not isinstance(result, dict):
+            return None
+        if which == "repeat":
+            mode = str(result.get("repeat") or "off").casefold()
+            details["music_preference"]["value"] = mode
+            reply = {
+                "one": "Repeat is on for the current track.",
+                "all": "Repeat is on for the whole queue.",
+                "off": "Repeat is off.",
+            }.get(mode, f"Repeat is set to “{mode}”.")
+        else:
+            on = bool(result.get("shuffle"))
+            details["music_preference"]["value"] = on
+            reply = "Shuffle is on." if on else "Shuffle is off."
+        details["skill_execution_confirmed"] = True
+        return {
+            "route": CHAT,
+            "rule": f"nix_music_{which}_status",
+            "reply": reply,
+            "details": details,
+        }
+
+    def _core_music_opposite(
+        self,
+        text: str,
+        skill_specs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any] | None:
+        """Answer or perform "the opposite of play", which the planner refused.
+
+        Measured live, "perform the opposite of playing the song" and "what is
+        the opposite of play" both failed closed with the planner's refusal
+        sentence. The question is answered in words; the imperative runs the
+        inverse speaker control through the same path as a spoken "pause".
+        Returns a complete response dict, or None when the request is not an
+        opposite-of-play/pause request.
+        """
+        intent = _music_opposite_intent(text)
+        if intent is None:
+            return None
+        command, asks_only = intent
+        if asks_only:
+            return {
+                "route": CHAT,
+                "rule": "nix_music_opposite_question",
+                "reply": (
+                    "Pause is the opposite of play, and resume (or unpause) is the "
+                    f"opposite of pause. Say “{command} the music” and I'll do it."
+                ),
+                "details": {
+                    "model_called": False,
+                    "skill_planner_called": False,
+                    "conversation_model_called": False,
+                    "skill_execution_confirmed": False,
+                    "music_opposite": {"command": command, "asks_only": True},
+                },
+            }
+        response = self._core_music_transport(command, skill_specs)
+        if response is not None:
+            response.setdefault("details", {})["music_opposite"] = {
+                "command": command,
+                "asks_only": False,
+            }
+        return response
 
     def _core_music_play_followup(
         self,
