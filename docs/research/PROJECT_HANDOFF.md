@@ -26,7 +26,7 @@ The central design rule is:
 README.md                         Project overview and basic commands
 .env.example                      Configuration template; never put secrets here
 .gitignore                        Runtime/model/cache exclusion policy
-PROJECT_HANDOFF.md                This document
+docs/research/PROJECT_HANDOFF.md  This document (moved here from the repository root)
 
 nix_core/
   brain.py                        Main Core pipeline and final response composer
@@ -69,7 +69,7 @@ nix_actions/
   scripts/actions_api.py          Actions HTTP API
   tests/                           Scheduler/propagation/session tests
 
-testing-echo-connect/             Optional Echo/Home Assistant prototype
+docs/research/                    Archived architecture, training and evaluation notes
 ```
 
 ## 3. Request flow

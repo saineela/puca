@@ -190,3 +190,14 @@ nix_core/ring_light_package/
 # Gesture controlled automation: a separate project with its own repository,
 # unrelated to NIX. NIX only reads the JSON it writes in its output/ folder.
 /gesture-controlled-automation/
+
+# Local-only scratch that is not part of the published product
+#
+# `testing-echo-connect/` is an isolated Echo/Home Assistant probe kept on this
+# machine: it is not on the product's request path and not something a reader of
+# the repository installs, so it stays here and out of the published tree.
+/testing-echo-connect/
+# The Luna burn-in harness is tracked; the runs it writes are not. A run's
+# report and state are results of one local batch, not part of the source.
+/luna_burnin/report*.json
+/luna_burnin/state.json

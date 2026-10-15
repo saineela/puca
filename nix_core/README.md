@@ -137,12 +137,12 @@ Git-ignored artifacts' current presence is not verified.
 
 Synthetic context injects hand-authored memory/actions messages in an
 evaluator; it is not an end-to-end stack test. See the exact historical scores
-and lineage in [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md); current local adapter
+and lineage in [`docs/research/PROJECT_HANDOFF.md`](../docs/research/PROJECT_HANDOFF.md); current local adapter
 presence is not verified.
 
 The code supports a Transformers/PEFT adapter when selected and local artifacts
 are present. See
-[`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for code-level backend caveats.
+[`docs/research/PROJECT_HANDOFF.md`](../docs/research/PROJECT_HANDOFF.md) for code-level backend caveats.
 
 Relevant configuration includes:
 
@@ -158,7 +158,7 @@ NIX_OPENAI_API_ALLOW_ORIGIN=*
 NIX_TZ=America/Chicago
 ```
 
-See [`PROJECT_HANDOFF.md`](../PROJECT_HANDOFF.md) for exact model paths, adapter lineage, VRAM controls, and runtime caveats.
+See [`docs/research/PROJECT_HANDOFF.md`](../docs/research/PROJECT_HANDOFF.md) for exact model paths, adapter lineage, VRAM controls, and runtime caveats.
 
 ## Services
 

@@ -65,7 +65,6 @@ NIX makes these responsibilities visible in code:
 - **WebSocket text gateway:** token-authenticated text transport for client/voice-gateway integrations. This is not, by itself, a complete speech-recognition or text-to-speech system.
 - **Optional semantic retrieval:** local Sentence Transformers/BGE embeddings when dependencies and model files are supplied.
 - **Optional model backends:** local Transformers/PEFT adapter selection, Ollama, and a TabbyAPI HTTP client. NIX does not include or launch those separately operated services automatically.
-- **Isolated integration prototype:** `testing-echo-connect/` explores a future Echo/Home Assistant boundary and is not on the primary request path.
 
 ### Planned, not yet implemented
 
@@ -100,7 +99,6 @@ The [**roadmap**](ROADMAP.md) details proposed Nix-Skills, Android access, real-
 | [`nix_knowledge/`](nix_knowledge/) | Persists and retrieves personal knowledge; interprets supported calendar/person-state language. | Structured operations and deterministic validation govern writes; local model artifacts are optional and ignored by Git. |
 | [`nix_actions/`](nix_actions/) | Captures, schedules, runs, cancels, and reschedules supported actions. | Deterministic engine; upstream Core/Knowledge decide what to capture. |
 | [`nix_decision/`](nix_decision/) | Defines a future trigger/state gate for possible proactive behavior. | Foundation only; no calling rules are enabled. |
-| `testing-echo-connect/` | Isolated Echo/Home Assistant integration prototype. | Optional experiment, not required by the main stack. |
 
 ### Simple request walkthrough
 
@@ -311,7 +309,7 @@ Timing covers only the classifier call and JSON serialization of the route and m
 
 ### Archived model-quality and latency evidence
 
-Small project-local evaluation suites are engineering checks, not human-subject studies or standardized language-quality scores. Historical Casper V6 notes report **7/8** in one policy-conditioned single-turn set and **1/5** in the latest documented direct multi-turn check; the V6 candidate is not promoted as the default. A historical isolated generation benchmark reported p50 **1.64 s** and max **4.28 s** over five short prompts after an approximately **8.35 s** load. The environment and protocol are in [`CASPER_V6_RESEARCH.md`](CASPER_V6_RESEARCH.md), and are not a claim of current serving performance.
+Small project-local evaluation suites are engineering checks, not human-subject studies or standardized language-quality scores. Historical Casper V6 notes report **7/8** in one policy-conditioned single-turn set and **1/5** in the latest documented direct multi-turn check; the V6 candidate is not promoted as the default. A historical isolated generation benchmark reported p50 **1.64 s** and max **4.28 s** over five short prompts after an approximately **8.35 s** load. The environment and protocol are in [`docs/research/CASPER_V6_RESEARCH.md`](docs/research/CASPER_V6_RESEARCH.md), and are not a claim of current serving performance.
 
 Historical Luna contextual scores were mixed and were recorded with synthetic injected context as well as isolated mode; synthetic evaluator context is not a full Core/Knowledge/Actions integration test.
 
@@ -365,8 +363,14 @@ nix_knowledge/
 └── models/                      Local weights, adapters, and datasets (Git-ignored)
 nix_actions/                    Deterministic actions and scheduling
 nix_decision/                   Explicit trigger/state-gate foundation (no rules enabled)
-testing-echo-connect/           Optional isolated integration prototype
 Nix-skills-repo/                Skill packaging guide and example skill
+docs/research/                  Archived research, training and handoff notes
+   |── PROJECT_HANDOFF.md       Architecture, operational boundaries, archived research
+   |── CASPER_V6_RESEARCH.md    Casper V6 experiments and evaluation caveats
+   |── LUNA_PRO_TRAINING_PLAN.md  Archived Luna Pro research record (retired)
+   └── PUCA_V4_RESEARCH_TRACKS.md  V4 research tracks
+model_cards/                    Draft Hugging Face model cards (not published to the Hub)
+NIX-Modeldev/                   Model research archive served at /NIX-Modeldev
 data/                           Local SQLite/runtime state (Git-ignored)
 ```
 ## Roadmap
@@ -392,9 +396,11 @@ All upcoming skills are operated by the **Nix-Actions** system's underlying laye
 - [`nix_decision/README.md`](nix_decision/README.md) — explicit trigger contract and safety gates.
 - [`nix_core/benchmarks/README.md`](nix_core/benchmarks/README.md) — benchmark harness usage and limitations.
 - [`Nix-skills-repo/README.md`](Nix-skills-repo/README.md) — how to package and publish a NIX skill.
-- [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md) — detailed architecture, operational boundaries, and archived research.
-- [`CASPER_V6_RESEARCH.md`](CASPER_V6_RESEARCH.md) — archived Casper V6 experiments and performance/evaluation caveats.
-- [`LUNA_PRO_TRAINING_PLAN.md`](LUNA_PRO_TRAINING_PLAN.md) — archived Luna Pro research record (retired).
+- [`docs/research/`](docs/research/) — the archived research and handoff notes:
+  - [`PROJECT_HANDOFF.md`](docs/research/PROJECT_HANDOFF.md) — detailed architecture, operational boundaries, and archived research.
+  - [`CASPER_V6_RESEARCH.md`](docs/research/CASPER_V6_RESEARCH.md) — archived Casper V6 experiments and performance/evaluation caveats.
+  - [`LUNA_PRO_TRAINING_PLAN.md`](docs/research/LUNA_PRO_TRAINING_PLAN.md) — archived Luna Pro research record (retired).
+  - [`PUCA_V4_RESEARCH_TRACKS.md`](docs/research/PUCA_V4_RESEARCH_TRACKS.md) — the archived V4 research tracks.
 - [`model_cards/luna-v6/`](model_cards/luna-v6/) and [`model_cards/casper-v5/`](model_cards/casper-v5/) — draft Hugging Face model cards.
 - [`NIX-Modeldev/index.html`](NIX-Modeldev/index.html) — model lineage, dataset provenance, and research archive.
 

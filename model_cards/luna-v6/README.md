@@ -16,7 +16,7 @@ tags:
 
 # Luna V6 Contextual LoRA Adapter for NIX PUCA — Draft
 
-> **DRAFT — DO NOT UPLOAD AS A PUBLIC MODEL CARD YET.** This local candidate has no approved redistribution license. The base model is gated and governed by Meta's Llama 3.2 Community License; the training-data manifest includes non-commercial and unresolved-provenance sources. Resolve the rights and license gate in [Hugging Face release checklist](https://github.com/saineela/puca/blob/main/HF_RELEASE_CHECKLIST.md) before creating a public Hub repository. This card does not grant rights to the adapter, base model, or training data.
+> **DRAFT — DO NOT UPLOAD AS A PUBLIC MODEL CARD YET.** This local candidate has no approved redistribution license. The base model is gated and governed by Meta's Llama 3.2 Community License; the training-data manifest includes non-commercial and unresolved-provenance sources. The rights and license gate is unresolved and has no companion document in the repository, so a public Hub repository must not be created until it is settled. This card does not grant rights to the adapter, base model, or training data.
 
 > **Research status:** The NIX source registry selects `luna-v6-contextual-v1` as its local Transformers default. That software setting is not equivalent to promotion of this particular checkpoint as a validated release-quality model. Archived project notes record this V6 candidate as **not promoted** after small matched checks. The NIX PUCA application's deterministic memory, routing, and action services are separate from this adapter.
 
@@ -161,4 +161,4 @@ If the adapter is cleared for release, cite its immutable Hub revision, for exam
 - [Llama 3.2 3B Instruct base model and license](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)
 - [Hugging Face PEFT adapter checkpoint format](https://huggingface.co/docs/peft/en/developer_guides/checkpoint)
 - [NIX PUCA repository](https://github.com/saineela/puca)
-- [Hugging Face release checklist](https://github.com/saineela/puca/blob/main/HF_RELEASE_CHECKLIST.md)
+- [NIX PUCA repository structure and research archive](https://github.com/saineela/puca)

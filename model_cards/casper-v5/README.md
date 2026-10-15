@@ -16,7 +16,7 @@ tags:
 
 # Casper PUCA V5 — Qwen3.5-4B LoRA Adapter — Draft
 
-> **DRAFT — DO NOT UPLOAD AS A PUBLIC MODEL CARD YET.** The adapter's training manifest lists non-commercial dialogue sources and asks for review before redistribution. The project has not approved a license for this adapter or documented clearance for distributing the resulting weights. See [Hugging Face release checklist](https://github.com/saineela/puca/blob/main/HF_RELEASE_CHECKLIST.md). This card does not grant rights to the adapter, base model, or training data.
+> **DRAFT — DO NOT UPLOAD AS A PUBLIC MODEL CARD YET.** The adapter's training manifest lists non-commercial dialogue sources and asks for review before redistribution. The project has not approved a license for this adapter or documented clearance for distributing the resulting weights, and there is no release checklist in the repository: the rights and clearance review is unresolved, not merely pending on a document. This card does not grant rights to the adapter, base model, or training data.
 
 > **Evidence status:** The repository contains a local Casper V5 adapter and a small saved comparison-output file, but no current reproducible V5 generation-speed/VRAM benchmark or standardized quality score. Claims below are limited to the stored configuration and artifacts; the project-specific scores require a separately published protocol before release.
 
@@ -118,7 +118,7 @@ Note: the NIX development loader uses a 4-bit NF4 base and a text-only causal-LM
 
 ## Evaluation status
 
-No standardized Casper V5 evaluation score is provided in this card because the reviewed file is a small example-output comparison rather than a defined scoring protocol. The owner-reported manual testing is not reproducible from the submitted materials. The existing `CASPER_V6_RESEARCH.md` results concern **Casper V6**, not V5; they are not transferable to this adapter.
+No standardized Casper V5 evaluation score is provided in this card because the reviewed file is a small example-output comparison rather than a defined scoring protocol. The owner-reported manual testing is not reproducible from the submitted materials. The existing `docs/research/CASPER_V6_RESEARCH.md` results concern **Casper V6**, not V5; they are not transferable to this adapter.
 
 Before publishing numerical quality claims, create an authorized, held-out, documented V5 test protocol with sample count, prompt provenance, scoring criteria, evaluator, base comparison, and reproducible run configuration. Do not include private/user data in public evaluation prompts.
 
@@ -144,4 +144,4 @@ If this adapter is cleared for release, cite its immutable Hub revision, for exa
 - [DailyDialog paper](https://aclanthology.org/I17-1099/)
 - [EmpatheticDialogues paper and dataset](https://aclanthology.org/P19-1534/)
 - [NIX PUCA repository](https://github.com/saineela/puca)
-- [Hugging Face release checklist](https://github.com/saineela/puca/blob/main/HF_RELEASE_CHECKLIST.md)
+- [NIX PUCA repository structure and research archive](https://github.com/saineela/puca)
