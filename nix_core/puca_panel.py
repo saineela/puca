@@ -44,6 +44,7 @@ from zoneinfo import ZoneInfo
 
 import console
 import music_api
+import panel_stream
 import voice
 import voice_api
 
@@ -72,6 +73,10 @@ PANEL_EXTENSIONS = {
     ".html": "text/html; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
+    # The wall's typography ships in the package and is served from here, so the
+    # page never asks a font CDN for anything: a display has to paint itself in
+    # a room whose internet is down.
+    ".woff2": "font/woff2",
     ".svg": "image/svg+xml",
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -199,6 +204,9 @@ def panel_info() -> dict:
     entry = panel_page_path(found[0], found[1]) if found else None
     return {
         "name": PANEL_NAME,
+        # The push channel: the page opens this on its own origin once, and the
+        # console tells it when something moved instead of being polled for it.
+        "stream": panel_stream.SOCKET_PATH,
         # Which panel this console is serving, so an open display can tell that
         # the page it is running is no longer the page it would be given.
         "build": panel_build(),
@@ -254,15 +262,19 @@ def _option(entry: Any) -> dict | None:
 def _declared_asset_name(asset: str, declared: list[str]) -> str | None:
     """The declared panel asset a request names, or None.
 
-    Accepts both the package path the manifest declares ("PUCA-Panel/panel.css")
-    and the bare name the page links from the root ("panel.css"); anything else —
-    a package file outside the panel folder, or a path climbing out of it — is
-    not a panel asset and stays unservable.
+    Accepts the package path the manifest declares ("PUCA-Panel/panel.css"), that
+    same path as the page's own folder sees it ("panel.css",
+    "fonts/outfit-latin.woff2") — a page links its files the way a page in its own
+    folder does, and a folder of its own is a normal thing for it to have — and
+    the bare name asked for from the port's root ("panel.css"). Anything else — a
+    package file outside the panel folder, or a path climbing out of it — is not
+    a panel asset and stays unservable.
     """
     if asset in declared:
         return asset
     for name in declared:
-        if name.rsplit("/", 1)[-1] == asset:
+        inside = name[len(PANEL_DIR) + 1:] if name.startswith(PANEL_DIR + "/") else name
+        if inside == asset or name.rsplit("/", 1)[-1] == asset:
             return name
     return None
 
@@ -290,6 +302,9 @@ def ask_choice(prompt: str, options: list[Any], *, source: str = "search", query
     global _question
     with _question_lock:
         _question = question
+    # A wall display is the surface this question exists for, and it is often
+    # idle: tell it now rather than let it wait up to a poll for the choice.
+    panel_stream.notify("question", question_id=question["id"])
     return dict(question)
 
 
@@ -312,7 +327,9 @@ def clear_question() -> bool:
     with _question_lock:
         had = _question is not None
         _question = None
-        return had
+    if had:
+        panel_stream.notify("question-cleared")
+    return had
 
 
 def answer_question(index: Any) -> dict:
@@ -381,9 +398,11 @@ def theme() -> dict:
 def panel_state() -> dict:
     """Everything the display needs for one paint, in one round trip.
 
-    A wall display polls on a timer, so the cheap snapshot, the queue and the
-    question travel together instead of costing three requests. Lyrics are left
-    out on purpose: they are per-track and the page caches them by track id.
+    The cheap snapshot, the queue and the question travel together instead of
+    costing three requests: this is the read the display makes on its fallback
+    timer and the one it makes when the push channel (``panel_stream``) tells it
+    something moved. Lyrics are left out on purpose: they are per-track and the
+    page caches them by track id.
     """
     payload: dict = {
         "ok": True,
@@ -575,6 +594,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             # reported.
             if asset.startswith(PANEL_DIR + "/") or self._names_a_panel_asset(asset):
                 return self._serve_panel_asset(asset)
+            if asset == "api/panel/socket":
+                if not panel_stream.wants_upgrade(self):
+                    raise PanelError(
+                        "The panel stream is a websocket; upgrade the request.",
+                        426, "upgrade_required",
+                    )
+                return panel_stream.HUB.serve(self)
             if asset == "api/panel/state":
                 return self._json(panel_state())
             if asset == "api/panel":

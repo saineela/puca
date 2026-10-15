@@ -73,7 +73,7 @@ PROVIDER_MANIFEST = {
                     {"type": "object", "properties": {"action": {"type": "string", "enum": ["play"]}, "query": {"type": "string", "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}}, "required": ["action"]},
                     {"type": "object", "properties": {"action": {"type": "string", "enum": ["library"]}, "kind": {"type": "string", "enum": ["playlists", "likes", "history"]}, "limit": {"type": "integer", "minimum": 1, "maximum": 12}}, "required": ["action", "kind"]},
                     {"type": "object", "properties": {"action": {"type": "string", "enum": ["lyrics"]}, "video_id": {"type": "string", "maxLength": 64}}, "required": ["action"]},
-                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["queue"]}, "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "shuffle", "repeat"]}, "query": {"type": "string", "minLength": 1, "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}, "index": {"type": "integer", "minimum": 0, "maximum": 99}, "on": {"type": "boolean"}, "mode": {"type": "string", "enum": ["off", "all", "one"]}, "auto": {"type": "boolean"}}, "required": ["action", "op"]},
+                    {"type": "object", "properties": {"action": {"type": "string", "enum": ["queue"]}, "op": {"type": "string", "enum": ["list", "add", "remove", "clear", "next", "play", "shuffle", "repeat", "add_range"]}, "query": {"type": "string", "minLength": 1, "maxLength": 200}, "video_id": {"type": "string", "maxLength": 64}, "playlist_id": {"type": "string", "maxLength": 100}, "index": {"type": "integer", "minimum": 0, "maximum": 99}, "on": {"type": "boolean"}, "mode": {"type": "string", "enum": ["off", "all", "one"]}, "auto": {"type": "boolean"}}, "required": ["action", "op"]},
                     {"type": "object", "properties": {"action": {"type": "string", "enum": ["save"]}, "kind": {"type": "string", "enum": ["like", "unlike", "playlist_create", "playlist_add"]}, "video_id": {"type": "string", "maxLength": 64}, "playlist_id": {"type": "string", "maxLength": 100}, "name": {"type": "string", "maxLength": 120}, "title": {"type": "string", "maxLength": 300}, "artist": {"type": "string", "maxLength": 200}, "album": {"type": "string", "maxLength": 300}}, "required": ["action", "kind"]},
                 ],
             },
@@ -804,6 +804,41 @@ def test_queue_add_forwards_the_track_and_leaves_the_speaker_alone(music_env, mo
     # Queueing is not playing: nothing may be handed to the speaker.
     assert not [item for item in runtime.calls if item["arguments"].get("action") == "play_url"]
     assert music_api._read_music_state() == {}
+
+
+def test_queue_add_range_forwards_the_playlist_and_the_song_it_started_at(music_env, monkeypatch):
+    """The page's "this song and every song under it" button: the console names
+    the playlist the row was listed in and the song that was tapped, and the
+    provider reads the tail of that playlist."""
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result(
+        [queue_track("b2", "Second"), queue_track("c3", "Third")], index=-1,
+        message="Queued 2 song(s) from “Second” to the end of the playlist.")})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue", {
+            "action": "add_range", "playlist_id": "PL-fake", "video_id": "b2"})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True and payload["count"] == 2
+    assert queue_calls(runtime) == [
+        {"action": "queue", "op": "add_range", "playlist_id": "PL-fake", "video_id": "b2"}
+    ]
+    # Adding is not playing: nothing may be handed to the speaker.
+    assert not [item for item in runtime.calls if item["arguments"].get("action") == "play_url"]
+
+
+def test_queue_add_range_without_a_playlist_is_refused(music_env, monkeypatch):
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result([])})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue", {
+            "action": "add_range", "video_id": "b2"})
+    finally:
+        server.shutdown()
+    assert status == 400 and payload["ok"] is False
+    assert queue_calls(runtime) == [], "nothing reaches the provider without a playlist"
 
 
 def test_queue_add_accepts_a_search_query(music_env, monkeypatch):

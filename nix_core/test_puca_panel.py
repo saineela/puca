@@ -36,7 +36,15 @@ from test_music_api import (  # noqa: E402
 )
 
 
-PANEL_FILES = ["PUCA-Panel/panel.html", "PUCA-Panel/panel.css", "PUCA-Panel/panel.js"]
+PANEL_FILES = [
+    "PUCA-Panel/panel.html",
+    "PUCA-Panel/panel.css",
+    "PUCA-Panel/panel.js",
+    # The wall's typography ships in the package and is served from here too, so
+    # the page never asks a font CDN for anything it draws with.
+    "PUCA-Panel/fonts.css",
+    "PUCA-Panel/fonts/outfit-latin.woff2",
+]
 
 # The provider manifest the music tests use, plus the panel page it carries and
 # the fields an unclear play answers with (the real manifest declares both).
@@ -284,6 +292,33 @@ def test_the_page_loads_its_own_assets_wherever_it_is_served(panel):
         assert headers["Content-Type"] == declared_headers["Content-Type"], name
 
 
+def test_the_walls_type_comes_from_the_box(panel):
+    # A display on a wall has to paint itself with no internet: its fonts are
+    # declared files of the package and the panel serves them from its own
+    # origin, on the same port as the page. A font file that is not declared
+    # stays unservable like any other file — "it is only a font" is not a reason
+    # to publish the package's folder.
+    server, _runtime = panel
+    assert puca_panel.PANEL_EXTENSIONS[".woff2"] == "font/woff2"
+    status, body, headers = read_raw(server, "/fonts/outfit-latin.woff2")
+    assert status == 200
+    assert headers["Content-Type"] == "font/woff2"
+    assert body
+    # ... and the stylesheet the page links is served the same way, wherever in
+    # its folder the page asks for it.
+    status, _body, headers = read_raw(server, "/fonts.css")
+    assert status == 200 and headers["Content-Type"].startswith("text/css")
+    status, _body, _headers = read_raw(server, "/PUCA-Panel/fonts/outfit-latin.woff2")
+    assert status == 200
+
+    skill_id, manifest = puca_panel.panel_skill()
+    declared = list(puca_panel.panel_assets(skill_id, manifest))
+    assert "PUCA-Panel/fonts/outfit-latin.woff2" in declared
+    assert not any(name.endswith("not-declared.woff2") for name in declared)
+    status, _body, _headers = read_json(server, "/fonts/not-declared.woff2")
+    assert status == 404
+
+
 def test_only_the_panel_folder_of_the_package_is_served(panel):
     server, _runtime = panel
     for asset in ("PUCA-Panel/panel.js", "PUCA-Panel/panel.css"):
@@ -422,6 +457,13 @@ def test_the_panel_offers_https_because_a_microphone_needs_it():
         server.server_close()
     assert status == 200 and payload["ok"] is True
     assert payload["url_https"].startswith("https://"), "the console can say where the microphone works"
+    # Both of the box's own addresses, not the name the wall happened to be opened
+    # at: they are what a display opened somewhere else moves itself onto, so the
+    # page talks to the box over the LAN rather than over the internet, and the
+    # TLS one it is handed to for the microphone is the address its own
+    # certificate is valid for.
+    assert payload["url"] == f"http://{puca_panel._lan_ip()}:{puca_panel.PANEL_PORT}/"
+    assert payload["url_https"] == f"https://{puca_panel._lan_ip()}:{puca_panel.PANEL_TLS_PORT}/"
 
 
 def read_json_over_tls(port: int, path: str, context) -> tuple[int, dict]:

@@ -20,6 +20,7 @@ from typing import Any
 
 import console
 import music_cache
+import panel_stream
 
 PAGE_ID = "music"
 PAGE_TITLE = "Music"
@@ -683,6 +684,7 @@ def apply_transport(command: str, value: Any = None) -> dict:
     payload["message"] = TRANSPORT_MESSAGES[command].format(
         percent=int(round(float(level) * 100)) if isinstance(level, (int, float)) else 0
     )
+    panel_stream.notify("transport", command=command)
     return payload
 
 
@@ -817,6 +819,9 @@ def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -
             except MusicApiError as exc:
                 state["handoff"] = {"supported": True, "skill_id": handoff_skill, "error": str(exc)}
     _write_music_state(state)
+    # What is playing just changed, and the wall display is the surface that
+    # shows it: tell it now instead of waiting for its next poll.
+    panel_stream.notify("playing")
     return state
 
 
@@ -900,13 +905,20 @@ def music_play(handler, _match=None) -> bool:
 QUEUE_OPS = {
     "list", "add", "remove", "clear", "next", "play", "move", "front", "next_up",
     "shuffle", "repeat",
+    # "Add this song and everything under it": the songs from one row to the end
+    # of the playlist it was listed in, which is the button on a playlist page.
+    "add_range",
 }
 REPEAT_MODES = ("off", "all", "one")
 
 # How many songs one library read may hand over. This is the reader's ceiling,
 # not the provider's page size: a wall display listing a playlist asks for as
 # many as it will show, and the provider answers with the list it holds.
-LIBRARY_LIMIT_MAX = 200
+# How many songs one library read may hand over. A real library is bigger than a
+# page of results — a Liked Music playlist can hold hundreds — and both the page
+# and the wall display list what they are given, so this is a memory bound on one
+# reply rather than a page size. The provider skill declares the same ceiling.
+LIBRARY_LIMIT_MAX = 500
 
 
 def _queue_payload(skill_id: str, result: dict) -> dict:
@@ -975,6 +987,18 @@ def music_queue(handler, _match=None) -> bool:
             return _fail(handler, MusicApiError("Provide index=<from> and to=<to>.", 400, "validation_error"))
         arguments["index"] = index
         arguments["to"] = to
+    elif op == "add_range":
+        # The playlist the song was listed in, and the song the user chose. With
+        # no video_id the whole playlist is queued, which is what the button on
+        # a playlist header means.
+        playlist_id = _text(body.get("playlist_id"), "playlist_id", 100)
+        if not playlist_id:
+            return _fail(handler, MusicApiError(
+                "Provide playlist_id=<the playlist the song came from>.", 400, "validation_error"))
+        arguments["playlist_id"] = playlist_id
+        video_id = _text(body.get("video_id"), "video_id", 64)
+        if video_id:
+            arguments["video_id"] = video_id
     elif op in {"front", "next_up"}:
         # "Play next" / "Play first" on a queued row (or on a track that is not
         # queued yet, which the provider inserts at that spot).
@@ -1020,7 +1044,20 @@ def music_queue(handler, _match=None) -> bool:
         _start_playback(result, skill_id, queue={"index": payload["index"]})
         snapshot = _now_playing_payload()
         payload.update({key: snapshot[key] for key in ("track", "playing", "player", "position", "handoff")})
+    panel_stream.notify("queue", action=op)
     return _respond(handler, payload)
+
+
+@_guarded
+def music_queue_add_range(handler, _match=None) -> bool:
+    """Add a playlist's songs from one row to the end to the queue.
+
+    The page's button is a queue write, so it belongs on the queue route: this
+    is the one place that knows the body's shape, and it forwards the same
+    ``add_range`` op the provider skill declares. Kept as its own function so the
+    route table (and the panel's copy of it) names it like every other handler.
+    """
+    return music_queue(handler, _match)
 
 
 @_guarded

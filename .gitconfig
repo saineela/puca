@@ -12,3 +12,5 @@
 [user]
 	name = Sai Neela
 	email = saiathulithn@gmail.com
+[core]
+	excludesFile = /root/.gitignore_global

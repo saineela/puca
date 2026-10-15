@@ -319,6 +319,15 @@ playing, the queue and the `build` of the panel being served in one round trip),
 `{"index": 0}` (plays that option and closes the question), `POST
 /api/panel/dismiss`, and `POST /api/panel/question`.
 
+The display is also *told*, rather than only asking: `GET /api/panel/socket`
+upgrades the same connection to a websocket (`panel_stream.py`, the page's own
+origin, so `wss://` and the TLS listener come for free). The console sends one
+small `{"type": "event", "event": "playing"|"question"|"question-cleared"|...}`
+frame when a track starts, a question is parked or cleared, the transport is
+driven or the queue moves, and the page answers it by reading
+`/api/panel/state` — the socket is latency, not a second implementation of the
+state. A plain (non-upgrade) `GET` of the socket path is refused with `426`.
+
 ## PUCA Panel (wall display)
 
 The panel is a second listener (`puca_panel.py`, port `49170`, `NIX_PANEL_PORT`)
@@ -330,6 +339,12 @@ needs no cross-origin setup.
 
 - The theme follows the console's clock (dark from 22:00, light from 06:00, in
   the console's own timezone), not the screen's.
+- The console **pushes** a change to the display over a websocket on the page's
+  own origin (`/api/panel/socket`), so a track that starts or a question that
+  arrives is on the wall immediately rather than at its next poll; the page
+  reconnects with a growing wait when the channel drops and still polls on a slow
+  fallback, so a display is never left stale. `?stream=0` turns the channel off,
+  and `window.__puca.stream()` reports `{enabled, up, url, attempts}`.
 - The lyrics of whatever is playing open by themselves and stay open until the
   user closes them; the next track opens them again.
 - Spoken requests are transcribed on the box (see *Hearing* below): a phrase that
@@ -359,9 +374,43 @@ needs no cross-origin setup.
   `something_to_show`, `lyrics_open`, `lyrics_by_user`, `sheet_open`) so a wall
   nobody can stand in front of can still be asked why it is awake.
 
+- The page asks **no font CDN** for its typography: the faces it draws with ship
+  in the package (`PUCA-Panel/fonts.css` and its `fonts/*.woff2`, both declared in
+  the skill's `files`) and this listener serves them from its own origin, so a
+  display on a wall with no internet still paints the design it was given.
+
 Only the panel folder is servable from that listener, path-normalised inside the
 package; a package's other files (`skill.json`, the worker, the Music page's own
-assets) are not reachable there.
+assets) are not reachable there. A declared asset answers both by the path the
+manifest gives it (`/PUCA-Panel/panel.css`) and by the name the page inside that
+folder uses (`/panel.css`, `/fonts/outfit-latin.woff2`) — a page links its files
+the way a page in its own folder does, and a folder of its own is a normal thing
+for it to have.
+
+### The wall talks to the box, not to the internet
+
+The page is served by this console, so every read it makes — the state, the
+music, the covers, the recogniser — is a relative path on the origin it was
+opened at. Pointed at the box's own address the whole wall is local already;
+pointed at a tunnel or a tailnet name, every poll leaves the LAN and comes back,
+and it stays that way for as long as the page is open because nothing in it ever
+asks whether there is a closer way to reach the box — a wall display is not
+reloaded by hand, so "it will be local next time somebody opens the right URL"
+never happens.
+
+So `panel_info()` reports where the box lives on its own network (`url` and
+`url_https`, both built from the box's LAN address), and the panel uses it:
+opened anywhere else, it checks whether that address answers (a bare `no-cors`
+reachability probe of `/api/panel/state`, so nothing of the console's is read
+across origins) and, if it does, hands the wall over to it — the same page and
+the same query, once per session, in the page's own direction of travel (a secure
+page moves to the box's secure listener, so the microphone it had is not what the
+move costs). An address that does not answer leaves the display exactly where it
+is: a wall showing music is never traded for a blank page. `?local=0` pins the
+wall where it was opened, for a display deliberately watched from outside the
+house, and `window.__puca.local()` on the page reports `{auto, here, box_http,
+box_https, on_the_box, looked, moved, moved_from, moved_to, reason}` — which is
+how a wall nobody can stand in front of is asked which address it is talking to.
 
 ### The display keeps itself current
 
@@ -393,8 +442,20 @@ browser only lends a page a microphone on a **secure** origin — over plain htt
 a LAN address the mic button can only say where the working address is. The
 certificate is self-signed, generated once into the console's data directory
 (`panel-cert.pem`, `panel-key.pem`) and regenerated when the names and addresses
-it has to be valid for change; the browser asks to be trusted once. `GET
-/api/panel` reports both addresses (`port`/`url` and `tls_port`/`url_https`).
+it has to be valid for change (**the box's own LAN address is one of them**, so
+the address the wall is handed to is not a name mismatch on top of the self-signed
+note); the browser asks to be trusted once. `GET /api/panel` reports both
+addresses (`port`/`url` and `tls_port`/`url_https`).
+
+A tap on the microphone on a page the browser will not lend one to is the one
+moment the wall can move itself somewhere better: the panel hands the display to
+that secure address and arrives listening (`?listen=1`, the microphone opens once
+the page is up), so the tap that moved the wall is the tap being listened to —
+rather than an address put on screen for somebody standing in front of a wall to
+type in. That move is attempted once per session and without a reachability probe
+(a probe of a self-signed address fails until the certificate has been accepted
+once, which is the very thing the move is for); if the wall is back on a page it
+cannot record from, it says where the voice works instead, as it always did.
 
 ## Hearing
 
