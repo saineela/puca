@@ -201,3 +201,6 @@ nix_core/ring_light_package/
 # report and state are results of one local batch, not part of the source.
 /luna_burnin/report*.json
 /luna_burnin/state.json
+# The knowledge stress harness is tracked; the report it writes next to
+# itself is the result of one local batch, not source.
+/nix_knowledge/scripts/knowledge_stress_report.json
