@@ -43,7 +43,21 @@ TOKEN = os.environ.get("NIX_MUSIC_QUEUE_TOKEN", "").strip()
 # How often the background looks for tracks to warm. One second is plenty: the
 # work itself is rate limited, this is only how quickly new tracks are noticed.
 TICK_SECONDS = float(os.environ.get("NIX_MUSIC_QUEUE_TICK", "1.0"))
+# How long the background leaves the provider alone after the provider fails to
+# answer at all (as opposed to answering that it does not know a track).
+PROVIDER_COOLDOWN_SECONDS = float(os.environ.get("NIX_MUSIC_QUEUE_PROVIDER_COOLDOWN", "30"))
 MAX_BODY = 2 * 1024 * 1024
+
+
+class ProviderUnavailable(RuntimeError):
+    """The provider could not be reached at all, so it refused nothing.
+
+    The difference matters to the misses rule: a track the provider refuses is
+    asked about again more slowly and finally not at all, but a provider that is
+    not answering has said nothing about the track and nothing is counted
+    against it. The background waits out a short cooldown instead of asking about
+    the next track, and asks again once the provider is back.
+    """
 
 
 class QueueService:
@@ -54,14 +68,18 @@ class QueueService:
         queue: MusicQueue,
         resolver: Callable[[str], dict | None] | None = None,
         console_url: str = "",
+        cooldown: float = PROVIDER_COOLDOWN_SECONDS,
     ) -> None:
         self.queue = queue
         self.resolver = resolver
         self.console_url = console_url.rstrip("/")
+        self.cooldown = max(0.0, float(cooldown))
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._inflight = threading.BoundedSemaphore(queue.limits.resolve_concurrency)
         self.resolved_calls = 0
+        self.provider_errors = 0
+        self._paused_until = 0.0
 
     # ── limits ────────────────────────────────────────────────────────────
     def set_limits(self, limits: dict | None) -> QueueLimits:
@@ -162,8 +180,15 @@ class QueueService:
         the bucket is empty the work simply waits for the next tick, which is
         the whole point: a playlist of five hundred songs resolves over minutes
         at the provider's pace rather than as one storm of requests.
+
+        A resolver that raises is a provider that did not answer, which counts
+        against nothing but the clock: see ``ProviderUnavailable``. The pause
+        and the cooldown are read here rather than in the loop so a caller
+        (``POST /warm``) gets the same restraint the background has.
         """
         if self.resolver is None:
+            return 0
+        if time.time() < self._paused_until:
             return 0
         wanted = self.pending() if limit is None else self.queue.pending(limit)
         batches: list[dict[str, Any]] = []
@@ -176,7 +201,15 @@ class QueueService:
             try:
                 resolved = self.resolver(entry["video_id"])
             except Exception:
-                resolved = None
+                # The provider did not answer, so it refused nothing: the track
+                # keeps its place and its clean record, the token is handed
+                # back, and the pass stops here rather than putting the same
+                # question about every other track to a provider that is down.
+                self.provider_errors += 1
+                self._paused_until = time.time() + self.cooldown
+                self.queue.bucket.tokens = min(self.queue.bucket.capacity,
+                                               self.queue.bucket.tokens + 1)
+                break
             finally:
                 self._inflight.release()
             self.resolved_calls += 1
@@ -215,8 +248,16 @@ def console_resolver(console_url: str, token: str = "", timeout: float = 20.0):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 payload = json.loads(response.read() or b"{}")
-        except (urllib.error.URLError, OSError, ValueError):
-            return None
+        except urllib.error.HTTPError as exc:
+            # A 404 is the provider answering — it does not know this track, and
+            # that is a miss. Anything else is the console or the skill in
+            # trouble, which says nothing about the track, so it is raised as
+            # the provider being unavailable rather than counted against it.
+            if exc.code == 404:
+                return None
+            raise ProviderUnavailable(f"the console answered {exc.code}") from exc
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise ProviderUnavailable(str(exc)) from exc
         track = payload.get("track") if isinstance(payload, dict) else None
         if isinstance(track, dict) and track.get("title"):
             return track
@@ -302,7 +343,8 @@ def _handler_for(service: QueueService):
                                    else service.queue.pending(self._number(limit, 0, 0, 500))})
             if path == "/stats":
                 return self._send({"ok": True, **service.queue.stats(),
-                                   "resolver_calls": service.resolved_calls})
+                                   "resolver_calls": service.resolved_calls,
+                                   "provider_errors": service.provider_errors})
             return self._send({"ok": False, "error": "not found"}, 404)
 
         def do_POST(self) -> None:  # noqa: N802

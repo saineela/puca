@@ -24,6 +24,20 @@ right shape for "play this next" and the wrong one for a playlist:
   arrive as bare ids (a stored playlist, a shared link) are resolved by a
   background loop, limited by the provider's own `resolves_per_minute`, and each
   answer is cached, so a song is asked about once and never again.
+- **A track the provider does not know is asked about a few times, then left
+  alone.** An id the provider refuses (a deleted video, an id typed by hand) is
+  retried with a doubling wait and after `MISS_LIMIT` refusals not at all, so one
+  dead id cannot spend the whole rate limit once a tick while the songs behind it
+  go unresolved. It is not removed: the row stays in the line-up saying which
+  track it was, `/stats` counts it under `unresolvable` instead of `pending`, and
+  queueing it again is a new request that starts the counting over.
+- **A provider that is not answering is not a refusal.** A resolver that raises
+  (the console or the skill is down) has said nothing about the track, so nothing
+  is counted against it: the background hands back its token, stops the pass
+  rather than asking about every other track, and waits
+  `NIX_MUSIC_QUEUE_PROVIDER_COOLDOWN` (30s) before trying again. The console's
+  answer is what draws the line: `404` means "I do not know this track", anything
+  else means the provider is in trouble.
 - **It outlives the console.** Restarting the dashboard, updating the skill, or
   reinstalling OpenDeck no longer touches the line-up.
 
@@ -55,6 +69,7 @@ over the data directory.
 | `NIX_MUSIC_QUEUE_FILE` | Where the service publishes its address (default `<data directory>/music-queue.json`). |
 | `NIX_MUSIC_QUEUE_TOKEN` | Sent as `X-Nix-Token` and required on every request when set. The service binds `0.0.0.0`, so this is what keeps a queue off the LAN. |
 | `NIX_MUSIC_QUEUE_TICK` | How often the background looks for tracks to warm (default 1.0s). |
+| `NIX_MUSIC_QUEUE_PROVIDER_COOLDOWN` | How long the background leaves a provider alone after a failed call (default 30s). |
 
 ## Its HTTP surface
 
@@ -63,8 +78,8 @@ over the data directory.
 | `GET` | `/health` | Liveness, the current revision, and the limits in force. |
 | `GET` | `/state?from=&limit=&revision=` | A window of the queue plus `total`, `index`, `shuffle`, `repeat` and `revision`. With `revision=<the one the caller holds>`, an unchanged queue answers `{"unchanged":true,"queue":[]}`. |
 | `GET` | `/all` | The whole line-up, for a caller that genuinely needs it. |
-| `GET` | `/pending?limit=` | The tracks the background still has to resolve. |
-| `GET` | `/stats` | Counters: adds, tracks added, resolved, misses, reads, unchanged reads, provider calls, and the limits. |
+| `GET` | `/pending?limit=` | The tracks the background still has to resolve: refused ids inside their wait are still here, the ones it has given up on are not. |
+| `GET` | `/stats` | Counters: adds, tracks added, resolved, misses, reads, unchanged reads, provider calls, and the limits — plus `pending` (still waiting on the provider), `unresolvable` (refused often enough that the queue stopped asking) and `provider_errors` (calls the provider did not answer at all). |
 | `POST` | `/add` | `{"tracks":[{video_id,title,…},…],"playlist_id":…,"mode":"append"\|"play_next"\|"replace"}` — the bulk write. |
 | `POST` | `/ops` | The provider's own vocabulary: `remove`, `move`, `front`, `next_up`, `clear`, `shuffle`, `repeat`, `set_index`/`play`, `next`. |
 | `POST` | `/limits` | The queue limits the OpenDeck instance declares (see below); the console pushes them whenever it reads the installed manifest. |

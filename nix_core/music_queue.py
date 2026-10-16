@@ -36,6 +36,23 @@ from typing import Any, Iterable
 # existing reader (the page, the wall panel, the assistant) is unchanged.
 TRACK_FIELDS = ("video_id", "title", "artist", "album", "duration_sec", "artwork_url")
 
+# A track the provider does not know (a deleted video, an id that was typed)
+# would otherwise be asked about on every tick, forever, spending the provider's
+# rate limit on a song that is never going to arrive. It is asked a few times,
+# each wait twice as long as the last, and then left alone: the entry stays in
+# the queue saying what it is, and asking again is what re-adding it means.
+MISS_LIMIT = 5
+MISS_BACKOFF_BASE = 15.0
+MISS_BACKOFF_MAX = 3600.0
+
+
+def miss_backoff(misses: int) -> float:
+    """How long to wait before asking about a track that failed this many times."""
+    if misses <= 0:
+        return 0.0
+    return min(MISS_BACKOFF_BASE * (2 ** (misses - 1)), MISS_BACKOFF_MAX)
+
+
 # Where the queue keeps its two files: the line-up, and the small note that says
 # where the service is listening. Both sit in the console's data directory
 # (``NIX_DATA_DIR``, which every other store here already follows and which the
@@ -494,14 +511,27 @@ class MusicQueue:
         with self._lock:
             prepared = self._conn.execute(
                 "SELECT COUNT(*) AS n FROM items WHERE prepared = 1").fetchone()["n"]
+            # An entry the provider refused often enough that the queue stopped
+            # asking: it is still in the line-up saying what it is, it is just
+            # not costing the provider anything any more. Waiting for the
+            # provider and given up on are therefore two different numbers, and
+            # "pending" means the first one — what the background would ask about
+            # if it looked right now.
+            given_up = ("EXISTS (SELECT 1 FROM tracks WHERE tracks.video_id = items.video_id "
+                        "AND tracks.misses >= ? AND tracks.resolved_at >= items.added_at)")
             pending = self._conn.execute(
-                "SELECT COUNT(*) AS n FROM items WHERE prepared = 0 AND title = ''").fetchone()["n"]
+                f"SELECT COUNT(*) AS n FROM items WHERE prepared = 0 AND title = '' "
+                f"AND NOT {given_up}", (MISS_LIMIT,)).fetchone()["n"]
+            refused = self._conn.execute(
+                f"SELECT COUNT(*) AS n FROM items WHERE prepared = 0 AND title = '' "
+                f"AND {given_up}", (MISS_LIMIT,)).fetchone()["n"]
             cached = self._conn.execute("SELECT COUNT(*) AS n FROM tracks").fetchone()["n"]
             return {
                 **self.counters,
                 "total": self.total(),
                 "prepared": int(prepared),
                 "pending": int(pending),
+                "unresolvable": int(refused),
                 "cached_tracks": int(cached),
                 "revision": self.revision(),
                 "limits": self.limits.as_dict(),
@@ -756,12 +786,14 @@ class MusicQueue:
 
     # ── the metadata cache and what still needs resolving ─────────────────
     def _remember(self, track: dict[str, Any]) -> None:
+        # A resolution clears the failures behind it: the provider knows this
+        # track now, so nothing it said before about not knowing it applies.
         self._conn.execute(
             "INSERT INTO tracks (video_id, title, artist, album, duration_sec, artwork_url, "
             "resolved_at, misses) VALUES (?, ?, ?, ?, ?, ?, ?, 0) "
             "ON CONFLICT(video_id) DO UPDATE SET title = excluded.title, artist = excluded.artist, "
             "album = excluded.album, duration_sec = excluded.duration_sec, "
-            "artwork_url = excluded.artwork_url, resolved_at = excluded.resolved_at",
+            "artwork_url = excluded.artwork_url, resolved_at = excluded.resolved_at, misses = 0",
             (track["video_id"], track.get("title", ""), track.get("artist", ""),
              track.get("album", ""), track.get("duration_sec", 0), track.get("artwork_url", ""),
              time.time()),
@@ -773,6 +805,11 @@ class MusicQueue:
         Only tracks that are still in front of the playing position are worth a
         provider call: a song already behind the cursor will never be reached,
         and resolving it would spend the provider's rate limit for nothing.
+
+        A track the provider has refused is asked again more slowly each time and
+        finally not at all (``MISS_LIMIT``), so one dead id cannot spend the
+        provider's rate limit once a tick for the life of the queue. Queueing it
+        again is a new request for it, and starts the counting over.
         """
         with self._lock:
             window = self.limits.prefetch if limit is None else limit
@@ -792,6 +829,15 @@ class MusicQueue:
                     not self.limits.cache_seconds
                     or now - cached["resolved_at"] <= self.limits.cache_seconds
                 ):
+                    continue
+                misses = int(cached["misses"] or 0) if cached else 0
+                # A track added again after it failed is a new request for it,
+                # so the failures before that do not count against it.
+                if cached and float(row["added_at"] or 0) > float(cached["resolved_at"] or 0):
+                    misses = 0
+                if misses >= MISS_LIMIT:
+                    continue
+                if misses and now - float(cached["resolved_at"] or 0) < miss_backoff(misses):
                     continue
                 out.append({"video_id": row["video_id"], "uid": row["uid"],
                             "title": row["title"], "artist": row["artist"]})

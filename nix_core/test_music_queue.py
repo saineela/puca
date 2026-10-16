@@ -160,6 +160,72 @@ def test_a_provider_that_does_not_know_a_track_is_remembered_as_a_miss(queue):
     assert queue.stats()["resolve_misses"] == 1
 
 
+# ── a dead id cannot spend the whole rate limit ──────────────────────────
+#
+# The other half of "the rate limit keeps a long playlist off the provider":
+# without it, the one id the provider will never know is asked about once a
+# tick for the life of the queue, and the songs waiting behind it are the ones
+# that go unresolved.
+
+
+def test_a_refused_track_is_not_asked_again_on_the_very_next_pass(queue):
+    queue.add_many([{"video_id": "ghost"}])
+    assert [entry["video_id"] for entry in queue.pending()] == ["ghost"]
+    queue.note_miss("ghost")
+    # The first refusal buys a wait, so the next tick does not spend another
+    # provider call on the same dead id.
+    assert queue.pending() == []
+    assert queue.stats()["pending"] == 1, "still waiting on the provider, not given up on"
+
+
+def test_the_wait_between_attempts_doubles_and_then_stops_growing():
+    assert music_queue.miss_backoff(0) == 0.0
+    assert music_queue.miss_backoff(1) == music_queue.MISS_BACKOFF_BASE
+    assert music_queue.miss_backoff(2) == 2 * music_queue.miss_backoff(1)
+    assert music_queue.miss_backoff(music_queue.MISS_LIMIT) == 16 * music_queue.MISS_BACKOFF_BASE
+    assert music_queue.miss_backoff(99) == music_queue.MISS_BACKOFF_MAX
+
+
+def test_a_track_refused_often_enough_is_left_alone_but_stays_in_the_queue(queue):
+    queue.add_many([{"video_id": "ghost"}, {"video_id": "keeper", "title": "Keeper"}])
+    for _ in range(music_queue.MISS_LIMIT):
+        queue.note_miss("ghost")
+    assert queue.pending() == []
+    stats = queue.stats()
+    assert stats["unresolvable"] == 1
+    assert stats["pending"] == 0
+    # Given up on is not the same as removed: the row is still there, saying
+    # which track it was, and the queue is still the length the listener saw.
+    assert queue.state().total == 2
+    assert queue.state().items[0]["video_id"] == "ghost"
+
+
+def test_a_dead_id_does_not_stop_the_tracks_behind_it_from_being_warmed(queue):
+    queue.add_many([{"video_id": "ghost"}, {"video_id": "real"}])
+    for _ in range(music_queue.MISS_LIMIT):
+        queue.note_miss("ghost")
+    assert [entry["video_id"] for entry in queue.pending()] == ["real"]
+
+
+def test_queueing_a_track_again_asks_the_provider_again(queue):
+    queue.add_many([{"video_id": "ghost"}])
+    for _ in range(music_queue.MISS_LIMIT):
+        queue.note_miss("ghost")
+    assert queue.pending() == []
+    queue.add_many([{"video_id": "ghost"}])
+    assert [entry["video_id"] for entry in queue.pending()] == ["ghost"]
+
+
+def test_a_track_that_arrives_after_being_refused_stops_being_unresolvable(queue):
+    queue.add_many([{"video_id": "ghost"}])
+    for _ in range(music_queue.MISS_LIMIT):
+        queue.note_miss("ghost")
+    assert queue.stats()["unresolvable"] == 1
+    queue.apply_resolution("ghost", {"title": "Ghost", "artist": "A"})
+    assert queue.stats()["unresolvable"] == 0
+    assert queue.state().items[0]["title"] == "Ghost"
+
+
 # ── the transport rules are unchanged ────────────────────────────────────
 
 
@@ -307,6 +373,102 @@ def test_a_track_the_provider_does_not_know_does_not_stall_the_queue(queue_servi
     assert service.queue.stats()["resolve_misses"] == 1
 
 
+def test_the_warm_loop_spends_one_call_on_a_dead_id_not_one_per_tick(queue_service_factory):
+    asked: list[str] = []
+
+    def dead_resolver(video_id: str):
+        asked.append(video_id)
+        return None if video_id == "dead" else {"title": video_id.upper()}
+
+    service, _calls = queue_service_factory(prefetch=3, per_minute=600, resolver=dead_resolver)
+    service.queue.add_many([{"video_id": "dead"}, {"video_id": "alive"}])
+    service.warm()
+    assert asked == ["dead", "alive"], "both are asked the first time round"
+    # Twenty more ticks: the dead id is inside its wait, and the queue does not
+    # spend the provider's rate limit asking about it again.
+    for _ in range(20):
+        service.warm()
+    assert asked == ["dead", "alive"]
+    assert service.queue.stats()["resolve_misses"] == 1
+
+
+def test_a_provider_that_is_not_answering_refuses_nothing(queue_service_factory):
+    def broken(video_id: str):
+        raise music_queue_service.ProviderUnavailable("the skill is not answering")
+
+    service, _calls = queue_service_factory(prefetch=3, per_minute=600, resolver=broken)
+    service.queue.add_many([{"video_id": "a"}, {"video_id": "b"}])
+    assert service.warm() == 0
+    # Nothing was answered about either track, so neither is marked as refused:
+    # a provider that is down must not cost a song its place in the queue.
+    assert service.queue.stats()["resolve_misses"] == 0
+    assert service.provider_errors == 1
+    assert [entry["video_id"] for entry in service.pending()] == ["a", "b"]
+    assert service.queue.stats()["pending"] == 2
+
+
+def test_a_provider_that_is_down_is_asked_once_and_then_left_alone(queue_service_factory):
+    asked: list[str] = []
+
+    def broken(video_id: str):
+        asked.append(video_id)
+        raise music_queue_service.ProviderUnavailable("down")
+
+    service, _calls = queue_service_factory(prefetch=3, per_minute=600, resolver=broken,
+                                            cooldown=30)
+    service.queue.add_many([{"video_id": "a"}, {"video_id": "b"}])
+    for _ in range(10):
+        service.warm()
+    # One failed call tells us the provider is down; the rest of the queue is
+    # not put to it, and the cooldown is what keeps the next ticks quiet too.
+    assert asked == ["a"]
+    assert service.provider_errors == 1
+    assert service.queue.counters["provider_calls"] == 0
+
+
+def test_the_console_s_answer_says_whether_a_track_was_refused_or_the_provider_is_down():
+    """The queue's callback has to tell the two apart, or it gives up wrongly."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    import socket
+
+    class Console(BaseHTTPRequestHandler):
+        def log_message(self, *args):  # quieter than the default line
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            asked = json.loads(self.rfile.read(length) or b"{}").get("video_id")
+            if asked == "known":
+                return self._answer(200, {"ok": True, "track": {"video_id": asked, "title": "Known"}})
+            if asked == "unknown":
+                return self._answer(404, {"ok": False, "error": "not known to the provider"})
+            return self._answer(503, {"ok": False, "error": "the skill is not answering"})
+
+        def _answer(self, status: int, payload: dict) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    console = ThreadingHTTPServer(("127.0.0.1", port), Console)
+    threading.Thread(target=console.serve_forever, daemon=True).start()
+    try:
+        resolve = music_queue_service.console_resolver(f"http://127.0.0.1:{port}")
+        assert resolve("known")["title"] == "Known"
+        assert resolve("unknown") is None, "the provider answered: it does not know this track"
+        with pytest.raises(music_queue_service.ProviderUnavailable):
+            resolve("offline")
+    finally:
+        console.shutdown()
+        console.server_close()
+
+
 def test_the_service_adopts_the_limits_the_console_pushes(queue_service_factory):
     service, _calls = queue_service_factory()
     adopted = service.set_limits({"max_tracks": 900, "prefetch": 5, "resolves_per_minute": 7})
@@ -322,7 +484,7 @@ def test_the_service_adopts_the_limits_the_console_pushes(queue_service_factory)
 def queue_service_factory():
     made = []
 
-    def factory(prefetch: int = 5, per_minute: int = 600, resolver=None):
+    def factory(prefetch: int = 5, per_minute: int = 600, resolver=None, cooldown: float = 0.0):
         calls: list[str] = []
 
         def default_resolver(video_id: str):
@@ -330,7 +492,8 @@ def queue_service_factory():
             return {"title": video_id.upper(), "artist": "A", "duration_sec": 100}
 
         queue = MusicQueue(":memory:", QueueLimits(prefetch=prefetch, resolves_per_minute=per_minute))
-        service = music_queue_service.QueueService(queue, resolver=resolver or default_resolver)
+        service = music_queue_service.QueueService(queue, resolver=resolver or default_resolver,
+                                                   cooldown=cooldown)
         made.append(service)
         return service, calls
 
