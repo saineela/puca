@@ -94,6 +94,10 @@ register_route("POST", r"/api/music/play", music_api.music_play)
 register_route("GET", r"/api/music/library", music_api.music_library)
 register_route("GET", r"/api/music/queue", music_api.music_queue)
 register_route("POST", r"/api/music/queue", music_api.music_queue)
+# The independent queue service calls this back, one track at a time, for a
+# track it was handed as a bare id. It resolves and nothing else: no queue is
+# touched and nothing starts playing.
+register_route("POST", r"/api/music/queue/resolve", music_api.music_queue_resolve)
 register_route("POST", r"/api/music/save", music_api.music_save)
 register_route("GET", r"/api/music/lyrics", music_api.music_lyrics)
 # Covers come from the console's own cache, so the page paints them without a

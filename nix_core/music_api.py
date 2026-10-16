@@ -15,16 +15,32 @@ import json
 import os
 import re
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from typing import Any
 
 import console
 import music_cache
+import music_queue as queue_engine
 import panel_stream
 
 PAGE_ID = "music"
 PAGE_TITLE = "Music"
-PAGE_EXTENSIONS = {".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+# What a declared page may load from its own package. The script and stylesheets
+# are the page; the fonts and pictures are what those files point at, so a page
+# paints with the provider's own typography instead of a font CDN (the wall
+# panel ships its fonts in the same package).
+PAGE_EXTENSIONS = {
+    ".js": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".woff2": "font/woff2",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
 MUSIC_STATE_NAME = "music.json"
 MAX_TEXT = 300
 
@@ -327,9 +343,35 @@ def _player_summary(player: dict | None) -> dict:
     return summary
 
 
+def _adopt_unrecorded_resume(state: dict, player: dict | None) -> dict:
+    """Adopt a resume that did not come through the console.
+
+    ``paused_at`` is what makes the position clock stand still, and only the
+    console's own Pause sets it. A track resumed by voice, by the speaker's
+    button or from another client therefore kept reading as paused: its progress
+    bar sat where it was and, once the queue was involved, the finished-track
+    check treated it as stopped. The speaker saying "playing" is the authority,
+    so the pause record is closed out here - the same bookkeeping apply_transport
+    does for a resume it was asked to make.
+    """
+    if _player_state_name(player) != "playing":
+        return state
+    paused_at = state.get("paused_at")
+    if not isinstance(paused_at, (int, float)):
+        return state
+    now = time.time()
+    state = dict(state)
+    state["paused_seconds"] = float(state.get("paused_seconds") or 0.0) + max(0.0, now - float(paused_at))
+    state["paused_at"] = None
+    state["updated_at"] = now
+    _write_music_state(state)
+    return state
+
+
 def _now_playing_payload(include_lyrics: bool = False) -> dict:
     state = _read_music_state()
     player = _player_status()
+    state = _adopt_unrecorded_resume(state, player)
     track = state.get("track") if isinstance(state.get("track"), dict) else None
     payload: dict = {
         "ok": True,
@@ -358,6 +400,11 @@ def _now_playing_payload(include_lyrics: bool = False) -> dict:
             payload["lyrics"] = None
             payload["lyrics_error"] = str(exc)
     return payload
+
+
+def _normalized_title(value: Any) -> str:
+    """A track title folded for comparison: case, punctuation and spacing only."""
+    return " ".join(re.sub(r"[^\w\s]+", " ", str(value or "").casefold()).split())
 
 
 def _lyrics_arguments(track: dict) -> dict:
@@ -389,7 +436,7 @@ def _page_blocks() -> list[tuple[str, dict, dict]]:
 def page_assets(skill_id: str, page: dict, manifest: dict) -> list[str]:
     """Declared, servable paths of one skill's contributed page."""
     declared = {path for path in manifest.get("files", []) if isinstance(path, str)}
-    paths = [page.get("script")] + list(page.get("styles", []) or [])
+    paths = [page.get("script")] + list(page.get("styles", []) or []) + list(page.get("assets", []) or [])
     servable: list[str] = []
     for path in paths:
         if isinstance(path, str) and path in declared and os.path.splitext(path)[1].lower() in PAGE_EXTENSIONS:
@@ -559,6 +606,7 @@ def music_index(handler, _match=None) -> bool:
             "POST /api/music/play",
             "GET /api/music/queue",
             "POST /api/music/queue",
+            "POST /api/music/queue/resolve",
             "GET /api/music/library?kind=&limit=&playlist_id=",
             "POST /api/music/save",
             "GET /api/music/lyrics",
@@ -577,8 +625,19 @@ def _maybe_advance_queue() -> None:
     speaker has gone idle. A one-off play never auto-advances, and a paused
     track is not finished, so this cannot hijack a deliberate pause.
     """
+    if _queue_service_on() and _queue_service_alive():
+        _advance_through_queue_service()
+        return
     state = _read_music_state()
     if not state.get("queue_active"):
+        return
+    # A paused speaker also reports itself idle, and the console's clock only
+    # stands still for a pause it made itself (paused_at). A track paused on the
+    # speaker - by its own button, by voice, or by another client - therefore kept
+    # counting to its end and the console advanced the queue under it, dropping
+    # the track from the queue and starting the next one with nobody asking. The
+    # recorded pause is what says "this stopped because someone stopped it".
+    if isinstance(state.get("paused_at"), (int, float)):
         return
     player = _player_status()
     if _player_state_name(player) not in {"idle", "off", "stopped"}:
@@ -908,8 +967,206 @@ QUEUE_OPS = {
     # "Add this song and everything under it": the songs from one row to the end
     # of the playlist it was listed in, which is the button on a playlist page.
     "add_range",
+    # A whole list in one write, and a read-only resolution of one track. Both
+    # belong to the independent queue service (see THE QUEUE SERVICE below): a
+    # playlist of four hundred songs is one call rather than four hundred.
+    "add_many", "resolve",
 }
 REPEAT_MODES = ("off", "all", "one")
+
+# How far into a queue a position may point. The queue itself is capped by the
+# provider the limits are read from; this is only the range the API accepts, so
+# a request cannot name a position the queue could never hold.
+QUEUE_INDEX_MAX = 4999
+
+# ---------------------------------------------------------------------------
+# THE QUEUE SERVICE
+# ---------------------------------------------------------------------------
+# The play queue lives in a service of its own (nix_core/music_queue_service.py)
+# so that a playlist longer than the skill's own hundred-track ceiling is stored
+# once and read in windows, and so that warming the tracks ahead of the cursor
+# is a background job rather than a page's polling traffic. It is reached over
+# HTTP; setting NIX_MUSIC_QUEUE_URL is what turns it on. With the variable
+# unset, every route below behaves exactly as it did before, through the
+# provider skill — which is what a box that has not started the service wants.
+QUEUE_SERVICE_URL = os.environ.get("NIX_MUSIC_QUEUE_URL", "").strip()
+QUEUE_SERVICE_TIMEOUT = float(os.environ.get("NIX_MUSIC_QUEUE_TIMEOUT", "20"))
+# How long a liveness probe of a *discovered* service is trusted. Nothing is
+# probed when the address was configured by hand: an address someone wrote down
+# is answered from, and its failures are reported rather than papered over.
+QUEUE_PROBE_TTL = 5.0
+_queue_probe = {"at": 0.0, "url": "", "alive": False}
+# How long the provider's declared limits are trusted before being read from the
+# installed manifest and pushed again. Installing a different music skill is
+# what changes them, and that is not a per-request event.
+QUEUE_LIMITS_TTL = 30.0
+_queue_limits = {"at": 0.0, "skill_id": "", "values": None}
+
+
+def _queue_service_url() -> tuple[str, bool]:
+    """Where the queue service is, and whether that was configured by hand.
+
+    The environment wins; otherwise the address the service published in the
+    data directory is used, which is how a console that was told nothing still
+    finds the queue running beside it.
+    """
+    if QUEUE_SERVICE_URL:
+        return QUEUE_SERVICE_URL.rstrip("/"), True
+    found = queue_engine.discover_service()
+    if found:
+        return found["url"], False
+    return "", False
+
+
+def _queue_service_token() -> str:
+    token = os.environ.get("NIX_MUSIC_QUEUE_TOKEN", "").strip()
+    if token:
+        return token
+    found = queue_engine.discover_service()
+    return found["token"] if found else ""
+
+
+def _queue_service_on() -> bool:
+    return bool(_queue_service_url()[0])
+
+
+def _queue_service_alive() -> bool:
+    """Is a *discovered* service answering? Cached, because it is a probe."""
+    url, explicit = _queue_service_url()
+    if not url or explicit:
+        return bool(url)
+    now = time.time()
+    if _queue_probe["url"] == url and now - _queue_probe["at"] < QUEUE_PROBE_TTL:
+        return bool(_queue_probe["alive"])
+    alive = True
+    try:
+        with urllib.request.urlopen(url + "/health", timeout=2):
+            pass
+    except (urllib.error.URLError, OSError, ValueError):
+        alive = False
+    _queue_probe.update({"at": now, "url": url, "alive": alive})
+    return alive
+
+
+def _queue_service_request(method: str, path: str, body: dict | None = None,
+                           timeout: float | None = None) -> dict:
+    """One call to the queue service, as a bounded, reported failure."""
+    url = _queue_service_url()[0] + path
+    data = json.dumps(body).encode() if body is not None else None
+    headers = {"Content-Type": "application/json"}
+    token = _queue_service_token()
+    if token:
+        headers["X-Nix-Token"] = token
+    request = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout or QUEUE_SERVICE_TIMEOUT) as response:
+            payload = json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = json.loads(exc.read() or b"{}").get("error", "")
+        except (ValueError, AttributeError):
+            detail = ""
+        raise MusicApiError(
+            detail or f"The music queue service refused the request ({exc.code}).",
+            409 if exc.code == 409 else 502, "queue_service_error") from exc
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise MusicApiError(
+            "The music queue service is not reachable.", 503, "queue_service_unavailable") from exc
+    if not isinstance(payload, dict):
+        raise MusicApiError("The music queue service sent an unreadable reply.", 502,
+                            "queue_service_error")
+    return payload
+
+
+def _push_queue_limits(*, force: bool = False) -> dict:
+    """Tell the queue service what this OpenDeck instance allows.
+
+    The limits are the provider skill's own declaration, read from the installed
+    manifest, so a queue that is queued against a skill with a different ceiling
+    follows that skill. The read is cached; the push is not, because the service
+    may have been restarted under us and would otherwise keep its old defaults.
+    """
+    if not _queue_service_on():
+        return {}
+    now = time.time()
+    if not force and _queue_limits["values"] is not None and now - _queue_limits["at"] < QUEUE_LIMITS_TTL:
+        return _queue_limits["values"]
+    values = queue_engine.QueueLimits().as_dict()
+    skill_id = ""
+    try:
+        skill_id, manifest, _provider = _provider_skill()
+        values = queue_engine.limits_from_manifest(manifest).as_dict()
+    except MusicApiError:
+        pass
+    try:
+        reply = _queue_service_request("POST", "/limits", {"limits": values}, timeout=5)
+        values = reply.get("limits") if isinstance(reply.get("limits"), dict) else values
+    except MusicApiError:
+        return _queue_limits["values"] or values
+    _queue_limits.update({"at": now, "skill_id": skill_id, "values": values})
+    return values
+
+
+def _queue_service_state(offset: int, limit: int, revision: int | None) -> dict:
+    _push_queue_limits()
+    query = f"/state?from={max(0, offset)}&limit={max(1, min(2000, limit))}"
+    if revision is not None:
+        query += f"&revision={max(0, revision)}"
+    return _queue_service_request("GET", query)
+
+
+def _queue_service_op(body: dict) -> dict:
+    _push_queue_limits()
+    return _queue_service_request("POST", "/ops", body)
+
+
+def _queue_service_add(tracks: list[dict], playlist_id: str = "", mode: str = "append") -> dict:
+    _push_queue_limits()
+    return _queue_service_request("POST", "/add", {
+        "tracks": tracks, "playlist_id": playlist_id, "mode": mode,
+    })
+
+
+def _queue_service_message(reply: dict) -> str:
+    accepted = reply.get("accepted") or 0
+    total = reply.get("total") or 0
+    refused = reply.get("refused") or 0
+    if accepted == 1:
+        message = f"1 track queued · {total} in the queue."
+    else:
+        message = f"{accepted} tracks queued · {total} in the queue."
+    if refused:
+        message += (f" {refused} did not fit: the queue holds {reply.get('max_tracks', 'no more')}."
+                    if reply.get("max_tracks") else f" {refused} did not fit.")
+    return message
+
+
+def _queue_service_payload(reply: dict) -> dict:
+    """The service's window, in the shape every existing reader already knows.
+
+    ``queue`` is the window, ``count`` is how many are in it (as before) and
+    ``total`` is the whole line-up, which is the number a page puts beside the
+    queue. ``revision`` is what a polling reader sends back to be told
+    "unchanged" without the queue being sent again.
+    """
+    items = reply.get("queue") if isinstance(reply.get("queue"), list) else []
+    index = reply.get("index")
+    index = index if isinstance(index, int) and -1 <= index < (reply.get("total") or 0) else -1
+    return {
+        "ok": True,
+        "action": "queue",
+        "queue": items,
+        "index": index,
+        "count": len(items),
+        "total": int(reply.get("total") or 0),
+        "offset": int(reply.get("offset") or 0),
+        "revision": int(reply.get("revision") or 0),
+        "unchanged": bool(reply.get("unchanged")),
+        "shuffle": bool(reply.get("shuffle")),
+        "repeat": reply.get("repeat") if reply.get("repeat") in REPEAT_MODES else "off",
+        "message": reply.get("message") or "",
+    }
 
 # How many songs one library read may hand over. This is the reader's ceiling,
 # not the provider's page size: a wall display listing a playlist asks for as
@@ -946,11 +1203,17 @@ def _queue_payload(skill_id: str, result: dict) -> dict:
 def music_queue(handler, _match=None) -> bool:
     """Read or change the play queue, or start the queue's next track.
 
-    The queue itself lives in the music provider skill (so the assistant can
-    queue tracks through its own tool); the console reads and drives it through
-    the declared provider action and performs the speaker hand-off here, exactly
-    as POST /api/music/play does.
+    The queue belongs to the independent queue service when one is running (see
+    THE QUEUE SERVICE above), and to the music provider skill otherwise. Either
+    way the caller speaks the same vocabulary: a read is a read, and the speaker
+    hand-off for a play or a skip is performed here, exactly as POST
+    /api/music/play does it.
     """
+    # A service whose address was published for us is only used while it is
+    # answering: a queue service that was stopped or uninstalled leaves the
+    # console with the provider's own queue rather than an API that says no.
+    if _queue_service_on() and _queue_service_alive():
+        return _music_queue_service(handler)
     if handler.command == "GET":
         try:
             skill_id, result = _provider_call("queue", {"op": "list"})
@@ -1046,6 +1309,272 @@ def music_queue(handler, _match=None) -> bool:
         payload.update({key: snapshot[key] for key in ("track", "playing", "player", "position", "handoff")})
     panel_stream.notify("queue", action=op)
     return _respond(handler, payload)
+
+
+def _provider_tracks(result: dict) -> list[dict]:
+    """The tracks a provider search or library read hands over."""
+    for key in ("tracks", "results", "items"):
+        value = result.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _queue_track_fields(track: dict) -> dict:
+    """The queue's own fields, lifted off a provider track record."""
+    return {key: track.get(key) for key in queue_engine.TRACK_FIELDS if track.get(key) is not None}
+
+
+def _queue_track_wanted(body: dict) -> dict:
+    """One track to queue: named by id, or resolved through the provider search.
+
+    A page that already knows the id (it came from a playlist listing) costs no
+    provider call at all: the queue stores what it was given and the background
+    fills in anything missing.
+    """
+    video_id = _text(body.get("video_id"), "video_id", 64)
+    if video_id:
+        wanted = {"video_id": video_id}
+        wanted.update(_queue_track_fields({
+            key: body.get(key) for key in ("title", "artist", "album", "duration_sec", "artwork_url")
+        }))
+        return wanted
+    query = _text(body.get("query"), "query", 200)
+    if not query:
+        raise MusicApiError("Provide query=<search text> or video_id=<id>.", 400, "validation_error")
+    _skill, result = _provider_call("search", {"query": query, "limit": 1})
+    tracks = _provider_tracks(result)
+    if not tracks:
+        raise MusicApiError(f"No track matched “{query}”.", 404, "no_match")
+    return _queue_track_fields(tracks[0])
+
+
+def _queue_write_batches(tracks: list[dict], max_batch: int) -> list[list[dict]]:
+    """A long playlist is written in the provider's own batch size.
+
+    Not one call per song, and not one unbounded call either: the ceiling is
+    the provider's, and a list longer than it is simply read in a few writes.
+    """
+    size = max(1, int(max_batch or 200))
+    return [tracks[start:start + size] for start in range(0, len(tracks), size)]
+
+
+def _queue_service_add_all(tracks: list[dict], playlist_id: str = "",
+                          mode: str = "append") -> dict:
+    """Queue a whole list, in as few writes as the provider's ceiling allows."""
+    limits = _push_queue_limits()
+    batches = _queue_write_batches(tracks, limits.get("max_batch", 200))
+    reply: dict = {}
+    accepted = refused = total = 0
+    for index, batch in enumerate(batches):
+        reply = _queue_service_add(batch, playlist_id=playlist_id,
+                                   mode=mode if index == 0 else "append")
+        accepted += int(reply.get("accepted") or 0)
+        refused += int(reply.get("refused") or 0)
+        total = int(reply.get("total") or total)
+        if refused and index + 1 < len(batches):
+            # The queue is full: the rest of the list would be refused too, so
+            # the writes stop rather than being sent to be turned away.
+            break
+    return {"accepted": accepted, "refused": refused, "total": total,
+            "revision": reply.get("revision"), "mode": mode,
+            "max_tracks": limits.get("max_tracks")}
+
+
+def _queue_service_play_from(result: dict, skill_id: str) -> dict | None:
+    """Hand the service's current queued track to the speaker.
+
+    The queue service decides *which* track plays; the provider skill is still
+    what turns a track into a stream URL and what receives the hand-off, so a
+    track started from the queue is played exactly like one played from search.
+    """
+    track = result.get("track") if isinstance(result.get("track"), dict) else None
+    if not track or not track.get("video_id"):
+        return None
+    _provider_skill_id, play_result = _provider_call("play", {"video_id": track["video_id"]})
+    _start_playback(play_result, skill_id, queue={"index": result.get("index")})
+    return play_result
+
+
+def _advance_through_queue_service() -> None:
+    """The queue service's version of "the track ended, play the next one"."""
+    try:
+        result = _queue_service_op({"op": "next", "auto": True})
+    except MusicApiError:
+        return
+    if not result.get("ok"):
+        return
+    skill_id = ""
+    try:
+        skill_id, _manifest, _provider = _provider_skill()
+    except MusicApiError:
+        return
+    _queue_service_play_from(result, skill_id)
+
+
+@_guarded
+def _music_queue_service(handler, _match=None) -> bool:
+    """The queue routes, answered by the independent queue service.
+
+    A read is a window plus a revision, so a page that already holds the current
+    revision is told "unchanged" and sends nothing back. A write is one call —
+    including ``add_many``, which is how a whole playlist changes hands: the
+    page posts the songs it already listed, and the service stores them and
+    warms them ahead of the cursor at the provider's own rate.
+    """
+    if handler.command == "GET":
+        query = _query(handler)
+        offset = _int(query.get("from"), "from", 0, 1_000_000) or 0
+        limit = _int(query.get("limit"), "limit", 1, 2000) or _push_queue_limits().get("window", 50)
+        revision = _int(query.get("revision"), "revision", 0, 2**31 - 1)
+        try:
+            reply = _queue_service_state(offset, limit, revision)
+        except MusicApiError as exc:
+            return _fail(handler, exc)
+        payload = _queue_service_payload(reply)
+        if not payload["message"]:
+            payload["message"] = (
+                f"{payload['total']} track(s) queued." if payload["total"] else "The queue is empty."
+            )
+        return _respond(handler, payload)
+
+    body = _body(handler)
+    op = (_text(body.get("action") or body.get("op"), "action", 24) or "list").lower()
+    if op not in QUEUE_OPS:
+        return _fail(handler, MusicApiError(
+            f"action must be one of: {', '.join(sorted(QUEUE_OPS))}.", 400, "validation_error"))
+    try:
+        if op == "add":
+            track = _queue_track_wanted(body)
+            mode = "play_next" if body.get("mode") == "play_next" else "append"
+            reply = _queue_service_add([track], mode=mode)
+        elif op == "add_many":
+            tracks = body.get("tracks")
+            if not isinstance(tracks, list) or not tracks:
+                return _fail(handler, MusicApiError(
+                    "Provide tracks=[{video_id, title, ...}, ...].", 400, "validation_error"))
+            if len(tracks) > 20000:
+                return _fail(handler, MusicApiError(
+                    "That is more than one call may queue.", 413, "too_many"))
+            mode = body.get("mode") if body.get("mode") in {"append", "play_next", "replace"} else "append"
+            reply = _queue_service_add_all(
+                [item for item in tracks if isinstance(item, dict)],
+                playlist_id=_text(body.get("playlist_id"), "playlist_id", 100), mode=mode)
+            reply["message"] = _queue_service_message(reply)
+        elif op == "add_range":
+            playlist_id = _text(body.get("playlist_id"), "playlist_id", 100)
+            if not playlist_id:
+                return _fail(handler, MusicApiError(
+                    "Provide playlist_id=<the playlist the song came from>.", 400, "validation_error"))
+            _skill, listing = _provider_call("library", {
+                "kind": "playlist", "playlist_id": playlist_id, "limit": LIBRARY_LIMIT_MAX})
+            songs = _provider_tracks(listing)
+            if not songs:
+                return _fail(handler, MusicApiError("That playlist has no songs to queue.",
+                                                    404, "no_match"))
+            anchor = _text(body.get("video_id"), "video_id", 64)
+            start = 0
+            if anchor:
+                found = next((position for position, song in enumerate(songs)
+                              if song.get("video_id") == anchor), None)
+                if found is None:
+                    return _fail(handler, MusicApiError(
+                        "That song is not in this playlist any more.", 404, "no_match"))
+                start = found
+            reply = _queue_service_add_all([_queue_track_fields(song) for song in songs[start:]],
+                                           playlist_id=playlist_id)
+            reply["message"] = _queue_service_message(reply)
+        elif op in {"remove", "move", "front", "next_up", "play", "next", "clear", "shuffle", "repeat"}:
+            arguments: dict = {"op": op}
+            index = _int(body.get("index"), "index", 0, QUEUE_INDEX_MAX)
+            to = _int(body.get("to"), "to", 0, QUEUE_INDEX_MAX)
+            if op in {"remove", "front", "next_up"} and index is None and not body.get("query") and not body.get("video_id"):
+                return _fail(handler, MusicApiError("Provide index=<queue position>.", 400, "validation_error"))
+            if op == "move" and (index is None or to is None):
+                return _fail(handler, MusicApiError("Provide index=<from> and to=<to>.", 400, "validation_error"))
+            if op == "play" and index is None:
+                return _fail(handler, MusicApiError("Provide index=<queue position>.", 400, "validation_error"))
+            if index is not None:
+                arguments["index"] = index
+            if to is not None and op == "move":
+                arguments["to"] = to
+            if op == "shuffle" and _flag(body.get("on"), "on") is not None:
+                arguments["on"] = _flag(body.get("on"), "on")
+            if op == "repeat":
+                mode = _text(body.get("mode"), "mode", 8).lower()
+                if mode and mode not in REPEAT_MODES:
+                    return _fail(handler, MusicApiError(
+                        f"mode must be one of: {', '.join(REPEAT_MODES)}.", 400, "validation_error"))
+                if mode:
+                    arguments["mode"] = mode
+            if op == "next" and body.get("auto"):
+                arguments["auto"] = True
+            reply = _queue_service_op(arguments)
+        else:  # ``list`` as a POST, which is the same read as GET
+            reply = _queue_service_state(0, _push_queue_limits().get("window", 50), None)
+    except MusicApiError as exc:
+        return _fail(handler, exc)
+
+    payload = _queue_service_payload(reply)
+    if op in {"add", "add_many", "add_range"}:
+        # A write says what it took: a caller that sent four hundred songs is
+        # owed a number, not just the queue it produced.
+        payload.update({key: reply[key] for key in ("accepted", "refused", "unqueable", "mode")
+                        if key in reply})
+    if op == "clear":
+        payload["removed"] = int(reply.get("removed") or 0)
+        payload["message"] = reply.get("message") or payload["message"]
+    if op in {"play", "next"}:
+        if not reply.get("ok"):
+            state = {}
+            try:
+                state = _queue_service_state(0, _push_queue_limits().get("window", 50), None)
+            except MusicApiError:
+                pass
+            payload.update(_queue_service_payload(state) if state else {})
+            payload["ok"] = False
+            payload["code"] = "queue_empty"
+            payload["error"] = reply.get("message") or "The queue has no track to play."
+            return _respond(handler, payload, 409)
+        try:
+            skill_id, _manifest, _provider = _provider_skill()
+            played = _queue_service_play_from(reply, skill_id)
+        except MusicApiError as exc:
+            return _fail(handler, exc)
+        if played is None:
+            return _fail(handler, MusicApiError("The queue has no track to play.", 409, "queue_empty"))
+        payload["track"] = _now_playing_payload()["track"]
+        payload["message"] = payload["message"] or f"Playing “{played.get('title') or ''}”."
+    elif not payload["message"]:
+        total = payload["total"]
+        payload["message"] = f"{total} track(s) queued." if total else "The queue is empty."
+    panel_stream.notify("queue", action=op)
+    return _respond(handler, payload)
+
+
+@_guarded
+def music_queue_resolve(handler, _match=None) -> bool:
+    """Resolve one track's metadata without queueing or playing it.
+
+    This is what the independent queue service calls back for, once per track
+    whose metadata never arrived (a queue built from bare video ids): the
+    service owns the rate limit and the cache, and this end knows how to ask the
+    installed provider skill.
+    """
+    video_id = _text(_body(handler).get("video_id"), "video_id", 64)
+    if not video_id:
+        return _fail(handler, MusicApiError("Provide video_id=<id>.", 400, "validation_error"))
+    try:
+        _skill, result = _provider_call("queue", {"op": "resolve", "video_id": video_id})
+    except MusicApiError as exc:
+        return _fail(handler, exc)
+    # The provider's result carries the track's own fields at the top level (its
+    # result schema is closed), so the resolved track is read from there.
+    track = _queue_track_fields(result)
+    if not track.get("video_id") or not track.get("title"):
+        return _respond(handler, {"ok": False, "video_id": video_id,
+                                  "error": "That track is not known to the provider."}, 404)
+    return _respond(handler, {"ok": True, "video_id": video_id, "track": track})
 
 
 @_guarded
@@ -1161,16 +1690,35 @@ def music_lyrics(handler, _match=None) -> bool:
     query = _query(handler)
     state = _read_music_state()
     track = state.get("track") if isinstance(state.get("track"), dict) else {}
-    arguments = _lyrics_arguments(track)
-    arguments.update({key: value for key, value in (
+    named = {key: value for key, value in (
         ("video_id", _text(query.get("video_id"), "video_id", 64)),
         ("title", _text(query.get("title"), "title", 200)),
         ("artist", _text(query.get("artist"), "artist", 200)),
         ("album", _text(query.get("album"), "album", 200)),
-    ) if value})
+    ) if value}
+    # A caller that names a track is answered for exactly that track. Merging the
+    # recorded track's own name over a named id used to make the provider look up
+    # the *last* song it played and hand its words back as the words of the named
+    # one - wrong lyrics, reported as a success, which is worse than none. The
+    # recorded track fills in only when nothing is named at all ("show me the
+    # lyrics" while music plays).
+    arguments = dict(named) if named else _lyrics_arguments(track)
     duration = _int(query.get("duration_sec"), "duration_sec", 1, 60 * 60)
     if duration:
         arguments["duration_sec"] = duration
+    if named and not duration:
+        # Naming the track that is playing by its title is the same request as
+        # naming nothing, and the console's own clock knows how long it runs: the
+        # provider matches best (and an exact LRCLIB lookup needs) a duration.
+        # A title that is not the recorded track's inherits nothing.
+        recorded_title = _normalized_title(track.get("title"))
+        if recorded_title and named.get("title") and _normalized_title(named["title"]) == recorded_title:
+            recorded_duration = track.get("duration_sec")
+            if isinstance(recorded_duration, (int, float)) and recorded_duration > 0:
+                arguments["duration_sec"] = int(recorded_duration)
+            for key in ("video_id", "artist", "album"):
+                if not arguments.get(key) and track.get(key):
+                    arguments[key] = track[key]
     if not arguments.get("video_id") and not arguments.get("title"):
         return _fail(handler, MusicApiError("Nothing is playing and no video_id/title was given.", 409, "no_track"))
     try:

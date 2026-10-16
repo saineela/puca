@@ -1,0 +1,204 @@
+/* The mini playbar's own look (see static/playbar.js).
+ *
+ * It floats above the console's own layout, pinned to the bottom centre of the
+ * window, so it is the same strip on every page: collapsed it is a small pill
+ * with the track's name and its position in the song, and it opens upward when
+ * the cursor reaches it (or the keyboard focuses it).
+ *
+ * Colours are the dashboard's own tokens, so the strip turns over with the
+ * theme instead of carrying a palette of its own.
+ */
+
+.playbar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: min(430px, calc(100vw - 28px));
+  padding: 7px 9px 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--paper) 88%, transparent);
+  box-shadow: 0 12px 34px #202a2222, 0 2px 8px #202a2212;
+  backdrop-filter: blur(10px);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.playbar:hover,
+.playbar:focus-within,
+.playbar.open {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  box-shadow: 0 18px 44px #202a2230, 0 3px 10px #202a2216;
+}
+
+/* The transport is always in the DOM and only revealed: showing it by hovering
+   must not move the strip's own footprint, or the cursor that reached for it
+   would push it around. */
+.playbar-panel {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height .2s ease, opacity .16s ease, margin .2s ease;
+}
+.playbar:hover .playbar-panel,
+.playbar:focus-within .playbar-panel,
+.playbar.open .playbar-panel {
+  max-height: 46px;
+  opacity: 1;
+  margin-bottom: 2px;
+}
+
+.playbar-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+}
+.playbar-btn:hover {
+  border-color: var(--line);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.playbar-btn svg { width: 18px; height: 18px; }
+.playbar-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 4px 12px #45634d33;
+}
+.playbar-play:hover { color: #fff; background: var(--accent-deep); }
+
+/* Play/pause and muted/unmuted are two drawings each; the state class picks. */
+.playbar .ic-pause,
+.playbar .ic-muted { display: none; }
+.playbar.playing .ic-play { display: none; }
+.playbar.playing .ic-pause { display: block; }
+.playbar.muted .ic-vol { display: none; }
+.playbar.muted .ic-muted { display: block; }
+
+.playbar-strip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 11px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.playbar-strip:hover { background: var(--surface-alt); }
+
+.playbar-art {
+  display: grid;
+  flex: 0 0 30px;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--accent-ink);
+  background: var(--surface);
+  font-size: 13px;
+}
+.playbar-art img { width: 100%; height: 100%; object-fit: cover; }
+
+.playbar-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.playbar-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.playbar-artist {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.playbar-where {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 20px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.playbar-where:empty { display: none; }
+
+.playbar-times {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font: 10px ui-monospace, monospace;
+}
+
+.playbar-progress {
+  position: absolute;
+  right: 12px;
+  bottom: 4px;
+  left: 12px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+.playbar-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}
+
+/* A control that is waiting on the console says so by going quiet, rather than
+   by leaving the strip looking as if the press did nothing. */
+.playbar.busy { opacity: .72; }
+.playbar.busy .playbar-btn { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .playbar,
+  .playbar-panel,
+  .playbar-progress i { transition: none; }
+}
+
+@media (max-width: 600px) {
+  .playbar {
+    bottom: 10px;
+    width: calc(100vw - 18px);
+    padding: 6px 8px 7px;
+  }
+  .playbar-artist { display: none; }
+}
+
+/* A page that wants the strip out of its way while something is printed to it
+   (release notes, a dialog) can say so without reaching into this file. */
+body.playbar-hidden .playbar { display: none; }

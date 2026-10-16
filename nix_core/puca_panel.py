@@ -452,6 +452,7 @@ _ROUTES: dict[str, Callable[..., bool]] = {
     "POST /api/music/play": music_api.music_play,
     "GET /api/music/queue": music_api.music_queue,
     "POST /api/music/queue": music_api.music_queue,
+    "POST /api/music/queue/resolve": music_api.music_queue_resolve,
     "GET /api/music/library": music_api.music_library,
     "POST /api/music/save": music_api.music_save,
     "GET /api/music/lyrics": music_api.music_lyrics,

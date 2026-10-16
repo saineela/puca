@@ -19,6 +19,8 @@ import console
 import console_extend
 import music_api
 import music_cache
+import music_queue
+import music_queue_service
 
 
 @pytest.fixture
@@ -26,6 +28,11 @@ def music_env(monkeypatch, tmp_path):
     monkeypatch.setattr(console, "SKILLS_STATE_PATH", str(tmp_path / "skills.json"))
     monkeypatch.setattr(console, "SKILLS_INSTALL_DIR", str(tmp_path / "installed"))
     monkeypatch.setattr(console, "DATA_DIR", str(tmp_path / "data"))
+    # The queue's own files follow the console's data directory, so pointing that
+    # at this test's directory is what keeps a queue service running on the box
+    # (this one publishes its address in the real data directory) from answering
+    # these tests' reads.
+    monkeypatch.setenv("NIX_DATA_DIR", str(tmp_path / "data"))
     return tmp_path
 
 
@@ -310,12 +317,63 @@ def read_bytes(server, path, headers=None):
 
 def test_manifest_accepts_page_and_media_provider():
     parsed = console._parse_skill_manifest(json.loads(json.dumps(PROVIDER_MANIFEST)), "skills/opendeck/skill.json", "NIX Community Skills")
-    assert parsed["device_ui"]["page"] == {"id": "music", "title": "Music", "script": "ui/music.js", "styles": ["ui/music.css"]}
+    assert parsed["device_ui"]["page"] == {"id": "music", "title": "Music", "script": "ui/music.js", "styles": ["ui/music.css"], "assets": []}
     assert set(parsed["device_ui"]["media"]["provider"]) == {"search", "play", "library", "lyrics", "queue", "save"}
     assert parsed["device_ui"]["media"]["provider"]["library"]["arguments"] == {"action": "library", "kind": "playlists"}
     # The queue action carries a default op so the console can read the queue
     # with no request body at all.
     assert parsed["device_ui"]["media"]["provider"]["queue"]["arguments"] == {"action": "queue", "op": "list"}
+
+
+def test_a_page_may_ship_the_fonts_and_pictures_it_loads():
+    """A page's typography travels in its own package, like the wall panel's.
+
+    The stylesheet a page declares points at faces and marks in the same package,
+    so the console serves those too - declared as page assets, never from a CDN.
+    """
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["files"] += ["PUCA-Panel/fonts.css", "PUCA-Panel/fonts/outfit-latin.woff2", "PUCA-Panel/puca-logo.png"]
+    manifest["device_ui"]["page"]["styles"].append("PUCA-Panel/fonts.css")
+    manifest["device_ui"]["page"]["assets"] = ["PUCA-Panel/fonts/outfit-latin.woff2", "PUCA-Panel/puca-logo.png"]
+    parsed = console._parse_skill_manifest(manifest, "skills/opendeck/skill.json", "NIX Community Skills")
+    page = parsed["device_ui"]["page"]
+    assert page["assets"] == ["PUCA-Panel/fonts/outfit-latin.woff2", "PUCA-Panel/puca-logo.png"]
+    assert "PUCA-Panel/fonts/outfit-latin.woff2" in music_api.page_assets("opendeck", page, manifest)
+
+
+def test_a_page_asset_must_be_declared_in_the_files_list():
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["device_ui"]["page"]["assets"] = ["PUCA-Panel/fonts/outfit-latin.woff2"]
+    with pytest.raises(console.SkillRepositoryError, match="files list"):
+        console._parse_skill_manifest(manifest, "skills/opendeck/skill.json", "NIX Community Skills")
+
+
+def test_a_page_asset_may_not_be_code():
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["files"].append("ui/extra.js")
+    manifest["device_ui"]["page"]["assets"] = ["ui/extra.js"]
+    with pytest.raises(console.SkillRepositoryError, match="fonts or pictures"):
+        console._parse_skill_manifest(manifest, "skills/opendeck/skill.json", "NIX Community Skills")
+
+
+def test_a_page_support_file_is_served_with_its_own_content_type(music_env, monkeypatch):
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["files"] += ["PUCA-Panel/fonts.css", "PUCA-Panel/fonts/outfit-latin.woff2"]
+    manifest["device_ui"]["page"]["styles"].append("PUCA-Panel/fonts.css")
+    manifest["device_ui"]["page"]["assets"] = ["PUCA-Panel/fonts/outfit-latin.woff2"]
+    install(monkeypatch, music_env, [manifest], FakeRuntime())
+    package = Path(console._skill_package_path("opendeck"))
+    (package / "PUCA-Panel" / "fonts").mkdir(parents=True, exist_ok=True)
+    (package / "PUCA-Panel" / "fonts" / "outfit-latin.woff2").write_bytes(b"wOF2font bytes")
+    server = serve()
+    try:
+        status, body, headers = read_bytes(server, "/api/skills/opendeck/page/PUCA-Panel/fonts/outfit-latin.woff2")
+        missing_status, _body, _headers = read_bytes(server, "/api/skills/opendeck/page/PUCA-Panel/fonts/nope.woff2")
+    finally:
+        server.shutdown()
+    assert status == 200 and body == b"wOF2font bytes"
+    assert headers["Content-Type"] == "font/woff2"
+    assert missing_status == 404, "an undeclared file stays unreachable"
 
 
 def test_manifest_rejects_a_page_asset_that_is_not_declared():
@@ -740,6 +798,70 @@ def test_lyrics_uses_the_recorded_track(music_env, monkeypatch):
     assert payload["lyrics"] == [{"time_sec": 1.5, "text": "hello"}]
     call = next(item for item in runtime.calls if item["arguments"].get("action") == "lyrics")
     assert call["arguments"] == {"action": "lyrics", "video_id": "abc12345678", "title": "Song", "artist": "Artist", "duration_sec": 200}
+
+
+def test_lyrics_for_a_named_track_are_answered_for_that_track(music_env, monkeypatch):
+    """Naming a video_id must never be answered with the recorded track's words.
+
+    The provider matches on title/artist (LRCLIB has no video ids), so merging
+    whatever the console last played over a named id made it look up the previous
+    song and return *its* lyrics as the words of the named one - a wrong answer
+    reported as a success, which is exactly what the music page showed.
+    """
+    runtime = FakeRuntime(results={"opendeck_music": {"ok": True, "action": "lyrics", "message": "ok",
+        "video_id": "b2", "title": "Other Song", "artist": "Other Artist",
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "none", "lyrics_source": "LRCLIB",
+        "tracks": [], "playlists": [], "count": 0}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], runtime)
+    write_state(track={"video_id": "a1", "title": "Playing Now", "artist": "Playing Artist",
+                       "duration_sec": 200})
+    server = serve()
+    try:
+        status, _payload, _headers = read_json(server, "/api/music/lyrics?video_id=b2")
+    finally:
+        server.shutdown()
+    assert status == 200
+    call = next(item for item in runtime.calls if item["arguments"].get("action") == "lyrics")
+    assert call["arguments"] == {"action": "lyrics", "video_id": "b2"}, (
+        "the recorded track's title, artist and duration must not be attached to a named one"
+    )
+
+
+def test_lyrics_named_by_the_playing_title_keep_the_recorded_duration(music_env, monkeypatch):
+    """The playing track named by title is the playing track: its clock comes too."""
+    runtime = FakeRuntime(results={"opendeck_music": {"ok": True, "action": "lyrics", "message": "ok",
+        "video_id": "a1", "title": "Playing Now", "artist": "Playing Artist",
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "none", "lyrics_source": "LRCLIB",
+        "tracks": [], "playlists": [], "count": 0}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], runtime)
+    write_state(track={"video_id": "a1", "title": "Playing Now!", "artist": "Playing Artist",
+                       "album": "An Album", "duration_sec": 200})
+    server = serve()
+    try:
+        read_json(server, "/api/music/lyrics?title=playing%20now")
+    finally:
+        server.shutdown()
+    call = next(item for item in runtime.calls if item["arguments"].get("action") == "lyrics")
+    assert call["arguments"] == {"action": "lyrics", "title": "playing now", "video_id": "a1",
+                                 "artist": "Playing Artist", "album": "An Album", "duration_sec": 200}
+
+
+def test_lyrics_for_another_title_inherit_nothing_from_the_recorded_track(music_env, monkeypatch):
+    """A title that is not what is playing is a different track, not a merge."""
+    runtime = FakeRuntime(results={"opendeck_music": {"ok": True, "action": "lyrics", "message": "ok",
+        "video_id": "", "title": "Yesterday", "artist": "",
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "none", "lyrics_source": "LRCLIB",
+        "tracks": [], "playlists": [], "count": 0}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST], runtime)
+    write_state(track={"video_id": "a1", "title": "Playing Now", "artist": "Playing Artist",
+                       "duration_sec": 200})
+    server = serve()
+    try:
+        read_json(server, "/api/music/lyrics?title=Yesterday")
+    finally:
+        server.shutdown()
+    call = next(item for item in runtime.calls if item["arguments"].get("action") == "lyrics")
+    assert call["arguments"] == {"action": "lyrics", "title": "Yesterday"}
 
 
 # ── queue ────────────────────────────────────────────────────────────────
@@ -1180,6 +1302,61 @@ def cover_url(original="https://cdn.example/cover.png"):
     return "/api/music/artwork?src=" + urllib.parse.quote(original, safe="")
 
 
+def test_an_idle_speaker_holding_a_recorded_pause_is_not_advanced(music_env, monkeypatch):
+    """A paused speaker reports itself idle — that is not a finished track.
+
+    This box's speaker answers "idle" for a paused stream, so the finished-track
+    check matched and the console started the next queued track (and dropped the
+    pause) whenever the wall clock passed the track's length while it was paused.
+    """
+    items = [queue_track("a1", "First"), queue_track("b2", "Second")]
+    runtime = FakeRuntime(
+        results={"opendeck_music": lambda _matched: queue_result(
+            items, index=1, message="Playing Second.",
+            play_url="http://192.168.0.152:4100/api/media/stream?url=z")},
+        player=idle_player(),
+    )
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    write_state(**finished_queue_state(paused_at=time.time() - 400))
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/now-playing")
+    finally:
+        server.shutdown()
+    assert status == 200
+    assert payload["track"]["title"] == "First", "the paused track is still the one playing"
+    assert queue_calls(runtime) == []
+
+
+def test_a_resume_made_outside_the_console_closes_the_pause_record(music_env, monkeypatch):
+    """The speaker says it is playing, so the console's pause record is over.
+
+    A track resumed by voice or on the device itself was still read as paused:
+    the progress bar stood still and, in a queue, the end-of-track check had a
+    pause in hand for music that was playing.
+    """
+    playing = {"ok": True, "action": "state", "message": "reported", "device_name": "Light",
+               "speaker": {"volume": 0.5, "muted": False, "state": "playing"},
+               "state": {"on": True, "brightness": 1.0, "effect": "None", "rgb": [255, 255, 255]}}
+    runtime = FakeRuntime(results={"opendeck_music": {"ok": True, "action": "now_playing",
+        "tracks": [], "playlists": [], "queue": [], "queue_index": -1, "count": 0,
+        "lyrics": [], "lyrics_plain": "", "lyrics_timing": "", "lyrics_source": "",
+        "video_id": "", "title": "", "artist": "", "duration_sec": 0, "artwork_url": "",
+        "mime_type": "", "play_url": ""}}, player=playing)
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    write_state(**finished_queue_state(paused_at=time.time() - 30, paused_seconds=10.0))
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/now-playing")
+    finally:
+        server.shutdown()
+    assert status == 200
+    assert payload["position"]["paused"] is False
+    saved = music_api._read_music_state()
+    assert saved["paused_at"] is None, "the speaker's own resume closes the pause record"
+    assert saved["paused_seconds"] >= 39.0, "the time it spent paused is added once, not lost"
+
+
 def test_artwork_route_serves_a_cover_from_the_cache(music_env, monkeypatch):
     """The first paint fetches a cover; every later paint comes off disk.
 
@@ -1239,3 +1416,287 @@ def test_a_cover_that_cannot_be_fetched_is_reported(music_env, monkeypatch):
         server.shutdown()
     assert status == 502
     assert payload["code"] == "artwork_unavailable"
+
+
+# ── the independent queue service ─────────────────────────────────────────
+#
+# The queue itself lives in its own service (nix_core/music_queue_service.py)
+# when one is running: the console proxies to it, a whole playlist changes hands
+# in a few writes rather than one per song, and a read carries a revision so a
+# page that holds the current one is told "unchanged" instead of being sent the
+# queue again.
+
+
+@pytest.fixture()
+def queue_service(tmp_path, monkeypatch):
+    """The queue service, in-process, on its own port, with the console pointed at it."""
+    started = []
+
+    def build(provider_limits=None, **limits):
+        queue = music_queue.MusicQueue(str(tmp_path / "queue.db"), music_queue.QueueLimits(**limits))
+        service = music_queue_service.QueueService(queue)
+        httpd = music_queue_service.ThreadingHTTPServer(
+            ("127.0.0.1", 0), music_queue_service._handler_for(service))
+        httpd.queue_service = service
+        # The address it would publish, for the checks that make the console
+        # find the service rather than be told where it is.
+        service.address = f"http://127.0.0.1:{httpd.server_address[1]}"
+        Thread(target=httpd.serve_forever, daemon=True).start()
+        started.append(httpd)
+        monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", f"http://127.0.0.1:{httpd.server_address[1]}")
+        monkeypatch.setattr(music_api, "_queue_limits", {"at": 0.0, "skill_id": "", "values": None})
+        return service
+
+    yield build
+    for httpd in started:
+        httpd.shutdown()
+
+
+def playlist_tracks(count, prefix="Song"):
+    return [
+        {"video_id": f"v{index:04d}", "title": f"{prefix} {index}", "artist": "Artist",
+         "duration_sec": 180, "artwork_url": ""}
+        for index in range(count)
+    ]
+
+
+def provider_with_limits(**limits):
+    manifest = json.loads(json.dumps(PROVIDER_MANIFEST))
+    manifest["device_ui"]["media"]["provider"]["queue"]["limits"] = limits
+    return manifest
+
+
+def test_a_whole_playlist_is_queued_in_one_request(music_env, monkeypatch, queue_service):
+    """The point of the service: four hundred songs, one write, no provider call."""
+    runtime = FakeRuntime(results={"opendeck_music": {}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    service = queue_service()
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue", {
+            "action": "add_many", "tracks": playlist_tracks(400), "playlist_id": "PL-liked"})
+        read_status, read, _h = read_json(server, "/api/music/queue?from=0&limit=50")
+        tail_status, tail, _h = read_json(server, "/api/music/queue?from=350&limit=50")
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert payload["accepted"] == 400 and payload["total"] == 400
+    assert "400 tracks queued" in payload["message"]
+    # The whole line-up is readable in windows, and the count is the whole queue.
+    assert read_status == 200 and read["total"] == 400 and read["count"] == 50
+    assert tail_status == 200 and tail["queue"][0]["title"] == "Song 350"
+    # Not one provider call: the page handed over the metadata it already listed.
+    assert queue_calls(runtime) == []
+    assert service.queue.total() == 400
+
+
+def test_a_reader_that_holds_the_revision_is_told_nothing_changed(music_env, monkeypatch, queue_service):
+    runtime = FakeRuntime(results={"opendeck_music": {}})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    queue_service()
+    server = serve()
+    try:
+        read_json(server, "/api/music/queue", {"action": "add_many", "tracks": playlist_tracks(30)})
+        _status, first, _h = read_json(server, "/api/music/queue?limit=10")
+        status, again, _h = read_json(server, f"/api/music/queue?limit=10&revision={first['revision']}")
+    finally:
+        server.shutdown()
+    assert status == 200 and again["unchanged"] is True and again["queue"] == []
+    assert again["total"] == 30
+    # A change moves the revision, so the same reader is answered in full again.
+    server = serve()
+    try:
+        read_json(server, "/api/music/queue", {"action": "add", "video_id": "v9999"})
+        _status, changed, _h = read_json(server, f"/api/music/queue?limit=10&revision={first['revision']}")
+    finally:
+        server.shutdown()
+    assert changed["unchanged"] is False and changed["total"] == 31
+
+
+def test_the_service_is_told_the_limits_the_provider_declares(music_env, monkeypatch, queue_service):
+    runtime = FakeRuntime(results={"opendeck_music": {}})
+    install(monkeypatch, music_env,
+            [provider_with_limits(max_tracks=900, max_batch=50, window=25, prefetch=4,
+                                  resolves_per_minute=12), player_manifest()], runtime)
+    service = queue_service()
+    server = serve()
+    try:
+        read_json(server, "/api/music/queue")
+    finally:
+        server.shutdown()
+    assert service.queue.limits.max_tracks == 900
+    assert service.queue.limits.window == 25
+    assert service.queue.limits.prefetch == 4
+    assert service.queue.bucket.rate == pytest.approx(12 / 60)
+
+
+def test_a_long_playlist_is_written_in_the_batches_the_provider_allows(music_env, monkeypatch, queue_service):
+    runtime = FakeRuntime(results={"opendeck_music": {}})
+    install(monkeypatch, music_env,
+            [provider_with_limits(max_batch=2, max_tracks=5000), player_manifest()], runtime)
+    service = queue_service()
+    server = serve()
+    try:
+        _status, payload, _h = read_json(server, "/api/music/queue", {
+            "action": "add_many", "tracks": playlist_tracks(5)})
+    finally:
+        server.shutdown()
+    assert payload["accepted"] == 5 and payload["total"] == 5
+    # Five songs, a batch ceiling of two: three writes, not five.
+    assert service.queue.stats()["adds"] == 3
+
+
+def test_a_playlist_beyond_the_ceiling_says_what_did_not_fit(music_env, monkeypatch, queue_service):
+    runtime = FakeRuntime(results={"opendeck_music": {}})
+    install(monkeypatch, music_env,
+            [provider_with_limits(max_tracks=3, max_batch=10), player_manifest()], runtime)
+    queue_service()
+    server = serve()
+    try:
+        _status, payload, _h = read_json(server, "/api/music/queue", {
+            "action": "add_many", "tracks": playlist_tracks(5)})
+    finally:
+        server.shutdown()
+    assert payload["accepted"] == 3 and payload["refused"] == 2
+    assert payload["total"] == 3
+
+
+def test_the_service_plays_the_track_it_hands_over(music_env, monkeypatch, queue_service):
+    runtime = FakeRuntime(
+        results={"opendeck_music": lambda matched: (
+            queue_result([queue_track("v0001", "Song 1")], index=0, message="Second",
+                         play_url="http://192.168.0.152:4100/api/media/stream?url=service")
+            if matched["arguments"].get("action") == "play" else {"ok": True, "action": "queue"})},
+        player={"ok": True, "action": "play_url", "message": "playing", "device_name": "Light",
+                "speaker": {"volume": 0.5, "muted": False, "state": "playing"},
+                "state": {"on": True, "brightness": 1.0, "effect": "None", "rgb": [255, 255, 255]}},
+    )
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    service = queue_service()
+    server = serve()
+    try:
+        read_json(server, "/api/music/queue", {"action": "add_many", "tracks": playlist_tracks(3)})
+        status, payload, _h = read_json(server, "/api/music/queue", {"action": "next"})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    # The service moved its own cursor and the provider resolved the stream.
+    assert service.queue.state().index == 0
+    assert payload["track"]["title"] == "Song 1"
+    plays = [item["arguments"] for item in runtime.calls if item["arguments"].get("action") == "play"]
+    assert plays == [{"action": "play", "video_id": "v0000"}]
+    handoff = next(item for item in runtime.calls if item["arguments"].get("action") == "play_url")
+    assert handoff["arguments"]["url"].endswith("url=service")
+    saved = music_api._read_music_state()
+    assert saved["queue_active"] is True and saved["queue_index"] == 0
+
+
+def test_a_playlist_song_can_be_queued_by_name_and_from_a_row(music_env, monkeypatch, queue_service):
+    """The page's own buttons through the service: a search hit, and \"this song
+    and every song under it\", which reads the playlist's tail once."""
+    runtime = FakeRuntime(results={"opendeck_music": lambda matched: {
+        "ok": True, "action": matched["arguments"]["action"], "message": "ok",
+        "tracks": [queue_track("hit1", "Hit")],
+    }})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    service = queue_service()
+    server = serve()
+    try:
+        _status, by_name, _h = read_json(server, "/api/music/queue", {"action": "add", "query": "Miles"})
+        _status, tail, _h = read_json(server, "/api/music/queue", {
+            "action": "add_range", "playlist_id": "PL-1", "video_id": "hit1"})
+    finally:
+        server.shutdown()
+    titles = [item["title"] for item in service.queue.snapshot()]
+    assert by_name["total"] == 1 and titles[0] == "Hit"
+    # The range add re-reads the playlist through the provider and queues its tail.
+    reads = [item["arguments"] for item in runtime.calls if item["arguments"].get("action") == "library"]
+    assert reads == [{"action": "library", "kind": "playlist", "playlist_id": "PL-1", "limit": 500}]
+    assert titles[1] == "Hit"
+
+
+def test_the_resolve_route_asks_the_provider_for_one_track(music_env, monkeypatch):
+    """What the queue service calls back for, once per track it was handed as a
+    bare id: the track's metadata, and nothing else — nothing is queued and
+    nothing starts playing."""
+    runtime = FakeRuntime(results={"opendeck_music": lambda matched: {
+        "ok": True, "action": "queue", "message": "Resolved",
+        **queue_track("bare123456", "Resolved Song"),
+        "queue": [], "queue_index": -1, "count": 0,
+    }})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _h = read_json(server, "/api/music/queue/resolve", {"video_id": "bare123456"})
+        missing_status, missing, _h = read_json(server, "/api/music/queue/resolve", {})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert payload["track"]["title"] == "Resolved Song"
+    assert queue_calls(runtime) == [{"action": "queue", "op": "resolve", "video_id": "bare123456"}]
+    assert not [item for item in runtime.calls if item["arguments"].get("action") == "play_url"]
+    assert missing_status == 400 and missing["code"] == "validation_error"
+
+
+def test_a_stopped_queue_service_is_reported_rather_than_guessed_at(music_env, monkeypatch):
+    """The console must not answer a queue read from the provider while the
+    service that owns the queue is unreachable: it would describe a line-up the
+    speaker is not following."""
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result([])})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", "http://127.0.0.1:1")
+    server = serve()
+    try:
+        status, payload, _h = read_json(server, "/api/music/queue")
+    finally:
+        server.shutdown()
+    assert status == 503 and payload["code"] == "queue_service_unavailable"
+    assert queue_calls(runtime) == []
+
+
+def test_a_published_queue_service_is_found_without_being_configured(monkeypatch, tmp_path, queue_service):
+    """The console is told nothing and still uses the queue running beside it.
+
+    The service publishes its address in the data directory, which is what makes
+    the console and the skill worker both find the same queue without either
+    being handed an environment variable.
+    """
+    published = str(tmp_path / "music-queue.json")
+    service = queue_service()
+    monkeypatch.setenv("NIX_MUSIC_QUEUE_FILE", published)
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", "")
+    monkeypatch.setattr(music_api, "_queue_probe", {"at": 0.0, "url": "", "alive": False})
+    assert music_api._queue_service_url() == ("", False), "nothing published yet"
+
+    music_queue.publish_service(service.address, path=published)
+    url, explicit = music_api._queue_service_url()
+    assert url.startswith("http") and explicit is False
+    assert music_api._queue_service_alive() is True, "it answers, so it is used"
+    music_queue.withdraw_service(path=published)
+
+
+def test_a_published_queue_service_that_stopped_falls_back_to_the_provider(music_env, monkeypatch, tmp_path):
+    """A stopped service must not turn every queue route into an error.
+
+    An address someone configured by hand is authoritative — its failures are
+    reported. An address the service published for us is not: when it is gone,
+    the console goes back to the provider skill's own queue, which is what a box
+    that has just uninstalled the service needs.
+    """
+    runtime = FakeRuntime(results={"opendeck_music": lambda _matched: queue_result(
+        [queue_track("a1", "From The Provider")], index=0, message="1 track(s) queued.")})
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    published = str(tmp_path / "music-queue.json")
+    music_queue.publish_service("http://127.0.0.1:1", path=published)
+    monkeypatch.setenv("NIX_MUSIC_QUEUE_FILE", published)
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", "")
+    monkeypatch.setattr(music_api, "_queue_probe", {"at": 0.0, "url": "", "alive": False})
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/queue")
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert [item["title"] for item in payload["queue"]] == ["From The Provider"]
+    assert queue_calls(runtime) == [{"action": "queue", "op": "list"}], \
+        "the provider's own queue answered, because the service was not there"

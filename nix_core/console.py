@@ -55,6 +55,10 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
+# The queue's own vocabulary (its limits and their field names). Imported here
+# because a music skill's declared limits are validated against it.
+import music_queue
+
 # ----------------------------------------------------------------------
 # Paths so the sibling packages import cleanly from anywhere.
 # ----------------------------------------------------------------------
@@ -74,7 +78,26 @@ DASHBOARD_PAGES = frozenset({
 # Console pages a skill may fill with its own declared page code, with the
 # extensions the console is willing to serve.
 SKILL_PAGE_IDS = frozenset({"music"})
-SKILL_PAGE_ASSET_EXTENSIONS = {".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+# What a declared page may load from its own package, and what the console serves
+# it as. A page's script and stylesheets are code; the rest is what those files
+# point at - the same typography and marks the wall panel ships in its package,
+# so a page never reaches for a font or image CDN to paint itself.
+SKILL_PAGE_ASSET_EXTENSIONS = {
+    ".js": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".woff2": "font/woff2",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+# Support files a page declares for its own stylesheet to load (fonts, pictures).
+# Never code: a second script is a second page, which is not a thing the console
+# can hand a keyboard or a mount point to.
+SKILL_PAGE_SUPPORT_EXTENSIONS = frozenset({".woff2", ".png", ".svg", ".webp", ".jpg", ".jpeg"})
+SKILL_PAGE_SCRIPT_EXTENSIONS = frozenset({".js"})
+SKILL_PAGE_ASSET_MAX = 12
 # Media provider actions a page skill may declare: reads, playback resolution,
 # the play queue, and library writes (like/unlike, playlist create/add) that the
 # Music page performs on the user's own library through the provider.
@@ -2045,19 +2068,45 @@ def _validate_skill_page(page):
     """Validate a skill-contributed console page (declared markup-free assets)."""
     if page is None:
         return None
-    if not isinstance(page, dict) or set(page) - {"id", "title", "script", "styles"}:
+    if not isinstance(page, dict) or set(page) - {"id", "title", "script", "styles", "assets"}:
         raise SkillRepositoryError("Skill device_ui page must use supported fields.")
     page_id = page.get("id")
     if not isinstance(page_id, str) or page_id not in SKILL_PAGE_IDS:
         raise SkillRepositoryError("Skill device_ui page must fill a console page this build ships.")
     title = _manifest_text(page.get("title", "Music"), "device_ui.page.title", required=False, limit=80)
     script = page.get("script")
-    if not isinstance(script, str) or os.path.splitext(script)[1].lower() not in SKILL_PAGE_ASSET_EXTENSIONS:
+    if not isinstance(script, str) or os.path.splitext(script)[1].lower() not in SKILL_PAGE_SCRIPT_EXTENSIONS:
         raise SkillRepositoryError("Skill device_ui page needs a declared .js script.")
     styles = _manifest_string_list(page.get("styles", []), "device_ui.page.styles", max_items=6, max_length=180)
-    for asset in [script, *styles]:
-        _validate_skill_file_path(asset)
-    return {"id": page_id, "title": title, "script": script, "styles": styles}
+    assets = _manifest_string_list(page.get("assets", []), "device_ui.page.assets", max_items=SKILL_PAGE_ASSET_MAX, max_length=180)
+    for path in [script, *styles, *assets]:
+        _validate_skill_file_path(path)
+    for path in assets:
+        if os.path.splitext(path)[1].lower() not in SKILL_PAGE_SUPPORT_EXTENSIONS:
+            raise SkillRepositoryError("Skill device_ui page assets must be fonts or pictures.")
+    return {"id": page_id, "title": title, "script": script, "styles": styles, "assets": assets}
+
+
+def _validate_skill_queue_limits(limits):
+    """Validate the queue limits a music provider declares.
+
+    These are the numbers the independent queue service follows: how long a
+    queue the provider will accept, how many tracks one write may carry, and how
+    often it is willing to be asked to resolve a track. They are numbers, not
+    prose — a limit the service cannot read would silently become a default, so
+    a declaration that is not a bounded integer is refused here instead.
+    """
+    if not isinstance(limits, dict) or not limits:
+        raise SkillRepositoryError("Skill media provider limits must be a non-empty object.")
+    known = set(music_queue.QueueLimits().as_dict())
+    clean = {}
+    for key, value in limits.items():
+        if key not in known:
+            raise SkillRepositoryError("Skill media provider declared a queue limit this build does not support.")
+        if type(value) is not int or not 0 <= value <= 1000000:
+            raise SkillRepositoryError("Skill media provider queue limits must be whole numbers.")
+        clean[key] = value
+    return clean
 
 
 def _validate_skill_media(media, tool_map):
@@ -2074,7 +2123,7 @@ def _validate_skill_media(media, tool_map):
     from skill_runtime import SkillRuntimeError, validate_json_schema
     clean = {}
     for action, entry in provider.items():
-        if not isinstance(entry, dict) or set(entry) - {"tool", "arguments"}:
+        if not isinstance(entry, dict) or set(entry) - {"tool", "arguments", "limits"}:
             raise SkillRepositoryError("Skill media provider entries need a tool and arguments.")
         tool = tool_map.get(entry.get("tool")) if isinstance(entry.get("tool"), str) else None
         arguments = entry.get("arguments", {})
@@ -2094,6 +2143,11 @@ def _validate_skill_media(media, tool_map):
             except SkillRuntimeError as exc:
                 raise SkillRepositoryError("Skill media provider argument does not match the tool schema.") from exc
         clean[action] = {"tool": entry["tool"], "arguments": arguments}
+        # The queue's own limits ride along with the action that reaches the
+        # queue, so the skill that owns the player also says how long a queue it
+        # will take and how often it may be asked to resolve a track.
+        if entry.get("limits") is not None:
+            clean[action]["limits"] = _validate_skill_queue_limits(entry["limits"])
     return {"provider": clean}
 
 
@@ -2192,7 +2246,7 @@ def _parse_skill_manifest(manifest: dict, manifest_path: str, repository_publish
             _validate_skill_json_schema(tool.get("result_schema"))
         device_ui = _validate_skill_device_ui(manifest.get("device_ui"), tools)
         if isinstance(device_ui, dict) and isinstance(device_ui.get("page"), dict):
-            for asset in [device_ui["page"]["script"], *device_ui["page"]["styles"]]:
+            for asset in [device_ui["page"]["script"], *device_ui["page"]["styles"], *device_ui["page"]["assets"]]:
                 if asset not in declared_files:
                     raise SkillRepositoryError("A skill page asset must also appear in the files list.")
         runtime = {"protocol": "nix-skill-jsonl-v1", "entrypoint": runtime_entry, "requirements": requirements, "autostart": False}

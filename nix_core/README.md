@@ -168,6 +168,7 @@ See [`docs/research/PROJECT_HANDOFF.md`](../docs/research/PROJECT_HANDOFF.md) fo
 | Actions API | `nix_actions` HTTP service, commonly port `8200` |
 | Console | Browser test dashboard; its own fixed port (`49117`) |
 | PUCA Panel | Wall display for the music NIX plays; its own fixed ports (`49170` http, `49171` https for the microphone) |
+| Music queue | The play queue itself (`music_queue_service.py`), independent of the console and of the music skill; its own port (`49119`) |
 | Websocket gateway | Voice/client interface, commonly port `9000` |
 
 Start the console:
@@ -181,6 +182,29 @@ The console binds `0.0.0.0:49117` by default (set `NIX_CONSOLE_HOST` to restrict
 Knowledge and Actions run in-process through an internal HTTP bridge, so starting the console opens one listening socket for the console itself — a browser needs only the console URL. The optional Testing-page runner is an exception: while a corpus batch runs it starts two temporary loopback-only subprocess APIs against copied databases.
 
 The console also starts the **PUCA Panel** (`puca_panel.py`) on its own fixed port, `49170` by default (`NIX_PANEL_PORT`, `NIX_PANEL_HOST`), and the same display over TLS on `49171` (`NIX_PANEL_TLS_PORT`). It is the wall display for the music an installed provider serves: one large now-playing card, playlist shelves and a **library page** of every playlist with its cover, the queue, the volume, and the lyrics of whatever is playing. Spoken requests are transcribed **on this machine** by `voice.py` (Whisper, served at `/api/voice`), not by a speech service: the page records through the browser's microphone and posts the clip to its own origin. A browser only allows a microphone on a secure origin, which is what the TLS listener is for, and its certificate is self-signed and generated once into the console's data directory. The panel serves the page from the installed provider's package (`PUCA-Panel/`) and the same `/api/music` handlers as the console, from its own origin, so the display never needs the console tab. A port already in use is reported and the console keeps running without the panel. A display left open is never reloaded by hand, so the state it polls reports the **build** of the panel the console is serving (the size and write time of the provider's panel files) and the page reloads itself once when that no longer matches the build it booted into; a page that is holding an older panel therefore updates itself instead of drawing it for as long as the wall is on. The same state says where the box lives on its own network (`url`/`url_https`, built from its LAN address), and a display opened at a tunnel or tailnet name hands itself over to that address once the box answers there — the wall talks to the box over the LAN rather than out to the internet and back, and a tap on the microphone on a page that cannot record moves it to the box's own TLS address, arriving listening (`?local=0` pins a display where it was opened). The page's own typography ships in the provider's package too, so nothing on the wall needs the internet to paint itself. The display is told when something changes rather than only polling for it: the panel listener upgrades the page's own connection at `/api/panel/socket` (a small websocket server, `panel_stream.py`, on the same origin, so the TLS listener serves it too) and `music_api`/`puca_panel` send one event when a track starts, a question is parked or cleared, the transport is driven or the queue moves. The page answers an event by reading `/api/panel/state`, which stays the one implementation of the state, and keeps a slow fallback poll for a channel that is down. See [`MUSIC_API.md`](MUSIC_API.md).
+
+The **play queue is a service of its own** (`music_queue.py` and
+`music_queue_service.py`, port `49119`, its own systemd unit). It exists because
+the queue used to live inside the music skill: a playlist meant one provider call
+per song and the hundred-and-first song was refused. The service stores the whole
+line-up in SQLite, takes a playlist as one write, answers a read as a window that
+carries a revision (so a page polling it is told "unchanged" rather than being
+sent the queue again), and warms the tracks ahead of the cursor in the background
+at the rate the OpenDeck instance declares, each track cached so a song is asked
+about once. Its database and the small file publishing its address live in the
+console's data directory (`NIX_DATA_DIR`), which is how the console and the skill
+worker both find it with nothing configured. Restarting the console, updating the
+skill or reinstalling OpenDeck no longer touches the line-up, and the console
+proxies the queue's own routes when the service answers — a read while it is
+down is reported rather than answered from a line-up the speaker is not following.
+The assistant's queue tool goes through the same service, so the page and the
+assistant read one queue. See [`MUSIC_QUEUE.md`](MUSIC_QUEUE.md).
+
+Every page of the console also carries a **mini playbar** (`static/playbar.js`):
+a small strip at the bottom that names what is playing, opens its controls —
+pause, previous, next, mute — when the cursor reaches it, and follows the
+speaker from any page, so what is playing does not depend on the Music page
+being the tab that is open. It hides itself when there is nothing to show.
 
 Useful console endpoints:
 
@@ -301,6 +325,10 @@ The websocket subprocess suite may require the local service/model environment. 
 - `MOBILE_APP_API.md` — mobile screen flows, proposed APIs, setup, and security contract.
 - `ws_server.py` — websocket gateway.
 - `panel_stream.py` — the PUCA Panel's push channel: a small websocket server the panel listener embeds, so the wall display is told when something moves instead of polling for it.
+- `music_queue.py` — the play queue itself: SQLite storage, windows with a revision, an in-front-of-the-cursor prefetch and its metadata cache.
+- `music_queue_service.py` — the process that owns that queue, on its own port and its own unit, and the background loop that warms it at the provider's rate.
+- `static/playbar.js` — the mini playbar every console page includes.
+- `MUSIC_QUEUE.md` — the queue service: why it exists, how it is run, its HTTP surface, and the limits the OpenDeck instance declares.
 - `followup.py` — short-lived continuation behavior.
 - `request_log.py` — JSONL request logging.
 - `analyze_logs.py` — log problem summaries and exports.

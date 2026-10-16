@@ -55,13 +55,26 @@ same page against the same state.
 | `POST` | `/api/music/control` | `{"action":"play"\|"pause"\|"resume"\|"stop"\|"mute"\|"unmute"\|"volume","value":0..1}` — routed to the installed skill's declared control, with a plain-language `message` for the result. |
 | `GET` | `/api/music/search?q=&limit=[&refresh=1]` | Provider catalog search, answered from the console's catalog cache. |
 | `POST` | `/api/music/play` | `{"query"}` or `{"video_id"}` — resolves the stream through the provider, remembers the track, and hands the URL to a `play_url` control when one is declared. |
-| `GET` | `/api/music/queue` | The play queue as the provider holds it: `{queue:[…], index, count, message}`. |
-| `POST` | `/api/music/queue` | `{"action":"add"\|"remove"\|"move"\|"front"\|"next_up"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. |
+| `GET` | `/api/music/queue[?from=&limit=&revision=]` | The play queue: `{queue:[…], index, count, total, offset, revision, unchanged, message}`. `queue` is a window of the line-up and `total` is how long it is; with `revision` set to the one the caller holds, an unchanged queue answers `unchanged:true` with no tracks at all. |
+| `POST` | `/api/music/queue` | `{"action":"add"\|"add_many"\|"add_range"\|"remove"\|"move"\|"front"\|"next_up"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. `add_many` takes `tracks:[{video_id,title,…},…]`, which is how a whole playlist changes hands in one call. |
+| `POST` | `/api/music/queue/resolve` | `{"video_id"}` — the track's metadata, read-only: nothing is queued and nothing plays. This is what the queue service calls back for. |
 | `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `frequent`, `stats`), answered from the console's catalog cache. |
 | `POST` | `/api/music/save` | `{"kind":"like"\|"unlike"\|"playlist_add"\|"playlist_create", …}` — writes to the user's own library through the declared `save` provider action. |
 | `GET` | `/api/music/lyrics[?video_id=|title=|artist=|album=|duration_sec=]` | Synchronized lyrics for the current or named track, plus the same position estimate. |
 | `GET` | `/api/music/artwork?src=<image url>` | One cover, from the console's own artwork cache: served from disk, fetched and stored on a miss, safe to keep for a month (`ETag`, `304`). |
 | `GET` | `/api/skills/<skill_id>/page/<path>` | A declared page asset of an installed skill. |
+
+**The queue has a service of its own.** When `NIX_MUSIC_QUEUE_URL` is set — or
+when the service has published its address in the console's data directory
+(`<NIX_DATA_DIR>/music-queue.json`, which is how a box finds its own queue with
+nothing configured) — the queue lives in `nix_core/music_queue_service.py` rather
+than in the provider skill: a playlist of any length is one write (`add_many`), reads are windows
+carrying a revision, and the tracks ahead of the cursor are warmed in the
+background at the rate the OpenDeck instance declares. The provider is still what
+resolves a stream and receives the hand-off, so a queued song plays exactly like
+a searched one. With neither an address nor a published one, every route above
+goes back to the provider skill's own queue, exactly as it did before. See
+`MUSIC_QUEUE.md`.
 
 Playback is a single call by design: the provider resolves a stream that can be
 fetched whole, the player skill prepares it for its own speaker, and the console
