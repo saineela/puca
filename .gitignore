@@ -18,13 +18,16 @@
 /.ssh/
 /.triton/
 
-# The agent's local working files: rules, and the research portal it writes
-# reports, proposals and specifications into. Never published — the same
-# patterns are in the machine-wide core.excludesFile, so every repository
-# (this one included, and the sibling checkouts below) ignores them.
+# The agent's local working files: rules, the research portal it writes reports,
+# proposals and specifications into, and the development desk (the queue, the
+# owner's prompts and everything a later session needs to pick the work up).
+# Never published — the same patterns are in the machine-wide core.excludesFile,
+# so every repository (this one included, and the sibling checkouts below)
+# ignores them.
 /agent.md
 **/agent.md
 /puca-portal/
+/.development/
 /*_train.log
 /*_eval*.log
 /*_run.log

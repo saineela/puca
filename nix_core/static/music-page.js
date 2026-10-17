@@ -357,6 +357,13 @@
       root.innerHTML = "";
       const container = document.createElement("div");
       container.className = "music-app";
+      // The skill's stylesheet is the page's whole design, and the shell's own
+      // stylesheet is appended to the document after it — so any generic name
+      // the shell also styles (a `.music-list`, a `.music-card`) resolves to the
+      // shell's rule, not the page's. The shell's file is a fallback for a skill
+      // that ships no styles at all, and it is marked as one here: only then may
+      // those rules apply.
+      if (!(capabilities.page.styles || []).length) container.classList.add("music-fallback");
       root.appendChild(container);
       try {
         await window.NixMusicPage.mount(container, NixMusic);

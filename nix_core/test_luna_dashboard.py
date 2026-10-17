@@ -556,8 +556,29 @@ def test_music_shell_polls_fast_and_the_page_layout_is_css_only():
     assert "@media(max-width:760px)" in styles
     assert "@media(max-width:520px)" in styles
     assert "aspect-ratio:1/1" in styles
-    assert ".music-app .music-list{max-height:none;overflow-y:visible}" in styles
+    assert ".music-app.music-fallback .music-list{max-height:none;overflow-y:visible}" in styles
     assert ".music-heading-actions{width:100%;justify-content:space-between}" in styles
+
+    # Every page rule in this file is a fallback for a skill that ships no
+    # stylesheet, and the file is appended to the document *after* the skill's
+    # own — so an unscoped fallback wins every tie against the page it exists
+    # for. (It did: a page that says the sheet's body scrolls still got the
+    # fallback's 460px inner scroll box.) So each one is scoped to the class the
+    # shell puts on the mount point only when there is no stylesheet to defer
+    # to, and the shell's own chrome is the only thing styled unconditionally.
+    for line in styles.splitlines():
+        line = line.strip()
+        if not line.startswith(".music-app") or "music-fallback" in line:
+            continue
+        raise AssertionError(f"a page rule is not scoped to the fallback: {line}")
+    assert "if (!(capabilities.page.styles || []).length) container.classList.add(\"music-fallback\");" in shell
+    assert 'container.className = "music-app";' in shell
+    # The words are the installed skill's own region — `music-lyrics` is the
+    # class its lyrics box carries — so this file sizes and scrolls neither. A
+    # cap here is not a fallback: it turned the full-screen sheet into a band
+    # with its own inner scrollbar, which left the follow-along nothing to
+    # scroll, so the current line could never be brought to the middle.
+    assert ".music-app .music-lyrics" not in styles
 
     with open(console.DASHBOARD_PATH, encoding="utf-8") as handle:
         dashboard = handle.read()
