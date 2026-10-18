@@ -1,0 +1,64 @@
+{
+  "total": 40,
+  "false_escalation": 0.1667,
+  "false_escalation_numerator": 3,
+  "false_escalation_denominator": 18,
+  "false_de_escalation": 0.0,
+  "false_de_escalation_numerator": 0,
+  "false_de_escalation_denominator": 14,
+  "undetermined": 8,
+  "undetermined_share": 0.2,
+  "replayed": 19,
+  "route_correctness": 0.425,
+  "answer_quality_mean": 0.6842,
+  "note": "False escalation counts only replayed escalations whose controlled alternative was correct; answer quality is reported separately.",
+  "experimental_unit": "case",
+  "answer_quality_proxy": {
+    "chosen": 0.6842,
+    "chat_arm": 0.4737,
+    "knowledge_arm": 0.7368,
+    "rubric": "deterministic proxy (value present, non-empty/non-uncertain, acknowledgement, question, deletion)"
+  },
+  "by_rubric": {
+    "open": {
+      "n": 22,
+      "chosen": 0.273,
+      "chat": 0.273,
+      "knowledge": 0.273
+    },
+    "memory": {
+      "n": 9,
+      "chosen": 0.222,
+      "chat": 0.111,
+      "knowledge": 0.333
+    },
+    "write": {
+      "n": 6,
+      "chosen": 0.667,
+      "chat": 0.167,
+      "knowledge": 0.667
+    },
+    "clarify": {
+      "n": 1,
+      "chosen": 1.0,
+      "chat": 1.0,
+      "knowledge": 1.0
+    },
+    "confirm": {
+      "n": 1,
+      "chosen": 0.0,
+      "chat": 0.0,
+      "knowledge": 0.0
+    },
+    "delete": {
+      "n": 1,
+      "chosen": 0.0,
+      "chat": 0.0,
+      "knowledge": 0.0
+    }
+  },
+  "set": {
+    "tag": "routing-heldout-2026-10-17",
+    "n": 40
+  }
+}

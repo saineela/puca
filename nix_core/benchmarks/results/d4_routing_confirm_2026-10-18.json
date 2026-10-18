@@ -1,0 +1,195 @@
+{
+  "total": 46,
+  "false_escalation": 0.1364,
+  "false_escalation_numerator": 3,
+  "false_escalation_denominator": 22,
+  "false_de_escalation": 0.0,
+  "false_de_escalation_numerator": 0,
+  "false_de_escalation_denominator": 16,
+  "undetermined": 8,
+  "undetermined_share": 0.1739,
+  "replayed": 38,
+  "route_correctness": 0.8421,
+  "route_correctness_denominator": 38,
+  "answer_quality_mean": 0.3158,
+  "note": "False escalation counts only replayed escalations whose controlled alternative was correct; answer quality is reported separately.",
+  "experimental_unit": "case",
+  "scored_cases": 38,
+  "unrouted_cases": 15,
+  "route_correctness_scored": 0.8421,
+  "answer_quality_proxy": {
+    "chosen": 0.3158,
+    "chat_arm": 0.5263,
+    "knowledge_arm": 0.5526,
+    "rubric": "deterministic proxy (value present, non-empty/non-uncertain, acknowledgement, question, deletion)"
+  },
+  "by_rubric": {
+    "open": {
+      "n": 16,
+      "chosen": 0.438,
+      "chat": 1.0,
+      "knowledge": 1.0
+    },
+    "memory": {
+      "n": 8,
+      "chosen": 0.0,
+      "chat": 0.0,
+      "knowledge": 0.0
+    },
+    "write": {
+      "n": 8,
+      "chosen": 0.5,
+      "chat": 0.375,
+      "knowledge": 0.5
+    },
+    "clarify": {
+      "n": 2,
+      "chosen": 0.5,
+      "chat": 0.5,
+      "knowledge": 0.5
+    },
+    "confirm": {
+      "n": 2,
+      "chosen": 0.0,
+      "chat": 0.0,
+      "knowledge": 0.0
+    },
+    "delete": {
+      "n": 2,
+      "chosen": 0.0,
+      "chat": 0.0,
+      "knowledge": 0.0
+    }
+  },
+  "set": {
+    "tag": "routing-confirm-2026-10-18",
+    "n": 46
+  },
+  "freeze": {
+    "tag": "routing-confirm-2026-10-18",
+    "sha256": "7ae28e09ff8c81d7b17594de22078f20e91292c6f9c4c708653749a9d51161e7",
+    "frozen_at": "2026-10-18T06:28:53.745481+00:00",
+    "set_file": "eval/data/routing_confirm.json",
+    "keys_file": "eval/data/routing_confirm_keys.json"
+  },
+  "human_review": {
+    "sheet": "benchmarks/results/d4_human_review_2026-10-18.csv",
+    "status": "scored by an agent rubric pass; a human review is still outstanding",
+    "reviewer": "agent rubric pass; not a human reviewer",
+    "method": "1-5 per arm per case under a written rubric - correctness: 5 answers the turn's request with the right value or act, 3 partially or misleadingly, 1 fails or invents; completeness: 5 covers every part asked, 1 nothing; honesty: 5 states plainly when something is unknown or asks for the missing slot, 1 invents a value; naturalness: 5 reads like a person, 1 reads broken. Every replayed case (38) scored on both arms by one reader (the agent) from the frozen replies in this sheet; no case was scored twice and no case was left out.",
+    "cases_scored": 38,
+    "cases_not_scored": [
+      "c39",
+      "c40",
+      "c41",
+      "c42",
+      "c43",
+      "c44",
+      "c45",
+      "c46"
+    ],
+    "per_dimension": {
+      "chat": {
+        "correctness": 3.368,
+        "completeness": 3.158,
+        "honesty": 4.737,
+        "naturalness": 4.316,
+        "n": 38
+      },
+      "knowledge": {
+        "correctness": 3.184,
+        "completeness": 2.895,
+        "honesty": 4.395,
+        "naturalness": 3.789,
+        "n": 38
+      }
+    },
+    "per_class": {
+      "calendar_clarify": {
+        "n": 2,
+        "chat_correctness": 3.0,
+        "knowledge_correctness": 3.0,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 4.0
+      },
+      "calendar_write": {
+        "n": 3,
+        "chat_correctness": 2.667,
+        "knowledge_correctness": 3.0,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 4.0
+      },
+      "conversation": {
+        "n": 8,
+        "chat_correctness": 5.0,
+        "knowledge_correctness": 3.875,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 5.0
+      },
+      "memory_delete": {
+        "n": 2,
+        "chat_correctness": 2.0,
+        "knowledge_correctness": 4.0,
+        "chat_honesty": 4.0,
+        "knowledge_honesty": 4.5
+      },
+      "memory_history": {
+        "n": 1,
+        "chat_correctness": 2.0,
+        "knowledge_correctness": 1.0,
+        "chat_honesty": 4.0,
+        "knowledge_honesty": 2.0
+      },
+      "memory_read": {
+        "n": 5,
+        "chat_correctness": 2.0,
+        "knowledge_correctness": 1.4,
+        "chat_honesty": 4.0,
+        "knowledge_honesty": 3.4
+      },
+      "memory_write": {
+        "n": 5,
+        "chat_correctness": 2.6,
+        "knowledge_correctness": 3.4,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 4.4
+      },
+      "safety_confirmation": {
+        "n": 2,
+        "chat_correctness": 2.0,
+        "knowledge_correctness": 3.5,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 4.5
+      },
+      "state_read": {
+        "n": 2,
+        "chat_correctness": 2.0,
+        "knowledge_correctness": 2.0,
+        "chat_honesty": 4.0,
+        "knowledge_honesty": 5.0
+      },
+      "statement_none": {
+        "n": 4,
+        "chat_correctness": 4.25,
+        "knowledge_correctness": 4.0,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 5.0
+      },
+      "world_question": {
+        "n": 4,
+        "chat_correctness": 5.0,
+        "knowledge_correctness": 3.75,
+        "chat_honesty": 5.0,
+        "knowledge_honesty": 4.5
+      }
+    }
+  },
+  "false_escalation_dispositions": {
+    "c17": "open-defect - routed to knowledge after the WP6 fix and it answers, but it also surfaces the superseded city (\"I previously lived in Boise\") beside the current one (Flagstaff): a stale value reaching a current-fact read.",
+    "c23": "fixed - after the WP6 fix the turn routes to knowledge and returns the stored state (\"My mother is doing okay.\"); the empty-state fallback to the fact store is what closed it.",
+    "c24": "fixed - same path as c23: routes to knowledge and returns the stored state (\"My sister is feeling tired.\").",
+    "c31": "open-defect - the Core gate now routes it to knowledge, but the knowledge selector still selects no function (\"didn't go through\"); the calendar-write phrasing \"put X in for <time>\" needs a deterministic rule.",
+    "c32": "open-defect - still answered on the chat path end-to-end (\"thoughts slipped\"), even though the isolated gate reads it as knowledge; the console's turn path re-routes it, so the write never reaches the store.",
+    "c38": "open-defect - routed to knowledge after the fix, but the deletion looks for a calendar event and never touches the stored fact (\"My old address was 14 Willow Lane.\"); fact deletion by description is not implemented."
+  }
+}

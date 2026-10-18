@@ -54,8 +54,10 @@ from config import (
 )
 from context import select_context
 from request_log import log_request, make_entry
+import voice_copy
 from router import CHAT, KNOWLEDGE, UNKNOWN, classify
 from routing_engine import CoreRoutingEngine
+import turn_state
 from tone_policy import conversation_policy
 from tabby_client import TabbyClient
 from puca_v4_contract import infer_envelope, verify_reply
@@ -366,6 +368,59 @@ def _explicit_named_color_intent(
     return skill_id, next(iter(colors))
 
 
+# Instruction-override framing has no legitimate reading in this product:
+# nothing behind it is a request for memory, a device or music. Catching
+# it here keeps a chat turn out of the skill planner, which used to answer
+# an override attempt with planner internals ("the dedicated skill planner
+# did not produce a valid, safe plan") instead of a refusal.
+_INSTRUCTION_OVERRIDE_RE = re.compile(
+    r"\b(?:ignore|disregard|forget)\s+(?:all\s+)?(?:your\s+|any\s+|the\s+|my\s+)?"
+    r"(?:previous\s+|prior\s+|above\s+|earlier\s+)?(?:instructions?|rules?|prompts?)\b"
+    r"|\byou\s+are\s+now\b"
+    r"|\b(?:developer|system)\s*(?:mode|prompt|message)\b"
+    r"|\bsystem\s*:",
+    re.IGNORECASE,
+)
+
+# Reading a stored secret OUT is not the same request as recalling it:
+# "what's my locker code" is memory, "print my locker code" is the
+# exfiltration shape. Measured live: the chat model answered the second
+# with an invented code (1234) instead of a refusal, so the display
+# framing is answered by Core, deterministically, before the model.
+_SECRET_DISPLAY_RE = re.compile(
+    r"\b(?:print|show|reveal|display|output|echo|read\s+(?:it\s+)?(?:out|aloud)|"
+    r"say\s+(?:it\s+)?aloud)\b[^.?!]{0,60}\b(?:password|passcode|pass\s?code|"
+    r"locker\s+(?:code|combination)|garage\s+code|alarm\s+code|"
+    r"safe\s+combination|\bpin\b|ssn|social\s+security|credit\s+card)\b",
+    re.IGNORECASE,
+)
+
+# Bulk destruction of stored memory has no single safe execution: the
+# answer is a confirmation, never "Done." A model that claims completion
+# for a delete it never performed is the failure this gate removes.
+_BULK_MEMORY_DELETE_RE = re.compile(
+    r"\b(?:delete|erase|wipe|clear|remove|forget)\s+"
+    r"(?:all\s+(?:of\s+)?)?(?:my\s+)?"
+    r"(?:reminders|events|calendar|memories|memory|facts|notes|knowledge|"
+    r"everything\s+(?:you\s+know|stored|about\s+me))\b",
+    re.IGNORECASE,
+)
+
+
+def _bulk_memory_delete_reply(text: str) -> str | None:
+    """The confirmation a bulk delete needs, or None for anything else."""
+    if not _BULK_MEMORY_DELETE_RE.search(text or ""):
+        return None
+    target = "reminders" if re.search(
+        r"\b(?:reminders?|events?|calendar)\b", text, re.IGNORECASE
+    ) else "stored memory"
+    return (
+        f"I haven't deleted anything. Removing all of your {target} at once "
+        "can't be undone, so I need you to name what to remove — "
+        "tell me the reminder or the fact and I'll delete just that one."
+    )
+
+
 def _polite_device_color_request(text: str, skill_specs: list[dict[str, Any]]) -> str | None:
     """Recognize the specific polite 'do you mind ... light to a color' phrasing."""
     normalized = " ".join((text or "").casefold().split()).replace("soemthing", "something")
@@ -477,16 +532,17 @@ def _playback_reply_with_handoff(reply: str, handoff: dict[str, Any]) -> str:
         return _ambiguous_play_reply(handoff)
     if handoff.get("supported") and not handoff.get("error"):
         return reply
+    # The speaker's reason can be a WorkerOperationError with a stream URL in it
+    # (measured live). That is a log line, not something a person says, and the
+    # provider's own "Playing …" sentence must not survive a failed hand-off —
+    # so the whole reply is replaced, and the reason stays in the request log
+    # (`playback_handoff.error` / `music_play_followup.handoff.error`).
     if handoff.get("supported"):
-        reason = str(handoff.get("error") or "").strip()
-        note = (
-            " Your speaker refused the stream"
-            + (f" ({reason[:160]})" if reason else "")
-            + ", so nothing is playing."
+        return (
+            "Ugh, the speaker wouldn't take it — nothing's playing. "
+            "Want me to try again?"
         )
-    else:
-        note = " No installed skill can play a stream URL, so nothing is playing."
-    return (reply.rstrip() + note)[:400]
+    return "I don't have a player for that yet, so nothing's playing."
 
 
 def _ring_light_result_confirms_action(matched: dict[str, Any], outcome: dict[str, Any]) -> bool:
@@ -1126,8 +1182,6 @@ _MUSIC_RECALL_RE = re.compile(
     r"\bwhat\s+did\s+(?:i|u|you)\s+(?:ask|tell|want)\b",
     re.IGNORECASE,
 )
-
-
 def _music_play_reference(text: str, device_names: Sequence[str] = ()) -> bool:
     """True when a play request names no track, only a reference to one."""
     words = _music_request_words(text, device_names)
@@ -1531,6 +1585,20 @@ def _explicit_color_followup_skill(
     return _mentioned_device_skill(normalized, skill_specs)
 
 
+def _context_sections(prompt: str) -> dict[str, int]:
+    """D3 logging-only section sizes for an assembled prompt.
+
+    The existing prompt stays authoritative; the composer labels its five
+    sections so a request log can show where the budget went.
+    """
+    try:
+        from eval.context_composer import section_sizes
+
+        return section_sizes(prompt, policy=prompt[:1600])
+    except Exception:
+        return {name: 0 for name in ("policy", "memory", "records", "history", "tools")}
+
+
 def _active_assistant_identity() -> tuple[str, str, str]:
     """Return the active conversational backend's name, role, and model ID."""
     if CASPER_BACKEND == "transformers":
@@ -1591,6 +1659,21 @@ class KnowledgeClient:
         response = requests.post(
             f"{self.base_url}/process",
             json={"text": text, "timezone": TIMEZONE},
+            timeout=HTTP_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def delete_fact(self, query: str, confirm: bool = False) -> dict[str, Any]:
+        """Delete stored facts by description, behind an explicit confirmation.
+
+        The service refuses a delete that does not carry ``confirm=true``, so
+        the two-step conversation in Core cannot be short-circuited by a
+        caller that forgets the first step.
+        """
+        response = requests.post(
+            f"{self.base_url}/delete_fact",
+            json={"query": query, "confirm": bool(confirm)},
             timeout=HTTP_TIMEOUT,
         )
         response.raise_for_status()
@@ -2014,6 +2097,156 @@ def split_clauses(text: str) -> list[str]:
 # ----------------------------------------------------------------------
 
 
+_MONTH_NUMBERS = {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5,
+    "june": 6, "july": 7, "august": 8, "september": 9, "october": 10,
+    "november": 11, "december": 12,
+}
+for _short, _full in (
+    ("jan", "january"), ("feb", "february"), ("mar", "march"),
+    ("apr", "april"), ("jun", "june"), ("jul", "july"), ("aug", "august"),
+    ("sep", "september"), ("sept", "september"), ("oct", "october"),
+    ("nov", "november"), ("dec", "december"),
+):
+    _MONTH_NUMBERS[_short] = _MONTH_NUMBERS[_full]
+
+_MONTH_WORDS = "|".join(sorted(_MONTH_NUMBERS, key=len, reverse=True))
+#: "October 19", "Oct 19, 2026", "19 October".
+_MONTH_FIRST_RE = re.compile(
+    rf"\b({_MONTH_WORDS})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(\d{{4}}))?",
+    re.IGNORECASE,
+)
+_DAY_FIRST_RE = re.compile(
+    rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({_MONTH_WORDS})\b",
+    re.IGNORECASE,
+)
+_ISO_DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+
+
+def _grounded_dates(
+    payload: dict[str, Any],
+) -> tuple[set[tuple[int, int]], set[tuple[int, int, int]]]:
+    """Every date the Knowledge result itself carries.
+
+    Returns the month/day pairs it holds, and the full triples where the year
+    is known. A stored fact often has a date and no year ("The renewal is due
+    March 4"), and the reply must not supply one.
+    """
+    result = payload.get("result") if isinstance(payload.get("result"), dict) else payload
+    if not isinstance(result, dict):
+        return set(), set()
+    days: set[tuple[int, int]] = set()
+    triples: set[tuple[int, int, int]] = set()
+    iso_values: list[str] = []
+    text_values: list[str] = []
+    temporal = result.get("temporal")
+    if isinstance(temporal, dict):
+        iso_values.extend(
+            str(temporal.get(key) or "")
+            for key in ("resolved_start", "resolved_end")
+        )
+        text_values.append(str(temporal.get("when") or ""))
+    for entry in result.get("events") or []:
+        if isinstance(entry, dict):
+            iso_values.append(str(entry.get("start") or ""))
+            iso_values.append(str(entry.get("start_local") or ""))
+            text_values.append(str(entry.get("when") or ""))
+    for raw in iso_values:
+        if not raw:
+            continue
+        try:
+            moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        triples.add((moment.year, moment.month, moment.day))
+        days.add((moment.month, moment.day))
+    for key in ("facts", "previous", "keys", "states"):
+        for row in result.get(key) or []:
+            if isinstance(row, dict):
+                text_values.append(str(row.get("value") or ""))
+                text_values.append(str(row.get("text") or ""))
+            elif isinstance(row, str):
+                text_values.append(row)
+    text_values.append(str(result.get("value") or ""))
+    for value in text_values:
+        for year, month, day in _stated_event_dates(value):
+            days.add((month, day))
+            if year is not None:
+                triples.add((year, month, day))
+    return days, triples
+
+
+def _stated_event_dates(text: str) -> set[tuple[int, int, int | None]]:
+    """Dates a generated reply states, month name or ISO form."""
+    found: set[tuple[int, int, int | None]] = set()
+    source = text or ""
+    for match in _MONTH_FIRST_RE.finditer(source):
+        month_word, day_text, year_text = match.groups()
+        day = int(day_text)
+        if 1 <= day <= 31:
+            found.add(
+                (
+                    int(year_text) if year_text else None,
+                    _MONTH_NUMBERS[month_word.casefold()],
+                    day,
+                )
+            )
+    for match in _DAY_FIRST_RE.finditer(source):
+        day_text, month_word = match.groups()
+        day = int(day_text)
+        if 1 <= day <= 31:
+            found.add((None, _MONTH_NUMBERS[month_word.casefold()], day))
+    for match in _ISO_DATE_RE.finditer(source):
+        year_text, month_text, day_text = match.groups()
+        found.add((int(year_text), int(month_text), int(day_text)))
+    return found
+
+
+def _stated_dates_are_grounded(composed: str, payload: dict[str, Any]) -> bool:
+    """True when no date in the reply contradicts the stored event time.
+
+    Measured live: composing "Put the optician in for Monday at 10am" for an
+    event stored at 2026-10-19T10:00 produced "Monday, October 20, 2025" and
+    "Oct 18". The existing gate anchored the clock time but not the day, so the
+    reply stated a date the store never held. A reply that states no date is
+    untouched.
+    """
+    days, triples = _grounded_dates(payload)
+    if not days:
+        return True
+    for year, month, day in _stated_event_dates(composed):
+        if (month, day) not in days:
+            return False
+        if year is not None and (year, month, day) not in triples:
+            return False
+    return True
+
+
+#: Phrases from the formatter's own prompt. A reply that contains one is
+#: not an answer; it is the model quoting its instructions.
+_FORMATTER_LEAK_MARKERS = (
+    "final user-facing response",
+    "core safe baseline",
+    "authoritative knowledge result",
+    "knowledge-scoped request",
+    "raw user request",
+    "knowledge memory context",
+    "user-facing response is",
+)
+
+
+def _render_moment(raw: str) -> str:
+    """ISO timestamp -> "Monday, October 19, 2026 at 10:00 AM", or ""."""
+    if not raw:
+        return ""
+    try:
+        moment = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return ""
+    rendered = moment.strftime("%A, %B %d, %Y at %I:%M %p")
+    return rendered.replace(" 0", " ")
+
+
 def _format_event(entry: dict[str, Any]) -> str:
     title = entry.get("title") or "event"
     # Relative labels are useful metadata, but the user-facing baseline must
@@ -2036,10 +2269,47 @@ def _format_event(entry: dict[str, Any]) -> str:
 # Honest, jargon-free failure line for Knowledge results. Internal status
 # codes ("no_function_selected") must never reach the user; the full payload
 # stays in the turn details for the console and logs.
-_KNOWLEDGE_FAILURE_REPLY = (
-    "I couldn't complete that request, so nothing was saved or changed. "
-    "Could you phrase it another way?"
-)
+_KNOWLEDGE_FAILURE_REPLY = voice_copy.KNOWLEDGE_FAILED
+_KNOWLEDGE_EMPTY_REPLY = voice_copy.KNOWLEDGE_EMPTY
+_NO_STATES_REPLY = voice_copy.NO_STATES
+_NO_EVENTS_REPLY = voice_copy.NO_EVENTS
+
+
+#: Routes the turn predictor may not overrule with a conversational reading.
+#: The gate saw a personal-data or action cue; a small model's "this is just
+#: conversation" opinion is what left "The renewal is due March 4" unanswered
+#: and unstored in the D4 confirmation replay (c32).
+_PROTECTED_ROUTING_RULES = frozenset({"personal_boundary", "self_question"})
+
+
+def expectation_may_redirect_to_chat(decision, expectation) -> bool:
+    """Whether the turn predictor's reading may send this turn to chat.
+
+    A conversational or correction reading normally keeps a reply out of the
+    request machinery. It must not demote a decision the deterministic gate
+    placed on the personal/action boundary: that decision already carries the
+    model-free evidence, and the cost of being wrong is a lost write or a
+    memory question answered from chat.
+    """
+    conversational = bool(
+        expectation.conversational
+        or expectation.read == turn_state.CORRECTION
+    )
+    if not conversational:
+        return False
+    if getattr(decision, "route", None) != KNOWLEDGE:
+        return True
+    return getattr(decision, "rule", "") not in _PROTECTED_ROUTING_RULES
+
+
+_FACT_DELETION_YES = frozenset({
+    "yes", "yeah", "yep", "yup", "yes please", "please do", "do it",
+    "go ahead", "confirm", "confirmed", "delete it", "remove it", "sure",
+})
+_FACT_DELETION_NO = frozenset({
+    "no", "nope", "no thanks", "don't", "dont", "do not", "cancel",
+    "stop", "not now", "leave it", "keep it",
+})
 
 
 def format_knowledge_result(payload: dict[str, Any]) -> str:
@@ -2067,6 +2337,34 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
     # authoritative person resolver and must not let Ollama guess.
     if result.get("operation") == "NEEDS_CLARIFICATION":
         return result.get("question") or "Who do you mean?"
+
+    # Deletion of stored facts is destructive, so its first answer is a
+    # confirmation naming exactly what would go. The generic failure line is
+    # never right for these statuses: some of them are refusals that removed
+    # nothing, and the user needs to know that.
+    if result.get("operation") == "DELETE_FACT_PENDING":
+        matches = result.get("matches") or []
+        named = "; ".join(
+            f"'{match.get('value', '')}'" for match in matches if match.get("value")
+        )
+        if not named:
+            return "I couldn't match that to a stored fact, so nothing has been deleted."
+        return (
+            f"I found {named}. Nothing has been deleted yet - "
+            "say yes and I'll remove it, or no to keep it."
+        )
+
+    if result.get("operation") == "DELETE_FACT":
+        deleted = result.get("deleted") or []
+        if deleted:
+            named = "; ".join(
+                f"'{item.get('value', '')}'" for item in deleted if item.get("value")
+            )
+            return f"Deleted {named}."
+        detail = result.get("detail")
+        if detail:
+            return str(detail)
+        return "Nothing was deleted."
 
     if not result.get("ok", True):
         # A failed mutation may carry a user-facing question (e.g. a
@@ -2098,9 +2396,16 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
 
         temporal = result.get("temporal") or {}
         title = data.get("title") or "event"
-        when = temporal.get("when") or temporal.get(
-            "resolved_start", ""
-        )
+        # The baseline names the absolute local date, not the relative wording:
+        # "Scheduled 'optician' tomorrow 10am" goes stale in a transcript, and
+        # it gives the composer nothing to anchor a day to (live composition
+        # moved a Monday to the following day until the date gate above was
+        # added).
+        when = _render_moment(
+            temporal.get("resolved_start") or data.get("start") or ""
+        ) or temporal.get("when") or temporal.get("resolved_start", "")
+        if result.get("duplicate"):
+            return f"Already scheduled: '{title}' {when}. Nothing was added twice."
         lines.append(f"Scheduled '{title}' {when}.")
         actions = result.get("actions") or {}
         if actions.get("ok"):
@@ -2148,8 +2453,14 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
     if "states" in result:
         states = result["states"]
         if not states:
-            return "No current states stored yet."
-        lines.append("Current states:")
+            return _NO_STATES_REPLY
+        # One person reads as a sentence about them, not as a one-line report.
+        if len(states) == 1 and not (result.get("moments") or []):
+            only = states[0]
+            label = only.get("name") or only.get("subject") or "They"
+            how = str(only.get("state") or "doing okay")
+            return f"{label} is {how} right now."
+        lines.append("Here's how everyone is:")
         for state in states[:10]:
             name = state.get("name") or state.get("subject") or "someone"
             lines.append(f"- {name}: {state.get('state', '?')}")
@@ -2163,7 +2474,7 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
     if "events" in result:
         events = result["events"]
         if not events:
-            return "No matching events found."
+            return _NO_EVENTS_REPLY
         lines.append(
             f"{result.get('count', len(events))} event(s) found:"
         )
@@ -2172,16 +2483,64 @@ def format_knowledge_result(payload: dict[str, Any]) -> str:
 
     if "facts" in result:
         facts = result["facts"]
-        if not facts:
-            return "I don't have that in my knowledge base yet."
+        previous = result.get("previous") or []
+        if not facts and not previous:
+            return _KNOWLEDGE_EMPTY_REPLY
         if result.get("query") == "name" and len(facts) == 1:
             value = str(facts[0].get("value") or "")
             match = re.search(r"(?:user's|your)\s+name\s+is\s+(.+)", value, re.I)
             if match:
                 return f"Your name is {match.group(1).rstrip('.')}."
-        lines.append("From your knowledge base:")
-        for fact in facts[:10]:
-            lines.append(f"- {fact.get('value', fact)}")
+        if previous:
+            # A history answer is two values in one sentence, said in the
+            # order that makes it true: what is now, then what was before.
+            now = "; ".join(
+                _to_second_person(str(fact.get("text") or fact.get("value", "")))
+                for fact in facts[:3]
+            )
+            before_parts: list[str] = []
+            for fact in previous[:3]:
+                sentence = _to_second_person(
+                    str(fact.get("text") or fact.get("value", ""))
+                )
+                # A closed record is described in the past: "you lived in
+                # Austin", not "you live in Austin (until ...)".
+                sentence = re.sub(
+                    r"\byou (live|lives) in\b", "you lived in", sentence
+                )
+                until = str(fact.get("valid_until") or "")[:10]
+                before_parts.append(sentence + (f" (until {until})" if until else ""))
+            before = "; ".join(before_parts)
+            if now and before:
+                return f"Now: {now}. Before that: {before}."
+            if before:
+                return f"Before that: {before}."
+        if facts:
+            # The same sentence twice is one answer: records written before
+            # the exact-duplicate gate existed still sit in the store.
+            seen_sentences: set[str] = set()
+            unique_facts: list[Any] = []
+            for fact in facts:
+                key = " ".join(
+                    str(fact.get("text") or fact.get("value", "")).casefold().split()
+                ).rstrip(" .!?")
+                if key in seen_sentences:
+                    continue
+                seen_sentences.add(key)
+                unique_facts.append(fact)
+            facts = unique_facts
+            # A single fact is a sentence, not a list of one.
+            if len(facts) == 1:
+                sentence = facts[0].get("text") or facts[0].get("value", "")
+                sentence = _to_second_person(str(sentence)).strip().rstrip(".")
+                if sentence:
+                    return sentence[:1].upper() + sentence[1:] + "."
+            lines.append("From your knowledge base:")
+            for fact in facts[:10]:
+                # A key carries the sentence it renders as ("user lives
+                # in Austin"); a fact carries only its value.
+                sentence = fact.get('text') or fact.get('value', fact)
+                lines.append(f"- {_to_second_person(str(sentence))}")
         return "\n".join(lines)
 
     if result.get("value"):
@@ -2559,6 +2918,21 @@ _PERSONAL_KNOWLEDGE_RE = re.compile(
     r"(?:remember|don't\s+forget|keep\s+in\s+mind)\s+(?:that\s+)?my\b)\s*\??$",
     re.IGNORECASE,
 )
+
+
+def _looks_like_clarification_attempt(text: str) -> bool:
+    """Is this a short try at answering a question we just asked?
+
+    "Maanvi", "the second one", "number 2" are attempts. "What's the
+    weather?" is not, and must not be forced back into the old question.
+    """
+    clean = " ".join((text or "").split())
+    if not clean:
+        return False
+    words = re.findall(r"[\w'’-]+", clean)
+    if len(words) <= 4:
+        return True
+    return bool(re.search(r"\b(?:the\s+)?(?:first|second|third|last|other)\s+one\b|\bnumber\s+\d+\b", clean, re.IGNORECASE))
 
 
 def should_delegate_to_knowledge(text: str) -> bool:
@@ -2987,7 +3361,16 @@ class Brain:
         # the next answer ("Maanvi", "the second one") can complete the prior
         # request instead of being routed as an unrelated statement.
         self._pending_clarifications: dict[str, dict[str, Any]] = {}
+        # A fact deletion is destructive, so Core holds the description that
+        # was named until the next turn either confirms or abandons it. The
+        # store itself only deletes with an explicit confirm flag.
+        self._pending_fact_deletions: dict[str, dict[str, Any]] = {}
         self._pending_lock = threading.Lock()
+        # The last prediction per conversation. The next turn is its
+        # observation: a correction is prediction error, and it is recorded so
+        # the signal exists for the pipeline to learn from rather than only
+        # producing an apology.
+        self._last_expectations: dict[str, turn_state.TurnExpectation] = {}
         # Every structured Knowledge result is handed back to Core's
         # presentation layer. The formatter always uses think=False; if
         # Ollama is unavailable, the deterministic rendering remains the
@@ -3042,6 +3425,115 @@ class Brain:
                 # use the role-based completion below.
                 "continuation_template": result.get("continuation_template"),
             }
+
+    def remember_pending_fact_deletion(
+        self,
+        conversation_id: str | None,
+        result: dict[str, Any],
+    ) -> None:
+        """Hold a deletion description until the next turn confirms it.
+
+        No idempotency is assumed: the pending entry is a conversation fact,
+        and it is consumed (or dropped) exactly once.
+        """
+        if not conversation_id:
+            return
+        query = str(result.get("query") or "").strip()
+        if not query:
+            return
+        with self._pending_lock:
+            self._pending_fact_deletions[conversation_id] = {
+                "query": query,
+                "matches": list(result.get("matches") or []),
+            }
+
+    def _drop_pending_fact_deletion(self, conversation_id: str | None) -> None:
+        if not conversation_id:
+            return
+        with self._pending_lock:
+            self._pending_fact_deletions.pop(conversation_id, None)
+
+    def _pending_fact_deletion_turn(
+        self,
+        text: str,
+        *,
+        conversation_id: str | None,
+        location: str,
+    ) -> dict[str, Any] | None:
+        """Answer the turn that follows a "Nothing has been deleted yet" reply.
+
+        Only an explicit affirmation reaches the store, and it reaches it with
+        ``confirm=True``. A refusal clears the pending item, and so does any
+        unrelated turn: a later "yes" must not delete something the user has
+        moved on from.
+        """
+        if not conversation_id:
+            return None
+        with self._pending_lock:
+            pending = self._pending_fact_deletions.get(conversation_id)
+        if not pending:
+            return None
+
+        normalized = " ".join(text.casefold().strip(" .!? ").split())
+        if normalized in _FACT_DELETION_NO:
+            self._drop_pending_fact_deletion(conversation_id)
+            return {
+                "route": KNOWLEDGE,
+                "rule": "fact_deletion_declined",
+                "reply": "Nothing was deleted.",
+                "details": {
+                    "deterministic": True,
+                    "model_called": False,
+                    "fact_deletion_confirm": False,
+                },
+            }
+
+        if normalized not in _FACT_DELETION_YES:
+            # Any other turn abandons the pending deletion.
+            self._drop_pending_fact_deletion(conversation_id)
+            return None
+
+        self._drop_pending_fact_deletion(conversation_id)
+        try:
+            payload = self.knowledge.delete_fact(pending["query"], confirm=True)
+        except Exception as exc:  # noqa: BLE001 - a failed delete must not crash
+            payload = {
+                "result": {
+                    "ok": False,
+                    "status": "knowledge_unavailable",
+                    "operation": "DELETE_FACT",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            }
+        reply = format_knowledge_result(payload)
+        try:
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="user",
+                content=text,
+                refs={"route": KNOWLEDGE, "rule": "fact_deletion_confirm"},
+            )
+            self._log_turn(
+                location=location,
+                conversation_id=conversation_id,
+                role="assistant",
+                content=reply,
+                refs={"route": KNOWLEDGE},
+            )
+        except Exception:  # noqa: BLE001 - logging must never block the reply
+            pass
+        return {
+            "route": KNOWLEDGE,
+            "rule": "fact_deletion_confirmed",
+            "reply": reply,
+            "details": {
+                "deterministic": True,
+                "model_called": False,
+                "fact_deletion_confirm": True,
+                "knowledge_result": payload.get("result") or {},
+            },
+        }
 
     def _take_clarification_answer(
         self,
@@ -3151,7 +3643,13 @@ class Brain:
             details.setdefault("assistant_name", assistant_name)
             details.setdefault("official_model", official_model)
             details.setdefault("backend", CASPER_BACKEND)
-            response["reply"] = clean_response_text(response.get("reply") or "")
+            details.setdefault(
+                "context_sections",
+                getattr(self, "_last_context_sections", {}),
+            )
+            response["reply"] = voice_copy.humanize_reply(
+                clean_response_text(response.get("reply") or "")
+            )
             if "routing_engine" not in details:
                 if len(clauses) > 1:
                     clause_decisions = [
@@ -3239,6 +3737,14 @@ class Brain:
         # planner that has no such action to select (measured live: the music
         # provider was chosen and the request failed closed, while a bare "stop"
         # reached no device at all and was answered as if it had).
+        # A bulk delete is answered with a confirmation before any skill or
+        # chat path can claim it succeeded.
+        bulk_delete_reply = _bulk_memory_delete_reply(clean)
+        if bulk_delete_reply is not None:
+            self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": "bulk_delete_confirmation"})
+            self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=bulk_delete_reply, refs={"route": CHAT, "rule": "bulk_delete_confirmation"})
+            return _finish({"route": CHAT, "rule": "bulk_delete_confirmation", "reply": bulk_delete_reply, "details": {"deterministic": True, "model_called": False, "skill_execution_confirmed": False}})
+
         transport = self._core_music_transport(clean, installed_specs)
         if transport is not None:
             self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": transport["rule"]})
@@ -3331,9 +3837,9 @@ class Brain:
             unavailable = skill_specs[0]
             device_name = str(unavailable.get("device_name") or unavailable.get("name") or "This device")[:80]
             if not unavailable.get("configured"):
-                reply = f"{device_name} isn't ready yet. Complete its setup in Skills, then review and explicitly trust the installed package."
+                reply = f"{device_name} isn't set up yet. Finish that in Skills and ask me again?"
             else:
-                reply = f"{device_name} is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+                reply = f"{device_name} is installed, but I can't use it until you trust it in Skills."
             self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "skill_id": unavailable["skill_id"]})
             self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=reply, refs={"route": CHAT, "skill_id": unavailable["skill_id"]})
             return _finish({"route": CHAT, "rule": "trusted_skill_unavailable", "reply": reply, "details": {"deterministic": True, "model_called": False, "skill_id": unavailable["skill_id"]}})
@@ -3361,12 +3867,24 @@ class Brain:
             if not state.get("runnable"):
                 device_name = str(self.skill_runtime._state().get("device_names", {}).get(candidate_id) or candidate[1].get("name") or "This device")[:80]
                 if not state.get("configured"):
-                    reply = f"{device_name} isn't ready yet. Complete its setup in Skills, then review and explicitly trust the installed package."
+                    reply = f"{device_name} isn't set up yet. Finish that in Skills and ask me again?"
                 else:
-                    reply = f"{device_name} is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+                    reply = f"{device_name} is installed, but I can't use it until you trust it in Skills."
                 self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "skill_id": candidate_id})
                 self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=reply, refs={"route": CHAT, "skill_id": candidate_id})
                 return _finish({"route": CHAT, "rule": "trusted_skill_unavailable", "reply": reply, "details": {"deterministic": True, "model_called": False, "skill_id": candidate_id}})
+
+        # A pending fact deletion owns the next turn: an explicit yes deletes
+        # what the confirmation named, a no (or anything else) leaves the store
+        # untouched. This runs before routing so a bare "yes" cannot become a
+        # new fact, a skill, or a world-chat answer.
+        deletion_turn = self._pending_fact_deletion_turn(
+            clean,
+            conversation_id=conversation_id,
+            location=location,
+        )
+        if deletion_turn is not None:
+            return _finish(deletion_turn)
 
         # A clarification answer belongs to the unresolved prior request.
         # Resolve it before ordinary routing, so a bare "Maanvi" cannot become
@@ -3376,14 +3894,25 @@ class Brain:
             clean,
         )
         if pending is not None and selected is None:
-            return _finish(
-                {
-                    "route": KNOWLEDGE,
-                    "reply": pending["question"] + " (Please name one of the listed options.)",
-                    "rule": "clarification_still_pending",
-                    "details": {"pending_clarification": True},
-                }
-            )
+            # A pending clarification is a question, not a debt. If the person
+            # says something else instead of answering it, that is a normal
+            # turn and gets a normal answer; the question stays on the table
+            # for whenever they come back to it. Only a short, answer-shaped
+            # utterance is treated as an attempt at the answer.
+            if _looks_like_clarification_attempt(clean):
+                return _finish(
+                    {
+                        "route": KNOWLEDGE,
+                        "reply": pending["question"],
+                        "rule": "clarification_still_pending",
+                        "details": {"pending_clarification": True},
+                    }
+                )
+            prediction = turn_state.predict_turn(clean, history=session_context)
+            if prediction.read in (turn_state.INSTRUCTION, turn_state.QUESTION):
+                with self._pending_lock:
+                    self._pending_clarifications.pop(conversation_id, None)
+
         if pending is not None and selected is not None:
             completed_request = self._complete_state_clarification(
                 pending["request"], pending, selected
@@ -3589,6 +4118,36 @@ class Brain:
         # A mixed request such as "remember X and tell me a joke" must still
         # reach the clause router so the durable-memory operation is preserved.
         clauses = split_clauses(clean)
+        # Predict what this turn is doing before choosing a pipeline. A turn
+        # predicted as ordinary conversation is cheap by budget: it does not
+        # reach the request machinery at all, and its topic is inherited from
+        # the last few turns so a short follow-up still means something.
+        expectation = turn_state.predict_turn(clean, history=session_context)
+        previous_expectation = self._last_expectations.get(conversation_id or "")
+        prediction_error = turn_state.prediction_error(previous_expectation, expectation)
+        if conversation_id:
+            if len(self._last_expectations) > 512:
+                self._last_expectations.clear()
+            self._last_expectations[conversation_id] = expectation
+        # A statement with the value missing has exactly one correct move: one
+        # question. It is not a failed write and not a retrieval.
+        if expectation.statement_action == turn_state.STATEMENT_CLARIFY:
+            question_text = turn_state.clarification_question(clean)
+            if question_text:
+                self._log_turn(location=location, conversation_id=conversation_id, role="user", content=clean, refs={"route": CHAT, "rule": "statement_clarification"})
+                self._log_turn(location=location, conversation_id=conversation_id, role="assistant", content=question_text, refs={"route": CHAT, "rule": "statement_clarification"})
+                return _finish(
+                    {
+                        "route": CHAT,
+                        "rule": "statement_clarification",
+                        "reply": question_text,
+                        "details": {
+                            "deterministic": True,
+                            "model_called": False,
+                            "turn_state": expectation.as_dict(),
+                        },
+                    }
+                )
         if len(clauses) == 1 and creative_chat_request(clean):
             self._log_turn(
                 location=location,
@@ -3612,7 +4171,7 @@ class Brain:
             )
             return _finish(response)
 
-        if len(clauses) > 1:
+        if len(clauses) > 1 and not expectation.conversational:
             return _finish(
                 self._handle_multi_clause(
                     clean,
@@ -3635,9 +4194,27 @@ class Brain:
         }
         # The explicit Core personal-memory contract remains authoritative over
         # a generic classifier result.
-        if should_delegate_to_knowledge(clean):
+        if expectation.read == turn_state.STATEMENT and expectation.statement_action == turn_state.STATEMENT_MEMORY_WRITE:
+            # A statement classified as one that must persist goes to memory by
+            # its own intent, not by a wording contract.
+            route = KNOWLEDGE
+            features.update(route=KNOWLEDGE, rule="statement_memory_write")
+        elif should_delegate_to_knowledge(clean):
             route = KNOWLEDGE
             features.update(route=KNOWLEDGE, rule="core_personal_memory_contract")
+        elif expectation_may_redirect_to_chat(decision, expectation):
+            # Nothing about this turn earned a classifier, a retrieval pass or
+            # a plan. A correction is not a new fact either: it is about the
+            # turn before it, and Luna answers it with the conversation in
+            # front of her. Neither one reaches the request machinery - unless
+            # the gate already placed the turn on the personal/action boundary.
+            route = CHAT
+            features.update(
+                route=CHAT,
+                rule="turn_prediction_conversation",
+                confidence=expectation.confidence,
+                reason=expectation.read,
+            )
         rule = features.get("rule")
         if route == KNOWLEDGE and should_delegate_to_knowledge(clean) and len(split_clauses(clean)) == 1:
             response = self._handle_knowledge(
@@ -3695,6 +4272,9 @@ class Brain:
             )
 
         response.setdefault("details", {})["routing_engine"] = decision.as_dict()
+        turn_details = expectation.as_dict()
+        turn_details["prediction_error"] = round(prediction_error, 3)
+        response.setdefault("details", {})["turn_state"] = turn_details
         self._log_turn(
             location=location,
             conversation_id=conversation_id,
@@ -3948,6 +4528,27 @@ class Brain:
         is_sensitive_write = (
             operation == "CREATE" and result.get("record_type") == "fact"
         )
+        # A history answer has two values in it (now and before) and the
+        # order is the whole answer. Measured live: the model read the
+        # current city as the "before" one. Core says it deterministically
+        # instead of handing an invertible pair to a rewriter.
+        if isinstance(result, dict) and result.get("previous"):
+            return deterministic
+
+        # An empty answer is not something to paraphrase. Handed an empty
+        # list, the model produces clinical lines like "I don't have any
+        # information about your mother's current state"; handed nothing at
+        # all it stays quiet, and Core's own sentence is the one a person
+        # would say. Luna is left to speak when there is actually something
+        # to say.
+        if isinstance(result, dict):
+            if "states" in result and not result["states"] and not result.get("moments"):
+                return deterministic
+            if "events" in result and not result["events"]:
+                return deterministic
+            if "facts" in result and not result["facts"]:
+                return deterministic
+
         is_empty_or_failed = (
             not result.get("ok", True)
             or result.get("query") == "name"
@@ -3955,11 +4556,11 @@ class Brain:
             or is_sensitive_write
             or deterministic.startswith(
                 (
-                    "I couldn't complete that request",
-                    "No matching events found",
-                    "No current states stored yet",
-                    "I don't have that",
-                    "Got it",
+                    _KNOWLEDGE_FAILURE_REPLY,
+                    _NO_EVENTS_REPLY,
+                    _NO_STATES_REPLY,
+                    _KNOWLEDGE_EMPTY_REPLY,
+                    voice_copy.INTRO_ACK,
                 )
             )
         )
@@ -4184,11 +4785,21 @@ class Brain:
             if (_missing(haystack, hard) or _missing(haystack, soft)) and not luna_formatter_prompt:
                 return deterministic
 
+        # Prompt-leak gate: live composition of a fact read returned "The
+        # final user-facing response is: ...". The formatter's own instructions
+        # are never part of an answer.
+        if any(marker in composed.casefold() for marker in _FORMATTER_LEAK_MARKERS):
+            return clean_response_text(deterministic)
+
         # Clock-time gate: the model must not state a time Knowledge never
         # produced ("19:00" -> "19:59") nor echo garbled ISO tokens.
         if not _stated_times_are_grounded(
             composed, [deterministic, source_json, temporal_grounding]
         ):
+            return clean_response_text(deterministic)
+        # Date gate: the same check for the day. A reply that moved the event
+        # to another date is not a valid rendering of what was stored.
+        if not _stated_dates_are_grounded(composed, knowledge_payload):
             return clean_response_text(deterministic)
 
         valid, _failures = verify_reply(
@@ -4271,6 +4882,13 @@ class Brain:
         deterministic = format_knowledge_result(payload)
         result = payload.get("result") or {}
         self._remember_clarification(conversation_id, text, result)
+        # A deletion that returned its matches is waiting for a yes. Anything
+        # else (a completed delete, a refusal, an unrelated reply) clears the
+        # pending item instead of leaving a stale confirmation behind.
+        if result.get("operation") == "DELETE_FACT_PENDING":
+            self.remember_pending_fact_deletion(conversation_id, result)
+        elif result.get("operation") in ("DELETE_FACT", "CANCEL", "CREATE"):
+            self._drop_pending_fact_deletion(conversation_id)
         # Fact writes already have an authoritative deterministic response and
         # do not need a post-write memory read or Casper generation. Event,
         # person-state, clarification, and lookup results still receive the
@@ -4293,6 +4911,12 @@ class Brain:
         )
         if is_fact_write:
             knowledge_context = ""
+        elif isinstance(result.get("facts"), list):
+            # A fact read is answered from its own matched rows. The full
+            # memory block also carries every other stored record, and a
+            # composer given it returned a superseded value beside the current
+            # one for "What city do I live in?" (D4 c17).
+            knowledge_context = ""
         else:
             try:
                 knowledge_context = self.knowledge.memory_block(text)
@@ -4308,6 +4932,13 @@ class Brain:
         failed_or_empty = (
             not result.get("ok", True)
             or result.get("operation") == "NEEDS_CLARIFICATION"
+            # A deletion prompt is a safety statement ("nothing has been
+            # deleted yet"), and the confirmation is the only word that may
+            # authorise the delete: a composer must not paraphrase it. Live
+            # verification showed the composed form ("Yes, please delete the
+            # note about your old address.") reading as if the delete had
+            # already happened.
+            or result.get("operation") in ("DELETE_FACT_PENDING", "DELETE_FACT")
             or result.get("query") == "name"
             or (
                 result.get("operation") == "CREATE"
@@ -4315,11 +4946,11 @@ class Brain:
             )
             or deterministic.startswith(
                 (
-                    "I couldn't complete that request",
-                    "No matching events found",
-                    "No current states stored yet",
-                    "I don't have that",
-                    "Got it",  # intro acknowledgment: deterministic only
+                    _KNOWLEDGE_FAILURE_REPLY,
+                    _NO_EVENTS_REPLY,
+                    _NO_STATES_REPLY,
+                    _KNOWLEDGE_EMPTY_REPLY,
+                    voice_copy.INTRO_ACK,  # intro acknowledgment: deterministic only
                 )
             )
         )
@@ -4347,7 +4978,7 @@ class Brain:
         if (
             failed_or_empty
             and deterministic
-            == "I don't have that in my knowledge base yet."
+            == _KNOWLEDGE_EMPTY_REPLY
             and re.match(
                 r"^who(?:'s|\s+is)\s+[a-z][a-z' ]*?\s*\??$",
                 text.strip(),
@@ -4400,7 +5031,15 @@ class Brain:
             result.get("operation") in {"STORE_STATE", "SUPERSEDE_STATE", "STATE_NOOP"}
             and active_assistant_name != "Luna"
         )
-        if is_fact_write or deterministic_state_write:
+        # A deletion prompt and its outcome are safety statements: "nothing
+        # has been deleted yet" is the whole point, and a composer paraphrased
+        # it as "Yes, please delete ..." in live verification. They use the
+        # deterministic rendering verbatim.
+        deterministic_deletion = result.get("operation") in (
+            "DELETE_FACT_PENDING",
+            "DELETE_FACT",
+        )
+        if is_fact_write or deterministic_state_write or deterministic_deletion:
             reply = deterministic
             formatter_ms = 0.0
         else:
@@ -4513,6 +5152,7 @@ class Brain:
                     "\n\nRelevant context already shared with NIX (use only if it helps with this message):\n"
                     f"{digest}"
                 )
+            self._last_context_sections = _context_sections(prompt)
             return prompt
 
         # Wall-clock awareness: the chat model has no clock of its own
@@ -4621,6 +5261,7 @@ class Brain:
                 "instead of guessing."
             )
 
+        self._last_context_sections = _context_sections(prompt)
         return prompt
 
     _DEVICE_CONTEXT_PATTERN = re.compile(
@@ -4980,6 +5621,20 @@ class Brain:
                 for call in calls[:8]
             ]
             try:
+                # D5: grammar owns the envelope; these two checks are
+                # independent of it. Intent, confirmation and outcome are
+                # enforced later in this path and in the skill runtime.
+                from eval.plan_validation import check_permission, check_schema
+
+                details["plan_envelope_validation"] = {
+                    "schema": check_schema(calls),
+                    "permission": check_permission(
+                        calls, allowed_skill_ids=allowed_skill_ids
+                    ),
+                }
+            except Exception:
+                pass
+            try:
                 validated = self.skill_manager.validate(calls, allowed_skill_ids)
             except SkillRuntimeError:
                 if not (color_grounding or brightness_grounding or effect_grounding or volume_grounding):
@@ -5215,8 +5870,8 @@ class Brain:
                         "route": CHAT,
                         "rule": "nix_model_skill_tool_rejected",
                         "reply": (
-                            "I didn't send a device command because the dedicated skill planner "
-                            "did not produce a valid, safe plan."
+                            "I couldn't get the light to that colour, and nothing "
+                            "changed. Want me to try again?"
                         ),
                         "details": details,
                     }
@@ -5230,13 +5885,17 @@ class Brain:
                     ),
                     "details": details,
                 }
+            # Written in the words a person would use, so even a path that
+            # bypasses the reply voice pass cannot show planner internals.
             return {
                 "route": CHAT,
                 "rule": "nix_model_skill_plan_rejected" if multi_action else "nix_model_skill_tool_rejected",
                 "reply": (
-                    f"I didn't send any device action because I couldn't validate the complete plan ({str(exc)[:160]})."
+                    "I couldn't line that up safely as one plan, so nothing was "
+                    "sent. We can do it a step at a time if you like."
                     if multi_action
-                    else "I didn't send a device command because the dedicated skill planner did not produce a valid, safe plan."
+                    else "I couldn't get that to the device this time, and "
+                    "nothing changed. Want me to try again?"
                 ),
                 "details": details,
             }
@@ -6266,6 +6925,42 @@ class Brain:
         conversation_id: str | None = None,
         skill_specs: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        # A stored secret asked for in display framing is refused before any
+        # model can answer it (and invent a different value while doing so).
+        if _SECRET_DISPLAY_RE.search(text or ""):
+            return {
+                "route": CHAT,
+                "rule": "secret_display_refusal",
+                "reply": (
+                    "I won't read that out. It is stored, and you can ask me "
+                    "to use it or change it — but printing a code or password "
+                    "is how one leaks."
+                ),
+                "details": {
+                    "deterministic": True,
+                    "model_called": False,
+                    "skill_execution_confirmed": False,
+                },
+            }
+
+        # An instruction-override attempt is refused in the companion's own
+        # voice, before the skill planner is consulted.
+        if _INSTRUCTION_OVERRIDE_RE.search(text or ""):
+            return {
+                "route": CHAT,
+                "rule": "instruction_override_refusal",
+                "reply": (
+                    "I can't take instructions that try to replace my own "
+                    "rules, so nothing has changed. I'm still happy to help "
+                    "with your memory, your devices or your music."
+                ),
+                "details": {
+                    "deterministic": True,
+                    "model_called": False,
+                    "skill_execution_confirmed": False,
+                },
+            }
+
         # A bare "who is <name>" question about someone the KB knows
         # is personal recall, not world trivia. Probe once and route
         # to knowledge when the person is on file.
@@ -6308,7 +7003,7 @@ class Brain:
                     return {
                         "route": CHAT,
                         "rule": "trusted_skill_unavailable",
-                        "reply": f"{device_name} isn't ready or trusted, so I didn't send a device command.",
+                        "reply": f"{device_name} isn't ready for me to use yet. Check it in Skills and ask me again?",
                         "details": {"model_called": False, "skill_execution_confirmed": False},
                     }
                 return self._handle_chat(
@@ -6450,7 +7145,7 @@ class Brain:
                     return {
                         "route": CHAT,
                         "rule": "trusted_skill_unavailable",
-                        "reply": "The targeted skill isn't currently ready or trusted, so I didn't send a device command.",
+                        "reply": "That one isn't ready for me to use yet. Check it in Skills and ask me again?",
                         "details": {"model_called": False, "skill_execution_confirmed": False},
                     }
                 capability_data = json.loads(
@@ -6525,7 +7220,7 @@ class Brain:
                         return {
                             "route": CHAT,
                             "rule": "nix_model_skill_tool_rejected",
-                            "reply": "I didn't send a device command because the requested color didn't match the immediately preceding color offer. Please state the color you want.",
+                            "reply": "That wasn't the colour I offered, so I haven't changed anything. Which one did you want?",
                             "details": {
                                 "model_called": False,
                                 "skill_planner_called": False,
@@ -6627,8 +7322,8 @@ class Brain:
                         "route": CHAT,
                         "rule": "nix_model_skill_profile_rejected",
                         "reply": (
-                            "I didn't send a device command because the skill profile "
-                            f"decider could not select a matching skill profile ({str(exc)[:160]})."
+                            "I couldn't tell which device you meant, so nothing changed. Say the "
+                            "device and the colour and I'll set it."
                         ),
                         "details": {
                             "model_called": False,
@@ -6777,7 +7472,7 @@ class Brain:
                         return {
                             "route": CHAT,
                             "rule": "nix_model_skill_tool_rejected",
-                            "reply": "I didn't send a device command because the proposed device didn't match your color request.",
+                            "reply": "That wasn't the light you meant, so nothing changed. Tell me which one and I'll set it.",
                             "details": {"model_called": True, "skill_proposal_validated": False},
                         }
                     arguments = matched.get("arguments") or {}
@@ -6805,7 +7500,7 @@ class Brain:
                         return {
                             "route": CHAT,
                             "rule": "nix_model_skill_tool_rejected",
-                            "reply": "I didn't send a device command because the proposed device didn't match your request.",
+                            "reply": "That wasn't the light you meant, so nothing changed. Tell me which one and I'll set it.",
                             "details": {"model_called": True, "skill_proposal_validated": False},
                         }
                     arguments = matched.get("arguments") or {}
@@ -6965,14 +7660,14 @@ class Brain:
                     return {
                         "route": CHAT,
                         "rule": "nix_model_skill_tool_missing",
-                        "reply": "I didn't send a device command because I couldn't confirm one clear color choice for that request.",
+                        "reply": "I couldn't tell which colour you meant, so I left it alone. Say the colour and I'll set it.",
                         "details": {"model_called": True, "skill_proposal_validated": False},
                     }
                 if _requires_multi_action_plan(action_text, skill_specs):
                     return {
                         "route": CHAT,
                         "rule": "nix_model_skill_plan_missing",
-                        "reply": "I didn't send a device command because I couldn't validate every requested action as one complete plan.",
+                        "reply": "I couldn't take every part of that as one safe plan, so nothing was sent. Want to do them one at a time?",
                         "details": {
                             "model_called": True,
                             "skill_plan_validated": False,
@@ -6994,7 +7689,7 @@ class Brain:
                             return {
                                 "route": CHAT,
                                 "rule": "nix_model_skill_tool_rejected",
-                                "reply": "I didn't send a device command because the proposed device didn't match your color request.",
+                                "reply": "That wasn't the light you meant, so nothing changed. Tell me which one and I'll set it.",
                                 "details": {"model_called": True, "skill_match_validated": False},
                             }
                         if arguments.get("action") != "color":
@@ -7045,7 +7740,7 @@ class Brain:
                 return {
                     "route": CHAT,
                     "rule": "nix_model_skill_tool_missing",
-                    "reply": "I didn't send a device command because the model didn't return a valid skill call.",
+                    "reply": "I couldn't turn that into something I can do, so nothing changed. Try saying it a little differently?",
                     "details": {"model_called": True, "skill_proposal_validated": False},
                 }
             reply = strip_model_control_traces(reply)
@@ -7098,17 +7793,13 @@ class Brain:
             return {
                 "route": CHAT,
                 "rule": f"{active_model_id}_unreachable",
-                "reply": (
-                    f"{assistant_name} Alert: Unable to reach the chat model "
-                    f"({self.ollama.model}) right now. "
-                    f"({type(exc).__name__})"
-                ),
+                "reply": voice_copy.LOST_THREAD,
                 "details": {"error": str(exc)},
             }
 
         result = {            "route": CHAT,
             "rule": f"{active_model_id}_{CASPER_BACKEND}_chat",
-            "reply": clean_response_text(reply) or "(empty reply from chat model)",
+            "reply": clean_response_text(reply) or voice_copy.LOST_THREAD,
 
             "details": {
                 "model": self.ollama.model,

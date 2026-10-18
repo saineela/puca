@@ -60,7 +60,8 @@ def make_entry(
     error: str | None = None,
 ) -> dict[str, Any]:
     """Uniform record shape so analyze_logs.py can rely on fields."""
-    return {
+    payload = details or {}
+    entry = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
         "request": request,
         "location": location,
@@ -70,8 +71,23 @@ def make_entry(
         "latency_ms": round(latency_ms, 1),
         "clauses": clauses or [],
         "error": error,
-        "details": _compact(details or {}),
+        "details": _compact(payload),
     }
+    # D3: every request shows the five section sizes. D4: the routing decision
+    # travels with its bounded ledger row (route, costs, fingerprint), never the
+    # full prompt.
+    if isinstance(payload.get("context_sections"), dict):
+        entry["context_sections"] = payload["context_sections"]
+    if isinstance(payload.get("routing_engine"), dict):
+        entry["routing_ledger"] = {
+            key: payload["routing_engine"].get(key)
+            for key in (
+                "route", "confidence", "rule", "requires_model",
+                "cost_estimate", "escalation_cost", "counterfactual",
+                "outcome", "fingerprint", "safety",
+            )
+        }
+    return entry
 
 
 def _compact(details: dict[str, Any], limit: int = 4000) -> dict[str, Any]:

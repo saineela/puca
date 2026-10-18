@@ -1,0 +1,32 @@
+{
+ "tree": "/root",
+ "cases": 32,
+ "correct": 28,
+ "unrouted": 3,
+ "by_label": {
+  "escalation_required": {
+   "n": 18,
+   "correct": 15
+  },
+  "fast_path_sufficient": {
+   "n": 14,
+   "correct": 13
+  }
+ },
+ "rules": {
+  "plain_statement": 7,
+  "self_question": 7,
+  "personal_boundary": 3,
+  "personal_statement": 3,
+  "general_question": 2,
+  "scheduling_verb": 2,
+  "store_fact": 2,
+  "abstain": 1,
+  "emotion_fast_path": 1,
+  "world_question": 1,
+  "opinion_of_assistant": 1,
+  "addressing_assistant": 1,
+  "residence_statement": 1
+ },
+ "accuracy": 0.875
+}

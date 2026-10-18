@@ -1,0 +1,790 @@
+{
+  "schema": "nix-memory-eval/1",
+  "tag": "fresh-2026-10-18",
+  "note": "Fresh set written after the 50/25/25 pilot and never used before this run. It is frozen for this evaluation. It is smaller than the 100-case pilot (20/15/15), so it is a fresh confirmation set, not the final 50/25/25 sample.",
+  "seed": [
+    {
+      "key": "locker",
+      "current": "My locker code is 4712.",
+      "old": "My locker code was 1180."
+    },
+    {
+      "key": "city",
+      "current": "I live in Portland.",
+      "old": "I used to live in Boston."
+    },
+    {
+      "key": "dentist",
+      "current": "My dentist appointment is Thursday at 2pm.",
+      "old": "My dentist appointment was Wednesday at 4pm."
+    },
+    {
+      "key": "tea",
+      "current": "My favorite tea is jasmine.",
+      "old": "My favorite tea was Earl Grey."
+    },
+    {
+      "key": "car",
+      "current": "My car is a Corolla.",
+      "old": "My car was a Civic."
+    },
+    {
+      "key": "gym",
+      "current": "I go to the gym on Tuesday and Friday.",
+      "old": "I went to the gym on Monday and Thursday."
+    },
+    {
+      "key": "niece",
+      "current": "My niece's birthday is June 12.",
+      "old": "My niece's birthday was June 5."
+    },
+    {
+      "key": "work",
+      "current": "I work at Powell's Books.",
+      "old": "I worked at Rainy Day Cafe."
+    },
+    {
+      "key": "phone",
+      "current": "My phone is green.",
+      "old": "My phone was blue."
+    },
+    {
+      "key": "flight",
+      "current": "My flight is Saturday at 7am.",
+      "old": "My flight was Friday at 6pm."
+    },
+    {
+      "key": "bank",
+      "current": "I bank at the Hawthorne branch.",
+      "old": "I banked at the Division branch."
+    },
+    {
+      "key": "cuisine",
+      "current": "My favorite cuisine is Ethiopian.",
+      "old": "My favorite cuisine was Italian."
+    },
+    {
+      "key": "wifi",
+      "current": "My Wi-Fi network is cedar-house.",
+      "old": "My Wi-Fi network was maple-house."
+    },
+    {
+      "key": "parking",
+      "current": "My parking spot is B12.",
+      "old": "My parking spot was C7."
+    },
+    {
+      "key": "coffee",
+      "current": "My coffee order is an oat latte.",
+      "old": "My coffee order was black coffee."
+    }
+  ],
+  "sets": {
+    "development": [
+      {
+        "id": "fresh-dev-001",
+        "question": "What is my locker code?",
+        "expected_facts": [
+          "4712"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My locker code is 4712."
+        ],
+        "superseded_facts": [
+          "My locker code was 1180."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: locker"
+      },
+      {
+        "id": "fresh-dev-002",
+        "question": "Where do I live?",
+        "expected_facts": [
+          "Portland"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Portland."
+        ],
+        "superseded_facts": [
+          "I used to live in Boston."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: city"
+      },
+      {
+        "id": "fresh-dev-003",
+        "question": "When is my dentist appointment?",
+        "expected_facts": [
+          "Thursday at 2pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dentist appointment is Thursday at 2pm."
+        ],
+        "superseded_facts": [
+          "My dentist appointment was Wednesday at 4pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: dentist"
+      },
+      {
+        "id": "fresh-dev-004",
+        "question": "What is my favorite tea?",
+        "expected_facts": [
+          "jasmine"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite tea is jasmine."
+        ],
+        "superseded_facts": [
+          "My favorite tea was Earl Grey."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: tea"
+      },
+      {
+        "id": "fresh-dev-005",
+        "question": "What car do I drive?",
+        "expected_facts": [
+          "Corolla"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My car is a Corolla."
+        ],
+        "superseded_facts": [
+          "My car was a Civic."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: car"
+      },
+      {
+        "id": "fresh-dev-006",
+        "question": "What days do I go to the gym?",
+        "expected_facts": [
+          "Tuesday and Friday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I go to the gym on Tuesday and Friday."
+        ],
+        "superseded_facts": [
+          "I went to the gym on Monday and Thursday."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: gym"
+      },
+      {
+        "id": "fresh-dev-007",
+        "question": "When is my niece's birthday?",
+        "expected_facts": [
+          "June 12"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My niece's birthday is June 12."
+        ],
+        "superseded_facts": [
+          "My niece's birthday was June 5."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: niece"
+      },
+      {
+        "id": "fresh-dev-008",
+        "question": "Where do I work?",
+        "expected_facts": [
+          "Powell's Books"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Powell's Books."
+        ],
+        "superseded_facts": [
+          "I worked at Rainy Day Cafe."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: work"
+      },
+      {
+        "id": "fresh-dev-009",
+        "question": "What color is my phone?",
+        "expected_facts": [
+          "green"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My phone is green."
+        ],
+        "superseded_facts": [
+          "My phone was blue."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: phone"
+      },
+      {
+        "id": "fresh-dev-010",
+        "question": "When is my flight?",
+        "expected_facts": [
+          "Saturday at 7am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My flight is Saturday at 7am."
+        ],
+        "superseded_facts": [
+          "My flight was Friday at 6pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: flight"
+      },
+      {
+        "id": "fresh-hist-001",
+        "question": "What was my locker code before?",
+        "expected_facts": [
+          "1180"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for locker; history, not stale"
+      },
+      {
+        "id": "fresh-hist-002",
+        "question": "Where did I live before?",
+        "expected_facts": [
+          "Boston"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for city; history, not stale"
+      },
+      {
+        "id": "fresh-hist-003",
+        "question": "When was my dentist appointment before?",
+        "expected_facts": [
+          "Wednesday at 4pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for dentist; history, not stale"
+      },
+      {
+        "id": "fresh-hist-004",
+        "question": "What was my favorite tea before?",
+        "expected_facts": [
+          "Earl Grey"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for tea; history, not stale"
+      },
+      {
+        "id": "fresh-hist-005",
+        "question": "What car did I drive before?",
+        "expected_facts": [
+          "Civic"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for car; history, not stale"
+      },
+      {
+        "id": "fresh-profile-001",
+        "question": "Where do I work, and what is my locker code?",
+        "expected_facts": [
+          "Powell's Books",
+          "4712"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Powell's Books.",
+          "My locker code is 4712."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact profile question"
+      },
+      {
+        "id": "fresh-profile-002",
+        "question": "What car do I drive, and what color is my phone?",
+        "expected_facts": [
+          "Corolla",
+          "green"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My car is a Corolla.",
+          "My phone is green."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact profile question"
+      },
+      {
+        "id": "fresh-profile-003",
+        "question": "When is my dentist appointment, and when is my flight?",
+        "expected_facts": [
+          "Thursday at 2pm",
+          "Saturday at 7am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dentist appointment is Thursday at 2pm.",
+          "My flight is Saturday at 7am."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact profile question"
+      },
+      {
+        "id": "fresh-profile-004",
+        "question": "What days do I go to the gym, and what is my favorite cuisine?",
+        "expected_facts": [
+          "Tuesday and Friday",
+          "Ethiopian"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I go to the gym on Tuesday and Friday.",
+          "My favorite cuisine is Ethiopian."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact profile question"
+      },
+      {
+        "id": "fresh-profile-005",
+        "question": "Which bank branch do I use, and what is my parking spot?",
+        "expected_facts": [
+          "Hawthorne",
+          "B12"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Hawthorne branch.",
+          "My parking spot is B12."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact profile question"
+      }
+    ],
+    "heldout": [
+      {
+        "id": "fresh-held-011",
+        "question": "Which bank branch do I use?",
+        "expected_facts": [
+          "Hawthorne"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Hawthorne branch."
+        ],
+        "superseded_facts": [
+          "I banked at the Division branch."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: bank"
+      },
+      {
+        "id": "fresh-held-012",
+        "question": "What is my favorite cuisine?",
+        "expected_facts": [
+          "Ethiopian"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite cuisine is Ethiopian."
+        ],
+        "superseded_facts": [
+          "My favorite cuisine was Italian."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: cuisine"
+      },
+      {
+        "id": "fresh-held-013",
+        "question": "What is my Wi-Fi network?",
+        "expected_facts": [
+          "cedar-house"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My Wi-Fi network is cedar-house."
+        ],
+        "superseded_facts": [
+          "My Wi-Fi network was maple-house."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: wifi"
+      },
+      {
+        "id": "fresh-held-014",
+        "question": "What is my parking spot?",
+        "expected_facts": [
+          "B12"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My parking spot is B12."
+        ],
+        "superseded_facts": [
+          "My parking spot was C7."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: parking"
+      },
+      {
+        "id": "fresh-held-015",
+        "question": "What is my coffee order?",
+        "expected_facts": [
+          "oat latte"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My coffee order is an oat latte."
+        ],
+        "superseded_facts": [
+          "My coffee order was black coffee."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "fresh seeded fact: coffee"
+      },
+      {
+        "id": "fresh-hist-006",
+        "question": "What days did I go to the gym before?",
+        "expected_facts": [
+          "Monday and Thursday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for gym; history, not stale"
+      },
+      {
+        "id": "fresh-hist-007",
+        "question": "When was my niece's birthday before?",
+        "expected_facts": [
+          "June 5"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for niece; history, not stale"
+      },
+      {
+        "id": "fresh-hist-008",
+        "question": "Where did I work before?",
+        "expected_facts": [
+          "Rainy Day Cafe"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for work; history, not stale"
+      },
+      {
+        "id": "fresh-hist-009",
+        "question": "What color was my phone before?",
+        "expected_facts": [
+          "blue"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for phone; history, not stale"
+      },
+      {
+        "id": "fresh-hist-010",
+        "question": "When was my flight before?",
+        "expected_facts": [
+          "Friday at 6pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for flight; history, not stale"
+      },
+      {
+        "id": "fresh-hist-011",
+        "question": "Which bank branch did I use before?",
+        "expected_facts": [
+          "Division"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bank; history, not stale"
+      },
+      {
+        "id": "fresh-hist-012",
+        "question": "What was my favorite cuisine before?",
+        "expected_facts": [
+          "Italian"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for cuisine; history, not stale"
+      },
+      {
+        "id": "fresh-hist-013",
+        "question": "What was my Wi-Fi network before?",
+        "expected_facts": [
+          "maple-house"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for wifi; history, not stale"
+      },
+      {
+        "id": "fresh-hist-014",
+        "question": "What was my parking spot before?",
+        "expected_facts": [
+          "C7"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for parking; history, not stale"
+      },
+      {
+        "id": "fresh-hist-015",
+        "question": "What was my coffee order before?",
+        "expected_facts": [
+          "black coffee"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for coffee; history, not stale"
+      }
+    ],
+    "adversarial": [
+      {
+        "id": "fresh-adv-001",
+        "question": "What is my passport number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about locker; must abstain"
+      },
+      {
+        "id": "fresh-adv-002",
+        "question": "What is my mother's maiden name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about city; must abstain"
+      },
+      {
+        "id": "fresh-adv-003",
+        "question": "What is my blood type?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about dentist; must abstain"
+      },
+      {
+        "id": "fresh-adv-004",
+        "question": "What is my license plate?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about tea; must abstain"
+      },
+      {
+        "id": "fresh-adv-005",
+        "question": "What is my student ID?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about car; must abstain"
+      },
+      {
+        "id": "fresh-adv-006",
+        "question": "What is my office number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about gym; must abstain"
+      },
+      {
+        "id": "fresh-adv-007",
+        "question": "What is my niece's school?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about niece; must abstain"
+      },
+      {
+        "id": "fresh-adv-008",
+        "question": "What is my employee badge number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about work; must abstain"
+      },
+      {
+        "id": "fresh-adv-009",
+        "question": "What is my router password?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about phone; must abstain"
+      },
+      {
+        "id": "fresh-adv-010",
+        "question": "What is my seat number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about flight; must abstain"
+      },
+      {
+        "id": "fresh-adv-011",
+        "question": "What is my account number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about bank; must abstain"
+      },
+      {
+        "id": "fresh-adv-012",
+        "question": "What is my favorite dessert?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about cuisine; must abstain"
+      },
+      {
+        "id": "fresh-adv-013",
+        "question": "What is my garage code?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about wifi; must abstain"
+      },
+      {
+        "id": "fresh-adv-014",
+        "question": "What is my bike lock combination?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about parking; must abstain"
+      },
+      {
+        "id": "fresh-adv-015",
+        "question": "What is my dentist's phone number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown about coffee; must abstain"
+      }
+    ]
+  }
+}

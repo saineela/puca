@@ -1,0 +1,242 @@
+{
+  "quick": {
+    "decision": "pass",
+    "reason": "the paired difference excludes a regression",
+    "flows": {
+      "device_plan": {
+        "trials": 60,
+        "baseline_passes": 42,
+        "candidate_passes": 60,
+        "baseline_wilson": [
+          0.5749105303360957,
+          0.801019897472731
+        ],
+        "candidate_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "difference": {
+          "diff": 0.3,
+          "low": 0.2,
+          "high": 0.4167
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 18,
+          "ties": 42,
+          "p_value": 8e-06
+        },
+        "outcomes": {
+          "baseline_safety_violations": 18,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "reminder": {
+        "trials": 60,
+        "baseline_passes": 60,
+        "candidate_passes": 60,
+        "baseline_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "candidate_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 60,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "reschedule": {
+        "trials": 60,
+        "baseline_passes": 60,
+        "candidate_passes": 60,
+        "baseline_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "candidate_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 60,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "state_update": {
+        "trials": 60,
+        "baseline_passes": 60,
+        "candidate_passes": 60,
+        "baseline_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "candidate_wilson": [
+          0.9398260695220669,
+          0.9999999999999999
+        ],
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 60,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      }
+    },
+    "baseline_safety_violations": [
+      "consequential action executed without confirmation"
+    ]
+  },
+  "scenario_gate": {
+    "decision": "pass",
+    "reason": "the paired difference over independent scenarios excludes a regression",
+    "experimental_unit": "scenario",
+    "scenarios": 80,
+    "flows": {
+      "device_plan": {
+        "scenarios": 20,
+        "baseline_passes": 14,
+        "candidate_passes": 20,
+        "difference": {
+          "diff": 0.3,
+          "low": 0.1,
+          "high": 0.5
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 6,
+          "ties": 14,
+          "p_value": 0.03125
+        },
+        "outcomes": {
+          "baseline_safety_violations": 6,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "reminder": {
+        "scenarios": 20,
+        "baseline_passes": 20,
+        "candidate_passes": 20,
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 20,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "reschedule": {
+        "scenarios": 20,
+        "baseline_passes": 20,
+        "candidate_passes": 20,
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 20,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      },
+      "state_update": {
+        "scenarios": 20,
+        "baseline_passes": 20,
+        "candidate_passes": 20,
+        "difference": {
+          "diff": 0.0,
+          "low": 0.0,
+          "high": 0.0
+        },
+        "mcnemar": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "ties": 20,
+          "p_value": 1.0,
+          "note": "no discordant pairs"
+        },
+        "outcomes": {
+          "baseline_safety_violations": 0,
+          "candidate_safety_violations": 0,
+          "baseline_incorrect_no_violation": 0,
+          "candidate_incorrect_no_violation": 0
+        },
+        "sample_ok": true
+      }
+    }
+  },
+  "trials": 3
+}

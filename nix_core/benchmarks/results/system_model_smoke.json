@@ -1,0 +1,113 @@
+{
+  "base_url": "http://127.0.0.1:49117",
+  "model": "luna-v6-contextual-v1",
+  "prompts": 3,
+  "routes": {
+    "unknown": 3
+  },
+  "routing": {
+    "name": "routing-classify",
+    "requests": 3,
+    "ok": 3,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 4.3,
+      "p50": 1.0,
+      "p95": 11.1,
+      "min": 0.9,
+      "max": 11.1
+    },
+    "non_empty_replies": 0,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 11.095634195953608,
+        "route": ""
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 0.9991400875151157,
+        "route": ""
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 0.8965199813246727,
+        "route": ""
+      }
+    ]
+  },
+  "puca_system_model": {
+    "name": "puca-system-model",
+    "requests": 3,
+    "ok": 3,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 2588.3,
+      "p50": 580.6,
+      "p95": 7127.6,
+      "min": 56.8,
+      "max": 7127.6
+    },
+    "non_empty_replies": 3,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 7127.561922185123,
+        "reply": "I don't have any information about your mother's current state.",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 56.83825770393014,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 580.6489218957722,
+        "reply": "Believer",
+        "route": "chat"
+      }
+    ]
+  },
+  "luna_model_path": {
+    "name": "luna-model-path",
+    "requests": 3,
+    "ok": 3,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 770.9,
+      "p50": 552.5,
+      "p95": 1706.8,
+      "min": 53.4,
+      "max": 1706.8
+    },
+    "non_empty_replies": 3,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 1706.8248642608523,
+        "reply": "I don't have any information about your mother's current state."
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 53.44721116125584,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 552.4804182350636,
+        "reply": "Believer"
+      }
+    ]
+  }
+}

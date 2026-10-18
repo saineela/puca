@@ -1,0 +1,7 @@
+-r requirements.txt
+
+pytest>=8
+
+-e ./nix_knowledge
+-e ./nix_actions
+-e ./nix_decision

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 class KnowledgeDatabase:
@@ -16,6 +17,7 @@ class KnowledgeDatabase:
         )
 
         self.connection.row_factory = sqlite3.Row
+        self._in_transaction = False
 
         self._initialize()
 
@@ -41,6 +43,11 @@ class KnowledgeDatabase:
 
                 valid_from TEXT,
                 valid_until TEXT,
+
+                -- Turn-level provenance for a supersede: the record that
+                -- replaced this one (D1 in the PUCA system model). Nullable
+                -- because rows created before the link existed stay valid.
+                superseded_by INTEGER,
 
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -80,7 +87,19 @@ class KnowledgeDatabase:
             """
         )
 
+        self._ensure_columns()
         self.connection.commit()
+
+    def _ensure_columns(self) -> None:
+        """Additive migrations, so an existing knowledge.db keeps working."""
+        existing = {
+            row["name"]
+            for row in self.connection.execute("PRAGMA table_info(knowledge)").fetchall()
+        }
+        if "superseded_by" not in existing:
+            self.connection.execute(
+                "ALTER TABLE knowledge ADD COLUMN superseded_by INTEGER"
+            )
 
     @staticmethod
     def encode(data: Any) -> str:
@@ -97,9 +116,27 @@ class KnowledgeDatabase:
 
         return json.loads(data)
 
+    @contextmanager
+    def transaction(self) -> Iterator["KnowledgeDatabase"]:
+        """Group several writes so a supersede link can never dangle."""
+        if self._in_transaction:
+            yield self
+            return
+        self._in_transaction = True
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            yield self
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+        finally:
+            self._in_transaction = False
+
     def execute(self, query: str, parameters=()):
         cursor = self.connection.execute(query, parameters)
-        self.connection.commit()
+        if not self._in_transaction:
+            self.connection.commit()
         return cursor
 
     def fetchone(self, query: str, parameters=()):

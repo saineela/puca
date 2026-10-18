@@ -8,6 +8,7 @@ adapter.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import requests
@@ -21,6 +22,8 @@ from config import (
     TABBY_MODEL,
 )
 from context import select_context
+from eval import inference_metrics
+from eval.privacy import OutboundBoundary, RedactionBlocked
 
 
 class TabbyClient:
@@ -35,6 +38,10 @@ class TabbyClient:
         self.api_url = api_url
         self.model = model
         self.api_key = api_key
+        # D9: a non-local Tabby endpoint is behind the redaction boundary. A
+        # local one is allowed through unchanged, and redaction that cannot
+        # complete blocks the send rather than leaking the original text.
+        self.privacy = OutboundBoundary()
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -52,18 +59,33 @@ class TabbyClient:
         think: bool | None = None,
         max_new_tokens: int | None = None,
     ) -> str:
-        messages: list[dict[str, str]] = [
-            {"role": "system", "content": system_prompt}
-        ]
-        messages.extend(
-            select_context(
-                history,
-                max_turns=CONTEXT_WINDOW,
-                max_chars=CONTEXT_MAX_CHARS,
-            )
+        context = select_context(
+            history,
+            max_turns=CONTEXT_WINDOW,
+            max_chars=CONTEXT_MAX_CHARS,
         )
-        messages.append({"role": "user", "content": user_text})
+        # Redact each outbound text segment separately, then rehydrate the reply
+        # from the local-only mapping. The mapping never enters the request.
+        redacted_system = self.privacy.prepare(
+            url=self.api_url, text=system_prompt
+        )
+        redacted_history = [
+            {
+                **turn,
+                "content": self.privacy.prepare(
+                    url=self.api_url, text=str(turn.get("content") or "")
+                ),
+            }
+            for turn in context
+        ]
+        redacted_user = self.privacy.prepare(url=self.api_url, text=user_text)
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": redacted_system}
+        ]
+        messages.extend(redacted_history)
+        messages.append({"role": "user", "content": redacted_user})
 
+        started = time.perf_counter()
         response = requests.post(
             self.api_url,
             headers=self._headers(),
@@ -77,12 +99,27 @@ class TabbyClient:
             timeout=timeout or HTTP_TIMEOUT,
         )
         response.raise_for_status()
+        elapsed_ms = (time.perf_counter() - started) * 1000
         data = response.json()
         choices = data.get("choices") or []
         if not choices:
             return ""
         message = choices[0].get("message") or {}
-        return str(message.get("content") or choices[0].get("text") or "")
+        reply = str(message.get("content") or choices[0].get("text") or "")
+        inference_metrics.record(
+            inference_metrics.CallMetrics(
+                model=self.model,
+                backend="tabby",
+                load_ms=0.0,
+                # A non-streaming transport cannot observe the first token;
+                # both fields stay None instead of pretending one is known.
+                ttft_ms=None,
+                decode_ms=elapsed_ms,
+                token_count=max(1, len(reply.split())),
+                cache_hit=False,
+            )
+        )
+        return self.privacy.redactor.rehydrate(reply)
 
     def health(self) -> dict[str, Any]:
         """Return Tabby's advertised model list without generating text."""

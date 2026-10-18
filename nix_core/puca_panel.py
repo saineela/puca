@@ -423,8 +423,11 @@ def panel_state() -> dict:
         payload["now_playing"] = None
         payload["now_playing_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
     try:
-        skill_id, result = music_api._provider_call("queue", {"op": "list"})
-        payload["queue"] = music_api._queue_payload(skill_id, result)
+        # Through the console's own reader, so the wall shows the same line-up as
+        # the page and the phone: the queue service's when it is running, the
+        # provider skill's when it is not. Reading the provider directly here is
+        # what once made the display show a queue nobody else was following.
+        payload["queue"] = music_api.current_queue_payload()
     except Exception as exc:
         payload["queue"] = None
         payload["queue_error"] = f"{type(exc).__name__}: {str(exc)[:160]}"

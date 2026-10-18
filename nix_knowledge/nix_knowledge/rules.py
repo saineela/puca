@@ -125,6 +125,57 @@ _IDENTITY_RECALL = re.compile(
     re.IGNORECASE,
 )
 
+# "Where do I live?" / "Where am I based?" - residence is a profile key,
+# so the lookup goes through find_facts like any other key recall. A past
+# frame ("where did I live before that") asks for the superseded record.
+_WHERE_LIVE = re.compile(
+    r"^(?:so\s+|and\s+|but\s+)?where\s+"
+    r"(?:(?:do|does|did|am|are|is)\s+(?:i|we)\b|"
+    r"(?:i|we)\s+(?:currently\s+)?(?:live|lived|stay|stayed|reside|resided))"
+    r"[^?]*\b(?:live|lived|living|stay|stayed|reside|resided|based|located)\b",
+    re.IGNORECASE,
+)
+
+# "what city do I live in" / "which country are we in".
+_WHERE_LIVE_WHAT = re.compile(
+    r"^what\s+(?:city|state|country|town|place)\s+"
+    r"(?:do|does|did)\s+(?:i|we)\s+(?:live|lived|stay|reside)\b",
+    re.IGNORECASE,
+)
+
+_PAST_FRAME = re.compile(
+    r"\b(?:before|previously|earlier|used\s+to|back\s+then|originally)\b"
+    r"|\bwhere\s+did\b",
+    re.IGNORECASE,
+)
+
+# Residence statements: "i live in Austin", "we moved to Seattle",
+# "i'm back in Austin". They are PROFILE keys (which supersede the old
+# city), not free-text facts, so the key extractor stores them.
+_RESIDENCE_STATEMENT = re.compile(
+    r"^(?:actually\s+|so\s+|ok\s+|okay\s+|and\s+|oh\s+)?"
+    r"(?:i|we)\s+(?:now\s+|currently\s+|just\s+)?"
+    r"(?:live|living|reside|residing)\s+in\b"
+    r"|^(?:actually\s+|so\s+|and\s+)?(?:i|we)\s+(?:just\s+)?"
+    r"(?:moved|relocated|moving|relocating)\s+to\b"
+    r"|^(?:and\s+|but\s+)?(?:i'm|i\s+am|im|we're|we\s+are)\s+back\s+in\b",
+    re.IGNORECASE,
+)
+
+_QUESTION_OPENER_RE = re.compile(
+    r"^(?:where|what|when|who|how|which|do|did|does|is|are|was|were|"
+    r"can|could|would|will|should|have|has)\b",
+    re.IGNORECASE,
+)
+
+# Any residence verb in the sentence, wherever the clause sits.
+_RESIDENCE_CUE = re.compile(
+    r"\b(?:live|lives|living|reside|resided|stay|stayed)\s+in\b"
+    r"|\b(?:moved|relocated|moving|relocating)\s+to\b"
+    r"|\bback\s+in\b",
+    re.IGNORECASE,
+)
+
 # Self-introduction detection: a sentence that identifies the user.
 # "my name is X" / "call me X" / "i was born ..." / "people call me X"
 _INTRO_MARKERS = re.compile(
@@ -240,6 +291,35 @@ _WHEN_IS = re.compile(
     re.IGNORECASE,
 )
 
+# ---- Personal questions no specific rule names. The D2 confirmation run
+# measured 37 of 65 zero-recall answers as the pipeline's own "no function
+# selected" reply, because the selector had no rule for "where do I work",
+# "what colour is my laptop", "which code opens my garage" or "how long is my
+# passport good for". The query is the question's content words only, so the
+# words that ask the question ("colour", "kind", "day") cannot stop the stored
+# sentence from matching; see nix_knowledge/query.py.
+_PERSONAL_QUESTION_RE = re.compile(
+    r"^(?:what|whats|which|when|where|who|whos|whose|how|"
+    r"do|does|did|am|is|are|can|could|would|will|should|"
+    r"tell|show|list|give|read|check)\b"
+    r"(?=[^?]*\b(?:i|me|my|mine|we|our|ours|us|home)\b)",
+    re.IGNORECASE,
+)
+
+#: Verbs and stand-ins that name no subject: a question whose content words
+#: are all of these ("what do i have", "do i have anything tomorrow") is a
+#: calendar browse, not a fact lookup.
+_EMPTY_SUBJECT_WORDS = frozenset({
+    "have", "has", "had", "having", "anything", "something", "everything",
+    "else", "going", "been", "being", "need", "want", "make", "made",
+    "thing", "things", "stuff", "left", "on", "about", "there",
+})
+
+#: A compound personal question ("tell me my garage code and my wifi
+#: password") splits here; `route_all` above already decomposes statements
+#: the same way, and the needle executes `multi_action` deterministically.
+_AND_SPLIT_RE = re.compile(r"\s+and\s+", re.IGNORECASE)
+
 # "what is my wifi password" / "what are my coworkers' emails" -> fact
 # recall. Calendar nouns are excluded so "what is my schedule" keeps
 # flowing to the calendar-browsing rule below.
@@ -339,6 +419,68 @@ _MOVE = re.compile(
 
 _CREATE = re.compile(
     r"^(?:i have|i've got|i got|we have|we've got|schedule|add|create)(?:\s+(?:a|an|my|our))?\s+(?P<rest>.+?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+# "put the optician in for Monday at 10am", "put in a haircut for friday at
+# 3pm", "put my dentist appointment in for tomorrow at 9". The verb is a
+# calendar write, but no existing create rule starts with it: the D4 replay
+# ended at "no function selected" (c31). The time must resolve, or the turn is
+# deferred rather than guessed.
+_PUT_IN_FOR = re.compile(
+    r"^put\s+in\s+(?:(?:the|a|an|my|our)\s+)?(?P<title>[\w'\- ]+?)\s+"
+    r"for\s+(?P<expr>[\w\- :/]+?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+# "book the plumber in for Wednesday at 8am" and "slot the dentist in for
+# Monday" are the same instruction as "put X in for Y": the verb changes, the
+# shape does not. The D4 follow-up found the first of these still selected no
+# function, so the verb list is explicit rather than open-ended.
+_PUT_TITLE_FOR = re.compile(
+    r"^(?:put|book|slot)\s+(?:(?:the|a|an|my|our)\s+)?(?P<title>[\w'\- ]+?)\s+"
+    r"(?:in|down|on\s+my\s+calendar)\s+for\s+(?P<expr>[\w\- :/]+?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+# A durable deadline stated in the user's own words: "The renewal is due
+# March 4", "my passport is due for renewal in May". No rule reached a write
+# for the first shape (D4 c32), so nothing was stored and the turn was answered
+# as chat. Only a resolvable date/piece of temporal language counts; "due
+# north" stays a world statement.
+_DUE_STATEMENT = re.compile(
+    r"^(?:the|my|our)\s+(?P<subject>[\w'\- ]+?)\s+(?:is|are)\s+due\s+"
+    r"(?P<expr>[\w\- :/]+?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+# Deleting a stored fact by description (D4 c38). It must not be confused
+# with cancelling a calendar event: the meta-noun ("note", "fact", "memory")
+# or the verb "forget" is what marks the target as memory rather than a diary
+# entry in the calendar store.
+# The same request, in the two other shapes a person uses: with a polite lead
+# ("can you remove the saved note about ...") and with the meta-noun last
+# ("delete my old address note"). Both were measured to still reach the
+# calendar-cancel rule after the D4 fix, which is the defect class c38.
+_DELETE_LEAD = r"(?:(?:can|could|would|will)\s+you\s+|please\s+)?"
+
+_FACT_DELETE = re.compile(
+    r"^" + _DELETE_LEAD +
+    r"(?:delete|remove|erase)\s+(?:the|my|that|this)\s+"
+    r"(?:saved\s+|stored\s+)?(?:note|fact|memory|record|entry|thing)\b"
+    r"(?:\s+(?:about|of|saying|that\s+says))?\s*(?P<query>.+?)\s*\.?$",
+    re.IGNORECASE,
+)
+
+_FACT_DELETE_TRAILING = re.compile(
+    r"^" + _DELETE_LEAD +
+    r"(?:delete|remove|erase)\s+(?:the|my|that|this)?\s*(?P<query>.+?)\s+"
+    r"(?:note|fact|memory|record|entry)\s*\.?$",
+    re.IGNORECASE,
+)
+
+_FORGET = re.compile(
+    r"^forget\s+(?:about\s+|that\s+)?(?P<query>.+?)\s*\.?$",
     re.IGNORECASE,
 )
 
@@ -600,6 +742,73 @@ def decompose(
 # ----------------------------------------------------------------------
 
 
+def _personal_query(part: str) -> str:
+    """The content words of one personal question, as a lookup query."""
+    # Absolute, like the spelling import above: the test harness loads this
+    # module as a top-level file, where a relative import has no package.
+    from nix_knowledge.query import content_words
+
+    return " ".join(content_words(part))
+
+
+def _personal_fact_actions(
+    lowered: str,
+) -> tuple[str, dict[str, Any]] | None:
+    """Deterministic recall for a personal question no earlier rule matched.
+
+    Returns ``None`` to defer, so the specific rules keep their precedence.
+    A compound question becomes one ``multi_action`` of fact lookups rather
+    than one lookup with a query that no stored sentence can satisfy.
+    """
+    from nix_knowledge.query import words as _words
+
+    personal_cues = {"my", "mine", "our", "ours", "home"}
+    asks_about_person = bool(
+        _PERSONAL_QUESTION_RE.match(lowered)
+        or (lowered.endswith("?") and personal_cues & set(_words(lowered)))
+    )
+    if not asks_about_person:
+        return None
+    # Scheduling language owns its turn: "remind me to call mom tomorrow at
+    # 5pm" contains "me" but is a calendar create, not a recall.
+    for scheduling in (_REMIND_TO, _ALARM_SET_RE, _WAKE_RE):
+        if scheduling.match(lowered):
+            return None
+    if _CALENDAR_NOUNS_RE.search(lowered):
+        # "when is my tsa meeting": the calendar rules below own it, and the
+        # needle retries through the fact finder when the calendar is empty.
+        return None
+
+    parts = _AND_SPLIT_RE.split(lowered) if " and " in lowered else [lowered]
+    history = bool(_PAST_FRAME.search(lowered))
+    actions: list[dict[str, Any]] = []
+    for part in parts:
+        query = _personal_query(part)
+        if not query:
+            continue
+        # "what do i have" / "do i have anything tomorrow" name no subject:
+        # they are calendar browsing, and the calendar rules below own them.
+        if query.split() and not (
+            set(query.split()) - _EMPTY_SUBJECT_WORDS
+        ):
+            continue
+        actions.append(
+            {
+                "name": "find_facts",
+                "arguments": {
+                    "query": query,
+                    "history": history or bool(_PAST_FRAME.search(part)),
+                },
+            }
+        )
+
+    if len(actions) == 1:
+        return actions[0]["name"], actions[0]["arguments"]
+    if len(actions) >= 2:
+        return "multi_action", {"actions": actions}
+    return None
+
+
 def route(
     request: str,
     resolver,
@@ -673,6 +882,34 @@ def route(
     # authoritative answer; Casper must not infer identity from chat.
     if _IDENTITY_RECALL.match(lowered):
         return "find_facts", {"query": "name"}
+
+    # ---- residence recall: "where do I live", "what city do I live in",
+    # and the past frame "where did I live before that" (superseded key).
+    if _WHERE_LIVE.match(lowered) or _WHERE_LIVE_WHAT.match(lowered):
+        return "find_facts", {
+            "query": "live",
+            "history": bool(_PAST_FRAME.search(lowered)),
+        }
+
+    # ---- residence statements store the profile key (and supersede the
+    # previous city), the same way a self-introduction stores its keys.
+    # The cue may sit in a later clause ("i don't live in Seattle any
+    # more, i'm back in Austin"), so it is searched, not matched at the
+    # start; the extractor already skips the negated place.
+    if (
+        _RESIDENCE_STATEMENT.search(lowered)
+        or _RESIDENCE_CUE.search(lowered)
+    ) and not _QUESTION_OPENER_RE.match(lowered):
+        from .keys import extract_keys
+
+        residence_keys = [
+            key
+            for key in extract_keys(text)
+            if key.get("predicate") == "location"
+            and str(key.get("subject") or "user") == "user"
+        ]
+        if residence_keys:
+            return "store_profile_keys", {"keys": residence_keys}
 
     # ---- recall: "do you remember X" must be checked BEFORE "remember X"
     match = _RECALL_ABOUT.match(lowered)
@@ -803,6 +1040,14 @@ def route(
         if value and not resolver.resolve(value):
             return "create_fact", {"value": text.strip()}
 
+    # ---- a stated deadline is a durable fact, not conversation
+    match = _DUE_STATEMENT.match(lowered)
+    if match:
+        subject = match.group("subject").strip()
+        expression = match.group("expr").strip()
+        if subject and resolver.resolve(expression) is not None:
+            return "create_fact", {"value": text.strip()}
+
     # ---- store fact
     match = _FACT.match(lowered)
     if match:
@@ -846,8 +1091,50 @@ def route(
     match = _WHAT_IS_MY.match(lowered)
     if match and not _CALENDAR_NOUNS_RE.search(match.group("query")):
         query = match.group("query").strip()
+        # "what's my dog called" asks for the same key as "what's my dog's
+        # name": the stored key says "name", so the lookup says it too.
+        query = re.sub(
+            r"\bcalled\b", "name", query, flags=re.IGNORECASE
+        )
+        query = re.sub(
+            r"\bname\s+name\b", "name", query, flags=re.IGNORECASE
+        )
+        # "what WAS my garage code before" is a history read: the past frame
+        # selects the superseded record and must not stay in the query, where
+        # no stored sentence contains it.
+        history = bool(_PAST_FRAME.search(lowered))
+        if history:
+            query = " ".join(
+                word
+                for word in query.split()
+                if word not in ("before", "previously", "earlier", "originally")
+            )
         if query:
-            return "find_facts", {"query": query}
+            return "find_facts", {"query": query, "history": history}
+
+    # ---- delete a stored fact by description. This must run before the
+    # calendar cancel rule, which otherwise reads "delete the note about my
+    # old address" as an event title and never touches the fact (D4 c38).
+    deleted = (
+        _FACT_DELETE.match(lowered)
+        or _FACT_DELETE_TRAILING.match(lowered)
+        or _FORGET.match(lowered)
+    )
+    if deleted:
+        query = deleted.group("query").strip()
+        if query:
+            from nix_knowledge.query import content_words
+
+            if content_words(query):
+                return "delete_fact", {"query": query}
+
+    # ---- personal questions the rules above did not name. Runs before the
+    # calendar lookups: a question with calendar vocabulary ("when is my
+    # dentist appointment") still goes to the calendar, and the needle's
+    # empty-result fallback gives the fact finder the second chance.
+    personal = _personal_fact_actions(lowered)
+    if personal is not None:
+        return personal
 
     # ---- "when is my tsa meeting"
     match = _WHEN_IS.match(lowered)
@@ -970,6 +1257,26 @@ def route(
         title = match.group("title").strip()
         if title:
             return "find_calendar_events", {"title": title}
+
+    # ---- "put <title> in/down/on my calendar for <time>" and
+    # "put in <title> for <time>": a calendar write stated with "put".
+    for pattern in (_PUT_TITLE_FOR, _PUT_IN_FOR):
+        match = pattern.match(lowered)
+        if match:
+            title = match.group("title").strip()
+            expression = match.group("expr").strip()
+            if not title or resolver.resolve(expression) is None:
+                return None
+            # A bare clock target ("monday 10am") is learned with an
+            # explicit "at" only when the resolver needs one; a time the
+            # resolver already understands is left exactly as stated.
+            return (
+                "create_calendar_event",
+                {
+                    "title": _preserve_title_acronyms(title, text),
+                    "temporal_expression": expression,
+                },
+            )
 
     # ---- create: '<title> <temporal suffix>'
     match = _CREATE.match(lowered)

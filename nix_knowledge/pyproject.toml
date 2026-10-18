@@ -3,7 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-dependencies = ["cactus-needle>=3.1.0", "pyspellchecker>=0.8.0"]
+dependencies = [
+    "cactus-needle>=3.1.0",
+    "numpy>=1.24",
+    "pyspellchecker>=0.8.0",
+    "torch>=2.0",
+    "transformers>=4.40",
+]
 name = "nix-knowledge"
 version = "0.1.0"
 description = "Nix Knowledge Engine"

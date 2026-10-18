@@ -1,0 +1,99 @@
+{
+  "total": 40,
+  "false_escalation": 0.0,
+  "false_escalation_numerator": 0,
+  "false_escalation_denominator": 18,
+  "false_de_escalation": 0.0,
+  "false_de_escalation_numerator": 0,
+  "false_de_escalation_denominator": 14,
+  "undetermined": 8,
+  "undetermined_share": 0.2,
+  "replayed": 0,
+  "route_correctness": 0.425,
+  "answer_quality_mean": null,
+  "note": "False escalation counts only replayed escalations whose controlled alternative was correct; answer quality is reported separately.",
+  "by_class": {
+    "conversation": {
+      "n": 8,
+      "correct": 3,
+      "scored": 3
+    },
+    "world_question": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "opinion": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "statement_none": {
+      "n": 4,
+      "correct": 0,
+      "scored": 1
+    },
+    "memory_read": {
+      "n": 5,
+      "correct": 4,
+      "scored": 4
+    },
+    "memory_history": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "state_read": {
+      "n": 2,
+      "correct": 0,
+      "scored": 1
+    },
+    "memory_write": {
+      "n": 4,
+      "correct": 4,
+      "scored": 4
+    },
+    "calendar_write": {
+      "n": 2,
+      "correct": 1,
+      "scored": 1
+    },
+    "calendar_clarify": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "safety_confirmation": {
+      "n": 1,
+      "correct": 0,
+      "scored": 0
+    },
+    "state_read_or_write": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "memory_delete": {
+      "n": 1,
+      "correct": 0,
+      "scored": 0
+    },
+    "ambiguous": {
+      "n": 8,
+      "correct": 0,
+      "scored": 0
+    }
+  },
+  "scored_accuracy": 0.8947,
+  "scored": 19,
+  "abstained": 17,
+  "abstention_share": 0.425,
+  "answers_judged": 0,
+  "counterfactual_replay": "not run",
+  "thresholds_changed": false,
+  "set": {
+    "tag": "routing-heldout-2026-10-17",
+    "n": 40,
+    "kind": "held-out"
+  }
+}

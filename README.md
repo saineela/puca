@@ -188,11 +188,10 @@ From the repository root:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ./nix_knowledge -e ./nix_actions
-python -m pip install requests websockets numpy
+python -m pip install -r requirements-dev.txt
 ```
 
-The command above installs the sibling packages and basic Core/HTTP dependencies. It does not install `pytest`, Sentence Transformers, a CUDA-enabled PyTorch build, Transformers/PEFT/bitsandbytes, or a model. Add only the optional stack needed for your chosen use case.
+This installs the sibling packages in editable mode, the Core HTTP/WebSocket dependencies, pytest, and the base PyTorch/Transformers runtime. It does not install a CUDA-specific PyTorch build, Sentence Transformers, PEFT/bitsandbytes, or model weights. For CUDA, install the matching PyTorch wheel first, then run the command above. Add only the optional stack needed for your chosen use case.
 
 ### 2. Configure trusted local settings
 
@@ -322,14 +321,14 @@ Run the package suites from the repository root:
 ```bash
 (cd nix_knowledge && python -m pytest tests -q)
 (cd nix_actions && PYTHONPATH=../nix_knowledge:. python -m pytest tests -q)
-(cd nix_core && python -m pytest -q --ignore=benchmarks)
+(cd nix_core && python -m pytest -q)
 PYTHONPATH=. python -m pytest -q nix_decision/nix_decision/test_engine.py
 ```
 
-A hermetic Core run that also excludes the live subprocess integration test is:
+The live subprocess integration suite boots real services and may call a live model backend. It is skipped by default; opt in when the services and backend are available:
 
 ```bash
-(cd nix_core && python -m pytest -q --ignore=benchmarks --ignore=test_e2e_subprocess.py)
+NIX_RUN_LIVE_E2E=1 python -m pytest -q nix_core/test_e2e_subprocess.py
 ```
 
 Test the API Token Guard and Open WebUI conversation-history isolation with:

@@ -1,0 +1,43 @@
+{
+  "tag": "real chat history replay 2026-10-17",
+  "requests": 703,
+  "D3_context_sections": {
+    "with_all_five": 675,
+    "share": 0.9602,
+    "sections": [
+      "policy",
+      "memory",
+      "records",
+      "history",
+      "tools"
+    ],
+    "note": "logging-only in Wave 1; budgets are enforced after the D2 curve"
+  },
+  "D4_routing": {
+    "route_mix": {
+      "chat": 351,
+      "knowledge": 352
+    },
+    "counterfactual": {
+      "unmeasured": 703
+    },
+    "outcomes": {
+      "unlabelled": 703
+    },
+    "undetermined_or_unlabelled": 703,
+    "undetermined_share": 1.0,
+    "note": "false escalation and false de-escalation need the frozen labelled routing set and its controlled replays"
+  },
+  "D5_plan_envelopes": {
+    "plans_checked": 18,
+    "malformed": 0,
+    "malformed_rate": 0.0,
+    "planner_runs": 23,
+    "validate_retry_rate": 0.3478,
+    "note": "a validate-retry rate at zero drops the grammar work rather than building it"
+  },
+  "D10_inference": {
+    "calls_with_model_recorded": 206,
+    "share": 0.293
+  }
+}

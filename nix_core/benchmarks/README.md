@@ -43,6 +43,11 @@ PYTHONPATH=nix_core python nix_core/benchmarks/speed_benchmark.py \
   --benchmark dashboard-classify --repeats 10 --warmup 2 \
   --scenario core-classify-baseline \
   --output /tmp/nix-speed-core.json
+
+# Reply wording when the pipeline has nothing to say (no services, no model).
+# Takes a tree root, so the same command measures a pre-fix worktree and the
+# working tree: honest / no engineering nouns / offers a next step / human shape.
+python nix_core/benchmarks/abstention_voice.py .
 ```
 
 The predictor benchmark requires the Knowledge API and may load Nix_predictor. The dashboard benchmark requires the console. Do not run live model benchmarks while another training or inference job is using the GPU.

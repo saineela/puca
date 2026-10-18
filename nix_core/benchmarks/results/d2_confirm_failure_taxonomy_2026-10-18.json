@@ -1,0 +1,734 @@
+{
+  "note": "Post-hoc failure taxonomy for the 65 zero-recall known cases of the WP2 run. Not part of the scored run; replies are reproduced from the same frozen instance.",
+  "counts": {
+    "empty_retrieval": 15,
+    "no_function_selected": 37,
+    "answered_without_expected_fact": 13
+  },
+  "cases": [
+    {
+      "set": "development",
+      "id": "confirm-dev-003",
+      "question": "When is my dentist appointment?",
+      "expected": [
+        "Friday at 3pm"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-005",
+      "question": "What kind of bike do I have?",
+      "expected": [
+        "Trek"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-006",
+      "question": "Which days do I go to the gym?",
+      "expected": [
+        "Monday and Thursday"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-007",
+      "question": "When is my nephew's birthday?",
+      "expected": [
+        "July 19"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-008",
+      "question": "Where do I work?",
+      "expected": [
+        "Cedar & Co"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-009",
+      "question": "What color is my laptop?",
+      "expected": [
+        "silver"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-010",
+      "question": "When is my flight?",
+      "expected": [
+        "Sunday at 6am"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-011",
+      "question": "Which bank branch do I use?",
+      "expected": [
+        "Sellwood"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-012",
+      "question": "Where does my sister live?",
+      "expected": [
+        "Austin"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-013",
+      "question": "What is my dog's name?",
+      "expected": [
+        "Biscuit"
+      ],
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-014",
+      "question": "When does my car insurance renew?",
+      "expected": [
+        "November 3"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-016",
+      "question": "When does my passport expire?",
+      "expected": [
+        "2031"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-017",
+      "question": "When is my project deadline?",
+      "expected": [
+        "October 30"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-019",
+      "question": "What am I allergic to?",
+      "expected": [
+        "penicillin"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-021",
+      "question": "What was my garage code before?",
+      "expected": [
+        "3319"
+      ],
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-023",
+      "question": "When was my dentist appointment before?",
+      "expected": [
+        "Tuesday at 11am"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-024",
+      "question": "What tea did I used to drink?",
+      "expected": [
+        "chamomile"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-025",
+      "question": "What bike did I have before this one?",
+      "expected": [
+        "Giant"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-026",
+      "question": "What days did I go to the gym before?",
+      "expected": [
+        "Wednesday and Saturday"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-027",
+      "question": "When was my nephew's birthday before?",
+      "expected": [
+        "July 2"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-028",
+      "question": "Where did I work before?",
+      "expected": [
+        "Bluebird Diner"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-029",
+      "question": "What color was my laptop before?",
+      "expected": [
+        "black"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-030",
+      "question": "When was my flight before?",
+      "expected": [
+        "Saturday at 9pm"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-031",
+      "question": "Which branch did I bank at before?",
+      "expected": [
+        "Alberta"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-032",
+      "question": "What was my coffee order before?",
+      "expected": [
+        "black coffee"
+      ],
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-033",
+      "question": "What day is my dentist appointment?",
+      "expected": [
+        "Friday at 3pm"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-034",
+      "question": "What day does my flight leave?",
+      "expected": [
+        "Sunday at 6am"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-035",
+      "question": "What date does my car insurance renew?",
+      "expected": [
+        "November 3"
+      ],
+      "route": "chat",
+      "reply": "My thoughts slipped for a second there \u2014 say that again?",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-036",
+      "question": "What date is my project deadline?",
+      "expected": [
+        "October 30"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-037",
+      "question": "What date is my nephew's birthday?",
+      "expected": [
+        "July 19"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-038",
+      "question": "What year does my passport expire?",
+      "expected": [
+        "2031"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-039",
+      "question": "Do I live in Tacoma and work at Cedar & Co?",
+      "expected": [
+        "Tacoma",
+        "Cedar & Co"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-040",
+      "question": "What are my gym days and my coffee order?",
+      "expected": [
+        "Monday and Thursday",
+        "flat white"
+      ],
+      "route": "knowledge+chat",
+      "reply": "I don't have that yet. Tell me and I'll remember it. a flat white with oats",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-042",
+      "question": "Tell me my garage code and my Wi-Fi password.",
+      "expected": [
+        "8042",
+        "maple-otter-42"
+      ],
+      "route": "knowledge+chat",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again? maple-otter",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-043",
+      "question": "What is my landlord's name and my dog's name?",
+      "expected": [
+        "Dana",
+        "Biscuit"
+      ],
+      "route": "knowledge+chat",
+      "reply": "I don't have that yet. Tell me and I'll remember it. Biscuit",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-044",
+      "question": "Which branch do I bank at, and when does my insurance renew?",
+      "expected": [
+        "Sellwood",
+        "November 3"
+      ],
+      "route": "chat+knowledge",
+      "reply": "You bank at theSellwood branch Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-045",
+      "question": "What am I allergic to, and what tea do I drink?",
+      "expected": [
+        "penicillin",
+        "oolong"
+      ],
+      "route": "knowledge+chat",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again? I don't have that information stored here. Can you tell me what tea you like?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-001",
+      "question": "Which city do I live in?",
+      "expected": [
+        "Tacoma"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-002",
+      "question": "What time is my dentist appointment?",
+      "expected": [
+        "Friday at 3pm"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-003",
+      "question": "Which tea do I like best?",
+      "expected": [
+        "oolong"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-004",
+      "question": "What bike do I ride?",
+      "expected": [
+        "Trek"
+      ],
+      "route": "chat",
+      "reply": "I don't have that information.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-005",
+      "question": "What date does my nephew's birthday fall on?",
+      "expected": [
+        "July 19"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-006",
+      "question": "Which company do I work for?",
+      "expected": [
+        "Cedar & Co"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-007",
+      "question": "What colour is my laptop?",
+      "expected": [
+        "silver"
+      ],
+      "route": "chat",
+      "reply": "Your laptop is silver.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-008",
+      "question": "What time does my flight leave?",
+      "expected": [
+        "Sunday at 6am"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-009",
+      "question": "Where do I bank?",
+      "expected": [
+        "Sellwood"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-010",
+      "question": "When is my project due?",
+      "expected": [
+        "October 30"
+      ],
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-011",
+      "question": "Which city did I live in before?",
+      "expected": [
+        "Denver"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-012",
+      "question": "What was my favorite tea before?",
+      "expected": [
+        "chamomile"
+      ],
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-013",
+      "question": "What bike did I ride before?",
+      "expected": [
+        "Giant"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-014",
+      "question": "Where did I work before Cedar & Co?",
+      "expected": [
+        "Bluebird Diner"
+      ],
+      "route": "knowledge",
+      "reply": "Another time, changed, no end, nothing was saved, through was, was, and way, before cedar, co.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-015",
+      "question": "Which branch did I bank at before Sellwood?",
+      "expected": [
+        "Alberta"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-016",
+      "question": "What is my dentist appointment and my flight time?",
+      "expected": [
+        "Friday at 3pm",
+        "Sunday at 6am"
+      ],
+      "route": "knowledge+chat",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again? your flight leaves at 8:00 AM tomorrow morning",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-018",
+      "question": "What color is my laptop and what bike do I ride?",
+      "expected": [
+        "silver",
+        "Trek"
+      ],
+      "route": "chat",
+      "reply": "I don't have that information stored here. Can you tell me what color your laptop is? I don't have that information.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-020",
+      "question": "What tea do I drink and when is my nephew's birthday?",
+      "expected": [
+        "oolong",
+        "July 19"
+      ],
+      "route": "chat+knowledge",
+      "reply": "Earl Grey I can't find anything for that.",
+      "class": "empty_retrieval"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-001",
+      "question": "Which code opens my garage?",
+      "expected": [
+        "8042"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-002",
+      "question": "What's the name of my dog?",
+      "expected": [
+        "Biscuit"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-003",
+      "question": "What days am I at the gym now?",
+      "expected": [
+        "Monday and Thursday"
+      ],
+      "route": "chat",
+      "reply": "Monday, Wednesday, Friday, Saturday, Sunday",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-004",
+      "question": "Who do I rent from?",
+      "expected": [
+        "Dana"
+      ],
+      "route": "chat",
+      "reply": "Your landlord is Dana.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-005",
+      "question": "Which city is my sister in?",
+      "expected": [
+        "Austin"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-006",
+      "question": "What medication should I avoid?",
+      "expected": [
+        "penicillin"
+      ],
+      "route": "chat",
+      "reply": "Penicillin.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-007",
+      "question": "What's the Wi-Fi key at home?",
+      "expected": [
+        "maple-otter-42"
+      ],
+      "route": "chat",
+      "reply": "The Wi-Fi key is maple-OTTER-42.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-008",
+      "question": "How long is my passport good for?",
+      "expected": [
+        "2031"
+      ],
+      "route": "chat",
+      "reply": "Your passport will expire in 2032.",
+      "class": "answered_without_expected_fact"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-009",
+      "question": "When does my car insurance come up for renewal?",
+      "expected": [
+        "November 3"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-010",
+      "question": "What do I usually order at a cafe?",
+      "expected": [
+        "flat white"
+      ],
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "class": "no_function_selected"
+    }
+  ]
+}

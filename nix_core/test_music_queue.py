@@ -660,3 +660,263 @@ def test_the_queues_own_files_follow_the_data_directory(monkeypatch, tmp_path):
     monkeypatch.setenv("NIX_MUSIC_QUEUE_DB", str(tmp_path / "given.db"))
     assert music_queue.service_file() == str(tmp_path / "given.json")
     assert music_queue.default_db() == str(tmp_path / "given.db")
+
+
+# ── one speaker, one queue: the service decides and hands off ────────────
+#
+# Three devices are open on the same speaker — the wall panel, the phone and a
+# laptop — and each of them can see the speaker's state. Before this, each one
+# also decided what came next, so one finished track could be advanced three
+# times, and a song played from one device was cut off by another's queue. The
+# rule these tests hold the service to: the queue decides, and one finished
+# track moves the line-up exactly once, however many devices are watching.
+
+
+def _playing_service(count: int = 3, *, with_player: bool = True):
+    played: list[dict] = []
+
+    def player(request: dict) -> dict:
+        played.append(request)
+        return {"ok": True}
+
+    service = music_queue_service.QueueService(
+        MusicQueue(":memory:", QueueLimits(prefetch=0, resolves_per_minute=0)),
+        player=player if with_player else None,
+    )
+    service.queue.add_many(tracks(count))
+    return service, played
+
+
+def _finished(video_id: str, *, position: float = 180.0, duration: float = 180.0,
+              queue_active: bool = True) -> dict:
+    return {"state": "idle", "video_id": video_id, "position": position,
+            "duration": duration, "queue_active": queue_active}
+
+
+def _started(video_id: str, *, position: float = 3.0, duration: float = 180.0) -> dict:
+    return {"state": "playing", "video_id": video_id, "position": position, "duration": duration}
+
+
+def test_selecting_a_queue_row_is_played_by_the_service():
+    service, played = _playing_service()
+    reply = service.queue_op({"op": "play", "index": 1})
+    assert reply["executed"] is True
+    assert [(call["video_id"], call["reason"]) for call in played] == [("v0001", "select")]
+
+
+def test_a_skip_is_one_hand_off_and_names_the_next_track():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    reply = service.queue_op({"op": "next"})
+    assert reply["ok"] is True
+    assert reply["executed"] is True
+    assert played[-1]["video_id"] == "v0001"
+    assert played[-1]["reason"] == "skip"
+    # The service is the one executing, so the caller has nothing to hand over.
+    assert len(played) == 2
+
+
+def test_three_devices_reporting_one_finished_track_advance_it_once():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+
+    service.report_playback(_started("v0000"))
+    first = service.report_playback(_finished("v0000"))
+    assert first["advanced"] is True
+    assert first["track"]["video_id"] == "v0001"
+
+    # The phone and the laptop poll the same finished track a moment later.
+    for _ in range(3):
+        again = service.report_playback(_finished("v0000"))
+        assert again["advanced"] is False
+
+    assert [call["video_id"] for call in played] == ["v0001"]
+    assert service.advanced == 2  # the select, then the one end-of-track
+
+
+def test_a_track_stopped_before_its_end_does_not_move_the_line_up():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+    service.report_playback(_started("v0000", position=10))
+    stopped = service.report_playback(_finished("v0000", position=20, duration=180))
+    assert stopped["advanced"] is False
+    assert played == []
+
+
+def test_a_one_off_play_ending_does_not_move_the_queues_line_up():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+    service.report_playback(_started("searched"))
+    reply = service.report_playback(_finished("searched", queue_active=False))
+    assert reply["advanced"] is False
+    assert played == []
+
+
+def test_a_finished_track_that_is_not_the_queued_one_is_ignored():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+    service.report_playback(_started("v0002"))
+    reply = service.report_playback(_finished("v0002"))
+    assert reply["advanced"] is False
+    assert played == []
+
+
+def test_without_a_player_the_service_still_decides_and_says_so():
+    """A service started without a player still owns the choice.
+
+    The console then performs the hand-off from the reply — once, because the
+    reply also carries ``executed: false`` and the same one-advance rule.
+    """
+    service, _played = _playing_service(with_player=False)
+    service.queue_op({"op": "play", "index": 0})
+    service.report_playback(_started("v0000"))
+    reply = service.report_playback(_finished("v0000"))
+    assert reply["advanced"] is True
+    assert reply["executed"] is False
+    assert reply["track"]["video_id"] == "v0001"
+    again = service.report_playback(_finished("v0000"))
+    assert again["advanced"] is False
+
+
+def test_a_paused_track_is_not_a_finished_track():
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+    service.report_playback(_started("v0000"))
+    paused = service.report_playback({"state": "paused", "video_id": "v0000",
+                                      "position": 40, "duration": 180})
+    assert paused["advanced"] is False
+    resumed = service.report_playback(_started("v0000", position=41))
+    assert resumed["advanced"] is False
+    assert played == []
+
+
+def test_the_service_shares_what_it_is_playing_with_every_reader(live_service):
+    base, service, _calls = live_service
+    _post(base + "/add", {"tracks": tracks(3)})
+    _post(base + "/ops", {"op": "play", "index": 0})
+    _post(base + "/playback", _started("v0000", position=12))
+    seen = _get(base + "/playback")
+    assert seen["video_id"] == "v0000"
+    assert seen["position"] == 12.0
+    # The queue's own read carries the same speaker state, so the page, the
+    # phone and the wall panel mirror one snapshot instead of three guesses.
+    assert _get(base + "/state?limit=10")["playback"]["video_id"] == "v0000"
+
+
+def test_the_service_reports_the_hand_off_it_performed(live_service):
+    base, service, _calls = live_service
+    _post(base + "/add", {"tracks": tracks(3)})
+    reply = _post(base + "/ops", {"op": "play", "index": 0})
+    # ``live_service`` builds the service without a player, so the decision is
+    # the service's and the press is the console's: exactly the split the reply
+    # has to describe.
+    assert reply["executed"] is False
+    assert reply["track"]["video_id"] == "v0000"
+
+
+def test_a_service_started_for_the_console_is_its_own_player(tmp_path, monkeypatch):
+    """The production wiring: the queue chooses, the console presses.
+
+    ``serve`` is what the unit file runs. Given a console address it must come
+    up able to resolve (asks the console, which owns the provider skill) and
+    able to play (posts the chosen track back to the console) — otherwise a box
+    would run a queue that can never start anything, and the old arrangement,
+    where the console decided, would quietly be the one still in force.
+    """
+    monkeypatch.setenv("NIX_MUSIC_QUEUE_FILE", str(tmp_path / "music-queue.json"))
+    server = music_queue_service.serve(
+        port=0, db=str(tmp_path / "queue.db"), console_url="http://127.0.0.1:49117")
+    try:
+        service = server.queue_service
+        assert service.resolver is not None
+        assert service.player is not None
+    finally:
+        server.queue_service.stop()
+        server.server_close()
+        music_queue.withdraw_service(path=str(tmp_path / "music-queue.json"))
+
+
+def test_simultaneous_reports_from_three_devices_advance_once():
+    """The wall, the phone and the laptop can poll in the same instant.
+
+    Reading the last report and writing the next one is one step here, so only
+    the first of three simultaneous "the track ended" reports advances the
+    line-up — the others are told it is already done. Without that, the same
+    finish would be seen three times and the speaker would skip two songs.
+    """
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    service.report_playback(_started("v0000"))
+    played.clear()
+
+    answers: list[dict] = []
+
+    def poll() -> None:
+        answers.append(service.report_playback(_finished("v0000")))
+
+    threads = [threading.Thread(target=poll) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sum(1 for answer in answers if answer["advanced"]) == 1
+    assert [call["video_id"] for call in played] == ["v0001"]
+
+
+def test_a_speaker_that_never_reports_playing_still_ends_a_track():
+    """This box's speaker reports idle for the whole track.
+
+    The hand-off resolves a stream the speaker fetches, and its own state never
+    turns to "playing" — so the console's own clock is the only progress signal.
+    The queue must still follow that track to its end (it did before, and a
+    queue that stops at the last song is worse than useless), must advance on
+    the end exactly once, and must not read the two reports in between as two
+    endings.
+    """
+    service, played = _playing_service()
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+
+    early = service.report_playback(_finished("v0000", position=20, duration=180))
+    assert early["advanced"] is False
+    middle = service.report_playback(_finished("v0000", position=120, duration=180))
+    assert middle["advanced"] is False
+
+    ended = service.report_playback(_finished("v0000", position=181, duration=180))
+    assert ended["advanced"] is True
+    assert [call["video_id"] for call in played] == ["v0001"]
+
+    # The phone reports the same end a moment later: still one advance.
+    assert service.report_playback(_finished("v0000", position=182, duration=180))["advanced"] is False
+    assert [call["video_id"] for call in played] == ["v0001"]
+
+
+def test_repeat_one_advances_at_the_end_of_every_pass():
+    """A repeated track has one ending per pass, not one ending ever.
+
+    The mark that stops a second reader of an ending is cleared when the
+    position falls back to the start of the track: that is a new pass, and its
+    own ending is a new advance. Without the restart rule, repeat-one would
+    advance once and then sit on the song forever.
+    """
+    service, played = _playing_service()
+    service.queue_op({"op": "repeat", "mode": "one"})
+    service.queue_op({"op": "play", "index": 0})
+    played.clear()
+
+    service.report_playback(_finished("v0000", position=100, duration=180))
+    first = service.report_playback(_finished("v0000", position=181, duration=180))
+    assert first["advanced"] is True and first["track"]["video_id"] == "v0000"
+    assert service.report_playback(_finished("v0000", position=190, duration=180))["advanced"] is False
+
+    # The next pass: the position is back at the start, then it ends again.
+    service.report_playback(_finished("v0000", position=4, duration=180))
+    second = service.report_playback(_finished("v0000", position=181, duration=180))
+    assert second["advanced"] is True
+    assert [call["video_id"] for call in played] == ["v0000", "v0000"]

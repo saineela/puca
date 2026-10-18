@@ -1,0 +1,84 @@
+{
+  "total": 24,
+  "false_escalation": 0.0,
+  "false_escalation_numerator": 0,
+  "false_escalation_denominator": 10,
+  "false_de_escalation": 0.0,
+  "false_de_escalation_numerator": 0,
+  "false_de_escalation_denominator": 10,
+  "undetermined": 4,
+  "undetermined_share": 0.1667,
+  "replayed": 0,
+  "route_correctness": 0.625,
+  "answer_quality_mean": null,
+  "note": "False escalation counts only replayed escalations whose controlled alternative was correct; answer quality is reported separately.",
+  "by_class": {
+    "conversation": {
+      "n": 8,
+      "correct": 5,
+      "scored": 5
+    },
+    "world_question": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "opinion": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "memory_read": {
+      "n": 2,
+      "correct": 2,
+      "scored": 2
+    },
+    "memory_history": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "state_read": {
+      "n": 1,
+      "correct": 0,
+      "scored": 0
+    },
+    "memory_write": {
+      "n": 3,
+      "correct": 3,
+      "scored": 3
+    },
+    "calendar_write": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "calendar_clarify": {
+      "n": 1,
+      "correct": 1,
+      "scored": 1
+    },
+    "safety_confirmation": {
+      "n": 1,
+      "correct": 0,
+      "scored": 0
+    },
+    "ambiguous": {
+      "n": 4,
+      "correct": 0,
+      "scored": 0
+    }
+  },
+  "scored_accuracy": 1.0,
+  "scored": 15,
+  "abstained": 7,
+  "abstention_share": 0.2917,
+  "answers_judged": 0,
+  "counterfactual_replay": "not run",
+  "thresholds_changed": false,
+  "set": {
+    "tag": "routing-pilot-2026-10-17",
+    "n": 24,
+    "kind": "pilot"
+  }
+}

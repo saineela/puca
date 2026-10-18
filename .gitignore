@@ -18,6 +18,10 @@
 /.ssh/
 /.triton/
 
+# Local Git identity/credential configuration. The tracked project must never
+# publish the machine owner's Git settings.
+/.gitconfig
+
 # The agent's local working files: rules, the research portal it writes reports,
 # proposals and specifications into, and the development desk (the queue, the
 # owner's prompts and everything a later session needs to pick the work up).

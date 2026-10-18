@@ -1,0 +1,2401 @@
+{
+ "kind": "scoring-rule-comparison",
+ "tag": "d2-scoring-v2-comparison-2026-10-18",
+ "generated_at": "2026-10-18T07:45:09.351933+00:00",
+ "source_cases": "benchmarks/results/d2_wp6_smoke_2026-10-18.json",
+ "frozen_set": "eval/data/memory_scenarios_confirm.json",
+ "rules": {
+  "scoring-v1-frozen-2026-10-18": "eval/memory_sets.py score_answer (frozen; unchanged)",
+  "scoring-v2-2026-10-18": "eval/scoring_v2.py score_answer_v2 (proposal)"
+ },
+ "summary": {
+  "scored_cases": 75,
+  "unknown_cases": 25,
+  "denominator_cases": 100,
+  "mean_fact_recall_scoring-v1-frozen-2026-10-18": 0.573333,
+  "mean_fact_recall_scoring-v2-2026-10-18": 0.613333,
+  "mean_recall_delta": 0.04,
+  "paired_bootstrap_95_interval_on_mean_delta": [
+   0.005,
+   0.065
+  ],
+  "interval_excludes_zero": true,
+  "cases_that_moved_up": [
+   "confirm-dev-008",
+   "confirm-dev-039",
+   "confirm-held-006",
+   "confirm-held-017"
+  ],
+  "cases_that_moved_down": [],
+  "cases_with_full_recall_v1": 65,
+  "cases_with_full_recall_v2": 69,
+  "stale_cases_v1": 0,
+  "stale_cases_v2": 0,
+  "unit": "case",
+  "note": "Both rules scored the same recorded replies in one pass. The frozen baseline number is unchanged and still reported under its own rule; v2 is a proposal, not a replacement."
+ },
+ "cases": [
+  {
+   "id": "confirm-dev-001",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "8042"
+   ],
+   "reply": "Your garage code is indeed 8042.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-002",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Tacoma"
+   ],
+   "reply": "Your sister lives in Texas, and you live in Washington.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-003",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Friday at 3pm"
+   ],
+   "reply": "I can't find anything for that.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-004",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "oolong"
+   ],
+   "reply": "Your favorite tea is indeed oolong.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-005",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Trek"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-006",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Monday and Thursday"
+   ],
+   "reply": "You go to the g",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-007",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "July 19"
+   ],
+   "reply": "Your nephew's birthday was July 19.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-008",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Cedar & Co"
+   ],
+   "reply": "I work at Cedars & Co.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 1.0
+  },
+  {
+   "id": "confirm-dev-009",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "silver"
+   ],
+   "reply": "Your laptop is silver.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-010",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Sunday at 6am"
+   ],
+   "reply": "Your flight is Sunday, October, 18th, at 6:00 AM.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-011",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Sellwood"
+   ],
+   "reply": "You can use the Sellwood bank branch.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-012",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Austin"
+   ],
+   "reply": "Your sister lives in Texas.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-013",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Biscuit"
+   ],
+   "reply": "Your dog's name is Biscuit",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-014",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "November 3"
+   ],
+   "reply": "Your car insurance renewal is scheduled for November 3",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-015",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "maple-otter-42"
+   ],
+   "reply": "Your Wi-Fi password was found in our database. It is maple-OTTER-42.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-016",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "2031"
+   ],
+   "reply": "Your passport expires in the year 2031",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-017",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "October 30"
+   ],
+   "reply": "Your project deadline is on October 30th.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-018",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Dana"
+   ],
+   "reply": "Your landlord is Dana",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-019",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "penicillin"
+   ],
+   "reply": "You are allergic to penecillin.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-020",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "flat white"
+   ],
+   "reply": "Your coffee order is indeed a flat white made with oat milk!",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-021",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "3319"
+   ],
+   "reply": "Now: My garage code is 8042.. Before that: My garage code was 3319. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-022",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Denver"
+   ],
+   "reply": "Now: My sister lives in Austin.; I live in Tacoma.. Before that: I used to live in Denver. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-023",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Tuesday at 11am"
+   ],
+   "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-024",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "chamomile"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-025",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Giant"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-026",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Wednesday and Saturday"
+   ],
+   "reply": "Now: I go to the gym on Monday and Thursday.. Before that: I went to the gym on Wednesday and Saturday. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-027",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "July 2"
+   ],
+   "reply": "Now: My nephew's birthday is July 19.. Before that: My nephew's birthday was July 2. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-028",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Bluebird Diner"
+   ],
+   "reply": "Now: I work at Cedar & Co.. Before that: I worked at Bluebird Diner. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-029",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "black"
+   ],
+   "reply": "Now: My laptop is silver.. Before that: My laptop was black. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-030",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Saturday at 9pm"
+   ],
+   "reply": "Now: My flight is Sunday at 6am.. Before that: My flight was Saturday at 9pm. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-031",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Alberta"
+   ],
+   "reply": "You banked at the Sell wood branch before.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-032",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "black coffee"
+   ],
+   "reply": "Now: My coffee order is a flat white with oat milk.. Before that: My coffee order was black coffee. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-033",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Friday at 3pm"
+   ],
+   "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 0.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 0.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-034",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Sunday at 6am"
+   ],
+   "reply": "My flight is Sunday at 6am.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-035",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "November 3"
+   ],
+   "reply": "Your car insurance renewal date is November 3",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-036",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "October 30"
+   ],
+   "reply": "Your project deadline is on October 30, 2027.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-037",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "July 19"
+   ],
+   "reply": "Your nephew's birthday was July 19.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-038",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "2031"
+   ],
+   "reply": "Your passport expires in the year 2031",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-039",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Tacoma",
+    "Cedar & Co"
+   ],
+   "reply": "Yes, you live in Tacoma, and yes, you work at Cedar and Co.",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.5
+  },
+  {
+   "id": "confirm-dev-040",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Monday and Thursday",
+    "flat white"
+   ],
+   "reply": "Your gym days are Monday and Thursday. a flat white with oats",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-041",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Tacoma",
+    "Austin"
+   ],
+   "reply": "Your sister lives in Texas, and you live in Washington. Your sister lives in Texas.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-042",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "8042",
+    "maple-otter-42"
+   ],
+   "reply": "Your garage code is #8042. Your Wi-Fi password remains unchanged. maple-otter",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-043",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Dana",
+    "Biscuit"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it. Biscuit",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-044",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "Sellwood",
+    "November 3"
+   ],
+   "reply": "You bank at theSellwood branch. Your car insurance renewal is on November 03. Your car insurance renewal is scheduled for November 3, so mark that date on your calendar.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-045",
+   "set": "development",
+   "unknown": false,
+   "expected_facts": [
+    "penicillin",
+    "oolong"
+   ],
+   "reply": "You are allergic to penecillin. I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-046",
+   "set": "development",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-047",
+   "set": "development",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-048",
+   "set": "development",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-049",
+   "set": "development",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-dev-050",
+   "set": "development",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-001",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Tacoma"
+   ],
+   "reply": "Your sister lives in Texas, but you live in Washington.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-002",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Friday at 3pm"
+   ],
+   "reply": "I can't find anything for that.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-003",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "oolong"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-004",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Trek"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-005",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "July 19"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-006",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Cedar & Co"
+   ],
+   "reply": "I work at Cedars & Co.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 1.0
+  },
+  {
+   "id": "confirm-held-007",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "silver"
+   ],
+   "reply": "Your laptop is silver.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-008",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Sunday at 6am"
+   ],
+   "reply": "My flight is Sunday at 6am.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-009",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Sellwood"
+   ],
+   "reply": "You bank at theSellwood branch.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-010",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "October 30"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-011",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Denver"
+   ],
+   "reply": "Your sister lives in Texas, and you live in Washington.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-012",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "chamomile"
+   ],
+   "reply": "Now: My favorite tea is oolong.. Before that: My favorite tea was chamomile. (until 2026-10-18).",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-013",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Giant"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-014",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Bluebird Diner"
+   ],
+   "reply": "I work at Ced",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-015",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Alberta"
+   ],
+   "reply": "You banked at the Sell wood branch.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-016",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Friday at 3pm",
+    "Sunday at 6am"
+   ],
+   "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again? your flight leaves at 8:00 AM tomorrow morning",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-017",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Cedar & Co",
+    "October 30"
+   ],
+   "reply": "You work at Cedar and Co., and your project deadline is on October 30th. Your project deadline is set for October 30, 2027.",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.5
+  },
+  {
+   "id": "confirm-held-018",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "silver",
+    "Trek"
+   ],
+   "reply": "Your laptop is silver. Your bike is black. I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-019",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "Denver",
+    "Tacoma"
+   ],
+   "reply": "Now: My sister lives in Austin.; I live in Tacoma.. Before that: I used to live in Denver. (until 2026-10-18). Your sister lives in Texas, and you live in Washington.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-020",
+   "set": "heldout",
+   "unknown": false,
+   "expected_facts": [
+    "oolong",
+    "July 19"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it. Your nephew's birthday will be July 19.",
+   "v1": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.5,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-021",
+   "set": "heldout",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-022",
+   "set": "heldout",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-023",
+   "set": "heldout",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-024",
+   "set": "heldout",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-held-025",
+   "set": "heldout",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-001",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "8042"
+   ],
+   "reply": "Your garage code is indeed 8042.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-002",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "Biscuit"
+   ],
+   "reply": "Your dog's name is Biscuit",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-003",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "Monday and Thursday"
+   ],
+   "reply": "You go to the gynm on Monday and Thursdays.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-004",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "Dana"
+   ],
+   "reply": "Your landlord is Dana",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-005",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "Austin"
+   ],
+   "reply": "Your sister lives in the city of Austin.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-006",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "penicillin"
+   ],
+   "reply": "You should avoid taking penicillin due to your allergy.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-007",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "maple-otter-42"
+   ],
+   "reply": "Your Wi-Fi password at home is maple-OTTER-42.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-008",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "2031"
+   ],
+   "reply": "Your passport expires in the year 2031",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-009",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "November 3"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-010",
+   "set": "adversarial",
+   "unknown": false,
+   "expected_facts": [
+    "flat white"
+   ],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 0.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": null,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-011",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-012",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-013",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-014",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-015",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-016",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-017",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-018",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-019",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-020",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-021",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-022",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-023",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-024",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  },
+  {
+   "id": "confirm-adv-025",
+   "set": "adversarial",
+   "unknown": true,
+   "expected_facts": [],
+   "reply": "I don't have that yet. Tell me and I'll remember it.",
+   "v1": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v1-frozen-2026-10-18"
+   },
+   "v2": {
+    "fact_recall": 1.0,
+    "temporal_correctness": 1.0,
+    "stale_fact": false,
+    "abstention_honesty": 1.0,
+    "scorer": "scoring-v2-2026-10-18"
+   },
+   "recall_delta": 0.0
+  }
+ ]
+}

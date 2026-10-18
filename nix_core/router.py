@@ -456,6 +456,24 @@ _PREFERENCE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Residence statements: "i live in Austin", "we moved to Seattle",
+# "i'm back in Austin". These are profile keys (location), and a
+# correction supersedes the old city, so they belong to Knowledge. A
+# question ("where do I live") never matches: the sentence must not
+# open with a wh-word.
+_RESIDENCE_RE = re.compile(
+    r"\b(?:live|living|reside|residing)\s+in\b"
+    r"|\b(?:moved|relocated|moving|relocating)\s+to\b"
+    r"|\bback\s+in\b",
+    re.IGNORECASE,
+)
+
+_RESIDENCE_QUESTION_RE = re.compile(
+    r"^(?:where|what|when|who|how|which|do|did|does|is|are|was|were|"
+    r"can|could|would|will|should|have|has)\b",
+    re.IGNORECASE,
+)
+
 # Health facts: "i'm allergic to peanuts".
 _ALLERGIC_RE = re.compile(
     r"^(?:i\s+(?:am\s+)?|i'm\s+|im\s+|we\s+are\s+|we're\s+)allergic\b",
@@ -1094,6 +1112,16 @@ def classify(
         r"\b(?:you|your|yourself)\b", lowered
     ):
         features.update(route=KNOWLEDGE, rule="preference_statement")
+        return KNOWLEDGE, features
+
+    # Residence statements: "i live in Austin", "i'm back in Austin".
+    # "my sister lives in Austin" stays out: the subject is the user.
+    if (
+        _RESIDENCE_RE.search(lowered)
+        and not _RESIDENCE_QUESTION_RE.match(lowered)
+        and re.search(r"\b(?:i|we|i'm|i\s+am|im|we're)\b", lowered)
+    ):
+        features.update(route=KNOWLEDGE, rule="residence_statement")
         return KNOWLEDGE, features
 
     # Event lead-ins: "i have a dentist appointment tomorrow at 3".

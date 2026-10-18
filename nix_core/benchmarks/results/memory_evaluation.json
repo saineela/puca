@@ -1,0 +1,1734 @@
+{
+  "results": {
+    "development": {
+      "scenarios": [
+        {
+          "id": "dev-001",
+          "tokens": 5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "dev-002",
+          "tokens": 25,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "dev-003",
+          "tokens": 18,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        }
+      ],
+      "accuracy": 0.333,
+      "temporal_correctness": 0.667,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 48,
+      "budget": 1200,
+      "scenarios_count": 3
+    },
+    "heldout": {
+      "scenarios": [
+        {
+          "id": "held-001",
+          "tokens": 5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "held-002",
+          "tokens": 25,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "held-003",
+          "tokens": 18,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        }
+      ],
+      "accuracy": 0.333,
+      "temporal_correctness": 0.667,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 48,
+      "budget": 1200,
+      "scenarios_count": 3
+    },
+    "adversarial": {
+      "scenarios": [
+        {
+          "id": "adv-001",
+          "tokens": 25,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "adv-002",
+          "tokens": 9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        },
+        {
+          "id": "adv-003",
+          "tokens": 16,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null
+          }
+        }
+      ],
+      "accuracy": 0.0,
+      "temporal_correctness": 0.333,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 50,
+      "budget": 1200,
+      "scenarios_count": 3
+    }
+  },
+  "freeze": {
+    "tag": "frozen-2026-10-17",
+    "model": "luna-v6-contextual-v1",
+    "hardware": "x86_64",
+    "scoring": {
+      "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+      "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+      "stale_fact_rate": "a superseded value is reported as current; lower is better",
+      "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+    },
+    "sets": {
+      "development": [
+        {
+          "id": "dev-001",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-002",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-003",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-004",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-005",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-006",
+          "question": "Where is my spare key?",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-007",
+          "question": "What is my favourite colour?",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-008",
+          "question": "When is my birthday?",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-009",
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-010",
+          "question": "What is my dog's name?",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-011",
+          "question": "What car do I drive?",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-012",
+          "question": "How do I take my coffee?",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-013",
+          "question": "What am I allergic to?",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-014",
+          "question": "What is my favourite book?",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-015",
+          "question": "Where did I grow up?",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-016",
+          "question": "When do I go to the gym?",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-017",
+          "question": "Who is my landlord?",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-018",
+          "question": "What is my home wifi called?",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-019",
+          "question": "When is my dentist appointment?",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-020",
+          "question": "What am I working on?",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-021",
+          "question": "What is my name? (asked again later)",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-022",
+          "question": "Where do I live? (asked again later)",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-023",
+          "question": "What is my sister's name? (asked again later)",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-024",
+          "question": "How is my mother doing right now? (asked again later)",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-025",
+          "question": "What is my locker code? (asked again later)",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-026",
+          "question": "Where is my spare key? (asked again later)",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-027",
+          "question": "What is my favourite colour? (asked again later)",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-028",
+          "question": "When is my birthday? (asked again later)",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-029",
+          "question": "Where do I work? (asked again later)",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-030",
+          "question": "What is my dog's name? (asked again later)",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-031",
+          "question": "What car do I drive? (asked again later)",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-032",
+          "question": "How do I take my coffee? (asked again later)",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-033",
+          "question": "What am I allergic to? (asked again later)",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-034",
+          "question": "What is my favourite book? (asked again later)",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-035",
+          "question": "Where did I grow up? (asked again later)",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-036",
+          "question": "When do I go to the gym? (asked again later)",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-037",
+          "question": "Who is my landlord? (asked again later)",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-038",
+          "question": "What is my home wifi called? (asked again later)",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-039",
+          "question": "When is my dentist appointment? (asked again later)",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-040",
+          "question": "What am I working on? (asked again later)",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-041",
+          "question": "What is my name? (asked again later)",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-042",
+          "question": "Where do I live? (asked again later)",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-043",
+          "question": "What is my sister's name? (asked again later)",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-044",
+          "question": "How is my mother doing right now? (asked again later)",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-045",
+          "question": "What is my locker code? (asked again later)",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-046",
+          "question": "Where is my spare key? (asked again later)",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-047",
+          "question": "What is my favourite colour? (asked again later)",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-048",
+          "question": "When is my birthday? (asked again later)",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-049",
+          "question": "Where do I work? (asked again later)",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-050",
+          "question": "What is my dog's name? (asked again later)",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        }
+      ],
+      "heldout": [
+        {
+          "id": "held-001",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-002",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-003",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-004",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-005",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-006",
+          "question": "Where is my spare key?",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-007",
+          "question": "What is my favourite colour?",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-008",
+          "question": "When is my birthday?",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-009",
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-010",
+          "question": "What is my dog's name?",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-011",
+          "question": "What car do I drive?",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-012",
+          "question": "How do I take my coffee?",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-013",
+          "question": "What am I allergic to?",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-014",
+          "question": "What is my favourite book?",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-015",
+          "question": "Where did I grow up?",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-016",
+          "question": "When do I go to the gym?",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-017",
+          "question": "Who is my landlord?",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-018",
+          "question": "What is my home wifi called?",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-019",
+          "question": "When is my dentist appointment?",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-020",
+          "question": "What am I working on?",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-021",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-022",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-023",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-024",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-025",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        }
+      ],
+      "adversarial": [
+        {
+          "id": "adv-001",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-002",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-003",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-004",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-005",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-006",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-007",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-008",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-009",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-010",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-011",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-012",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-013",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-014",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-015",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-016",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-017",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-018",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-019",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-020",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-021",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-022",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-023",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-024",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-025",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        }
+      ]
+    },
+    "baselines": [
+      "full_recent_transcript",
+      "filesystem_dump"
+    ],
+    "sha256": "bb5c17db81888de70b847867edad898cd6163902d7898202498cffb940a4c435",
+    "frozen_at": "2026-10-17T13:04:49.789694+00:00",
+    "prior_exposure": "none recorded",
+    "retired": []
+  }
+}

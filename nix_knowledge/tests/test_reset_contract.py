@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from pathlib import Path
 
 from nix_knowledge.engine import KnowledgeEngine
 
 
 def _load_api():
-    path = "scripts/knowledge_api.py"
-    spec = importlib.util.spec_from_file_location("test_knowledge_api", path)
+    path = Path(__file__).resolve().parents[1] / "scripts" / "knowledge_api.py"
+    spec = importlib.util.spec_from_file_location("test_knowledge_api", str(path))
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     assert spec.loader is not None

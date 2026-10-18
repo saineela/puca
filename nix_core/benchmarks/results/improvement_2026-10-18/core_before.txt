@@ -1,0 +1,214 @@
+FFFFF.FFFFFF                                                             [100%]
+=================================== FAILURES ===================================
+_________ test_a_conversational_prediction_does_not_demote_a_due_write _________
+
+    def test_a_conversational_prediction_does_not_demote_a_due_write():
+        decision = route_request("The renewal is due March 4")
+>       assert decision.route == "knowledge", decision
+E       AssertionError: RouteDecision(route='unknown', confidence=0.0, reason='insufficient_route_evidence', rule='abstain', requires_knowledge=False, requires_model=True, safety='normal', latency_ms=2.949)
+E       assert 'unknown' == 'knowledge'
+E         
+E         - knowledge
+E         + unknown
+
+test_evidence_defect_regressions.py:28: AssertionError
+_________ test_a_stored_deadline_is_read_from_the_store_not_from_chat __________
+
+    def test_a_stored_deadline_is_read_from_the_store_not_from_chat():
+        """A due-date read is the write's other half.
+    
+        Live verification of c32 found the follow-up "When is the renewal due?"
+        answered by chat as "March 4, 2027" for a fact stored without a year. The
+        deadline read belongs to the memory arm.
+        """
+        decision = route_request("When is the renewal due?")
+>       assert decision.route == "knowledge", decision
+E       AssertionError: RouteDecision(route='chat', confidence=0.86, reason='symbolic_classifier', rule='general_question', requires_knowledge=False, requires_model=False, safety='normal', latency_ms=0.188)
+E       assert 'chat' == 'knowledge'
+E         
+E         - knowledge
+E         + chat
+
+test_evidence_defect_regressions.py:45: AssertionError
+________ test_a_conversational_turn_with_no_boundary_still_goes_to_chat ________
+
+    def test_a_conversational_turn_with_no_boundary_still_goes_to_chat():
+        undecided = RouteDecision(
+            route="unknown",
+            confidence=0.0,
+            reason="insufficient_route_evidence",
+            rule="abstain",
+            requires_knowledge=False,
+            requires_model=True,
+        )
+        expectation = turn_state.predict_turn("that was a good film", history=[])
+>       assert brain.expectation_may_redirect_to_chat(undecided, expectation) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'brain' has no attribute 'expectation_may_redirect_to_chat'
+
+test_evidence_defect_regressions.py:62: AttributeError
+_________________ test_a_plain_statement_keeps_its_normal_path _________________
+
+    def test_a_plain_statement_keeps_its_normal_path():
+        decision = route_request("The renewal is due March 4")
+        expectation = turn_state.predict_turn("I finished the book", history=[])
+        # Nothing in this expectation asks for a redirect at all.
+>       assert brain.expectation_may_redirect_to_chat(decision, expectation) is False
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'brain' has no attribute 'expectation_may_redirect_to_chat'
+
+test_evidence_defect_regressions.py:69: AttributeError
+______________ test_a_composed_event_reply_may_not_move_the_date _______________
+
+    def test_a_composed_event_reply_may_not_move_the_date():
+        """Live composition of the c31 write said "Monday, October 20, 2025" for
+        an event stored at 2026-10-19T10:00. The clock was grounded; the day was
+        not."""
+        payload = {
+            "result": {
+                "operation": "CREATE",
+                "record_type": "event",
+                "temporal": {
+                    "resolved_start": "2026-10-19T10:00:00-05:00",
+                    "resolved_end": "2026-10-19T10:00:00-05:00",
+                    "when": "tomorrow 10am",
+                },
+            }
+        }
+>       assert brain._stated_dates_are_grounded(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "Scheduled 'optician' for Monday, October 19, 2026 at 10:00 AM.", payload
+        )
+E       AttributeError: module 'brain' has no attribute '_stated_dates_are_grounded'. Did you mean: '_stated_times_are_grounded'?
+
+test_evidence_defect_regressions.py:87: AttributeError
+_________________ test_a_fact_read_reply_may_not_invent_a_year _________________
+
+    def test_a_fact_read_reply_may_not_invent_a_year():
+        """Live composition of "When is the renewal due?" produced "March 4, 2027"
+        for a fact stored as "The renewal is due March 4" with no year at all."""
+        payload = {
+            "result": {
+                "ok": True,
+                "query": "renewal due",
+                "facts": [{"value": "The renewal is due March 4"}],
+                "previous": [],
+            }
+        }
+>       assert brain._stated_dates_are_grounded(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "Your renewal is due March 4.", payload
+        )
+E       AttributeError: module 'brain' has no attribute '_stated_dates_are_grounded'. Did you mean: '_stated_times_are_grounded'?
+
+test_evidence_defect_regressions.py:121: AttributeError
+________________ test_the_event_baseline_names_the_stored_date _________________
+
+    def test_the_event_baseline_names_the_stored_date():
+        payload = {
+            "result": {
+                "operation": "CREATE",
+                "record_type": "event",
+                "data": {"title": "optician"},
+                "temporal": {
+                    "when": "tomorrow 10am",
+                    "resolved_start": "2026-10-19T10:00:00-05:00",
+                },
+            }
+        }
+        reply = brain.format_knowledge_result(payload)
+>       assert "October 19, 2026" in reply, reply
+E       AssertionError: Scheduled 'optician' tomorrow 10am.
+E       assert 'October 19, 2026' in "Scheduled 'optician' tomorrow 10am."
+
+test_evidence_defect_regressions.py:142: AssertionError
+_____________ test_a_fact_deletion_is_confirmed_before_it_deletes ______________
+
+    def test_a_fact_deletion_is_confirmed_before_it_deletes():
+        knowledge = _StubKnowledge()
+        instance = _bare_brain(knowledge)
+    
+        # Nothing pending: the turn is not ours to answer.
+>       assert _turn(instance, "delete the note about my old address") is None
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+test_evidence_defect_regressions.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+instance = <brain.Brain object at 0x7b9a4fd9aba0>
+text = 'delete the note about my old address', conversation_id = 'conv-1'
+
+    def _turn(instance, text, conversation_id="conv-1"):
+>       return instance._pending_fact_deletion_turn(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            text, conversation_id=conversation_id, location="test"
+        )
+E       AttributeError: 'Brain' object has no attribute '_pending_fact_deletion_turn'. Did you mean: '_pending_fact_deletions'?
+
+test_evidence_defect_regressions.py:183: AttributeError
+___________________ test_a_declined_deletion_deletes_nothing ___________________
+
+    def test_a_declined_deletion_deletes_nothing():
+        knowledge = _StubKnowledge()
+        instance = _bare_brain(knowledge)
+>       instance.remember_pending_fact_deletion(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "conv-1", {"query": "my old address", "matches": []}
+        )
+E       AttributeError: 'Brain' object has no attribute 'remember_pending_fact_deletion'
+
+test_evidence_defect_regressions.py:223: AttributeError
+____________ test_the_pending_delete_reply_names_the_fact_and_asks _____________
+
+    def test_the_pending_delete_reply_names_the_fact_and_asks():
+        payload = {
+            "result": {
+                "ok": True,
+                "status": "needs_confirmation",
+                "operation": "DELETE_FACT_PENDING",
+                "query": "my old address",
+                "matches": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}],
+                "deleted": [],
+            }
+        }
+        reply = brain.format_knowledge_result(payload)
+        assert "14 Willow Lane" in reply, reply
+>       assert "Nothing has been deleted" in reply, reply
+E       AssertionError: {"ok": true, "status": "needs_confirmation", "operation": "DELETE_FACT_PENDING", "query": "my old address", "matches": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}], "deleted": []}
+E       assert 'Nothing has been deleted' in '{"ok": true, "status": "needs_confirmation", "operation": "DELETE_FACT_PENDING", "query": "my old address", "matches": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}], "deleted": []}'
+
+test_evidence_defect_regressions.py:246: AssertionError
+_______________ test_the_delete_result_reports_what_was_removed ________________
+
+    def test_the_delete_result_reports_what_was_removed():
+        payload = {
+            "result": {
+                "ok": True,
+                "status": "deleted",
+                "operation": "DELETE_FACT",
+                "query": "my old address",
+                "count": 1,
+                "deleted": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}],
+            }
+        }
+        reply = brain.format_knowledge_result(payload)
+>       assert reply.startswith("Deleted"), reply
+E       AssertionError: {"ok": true, "status": "deleted", "operation": "DELETE_FACT", "query": "my old address", "count": 1, "deleted": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}]}
+E       assert False
+E        +  where False = <built-in method startswith of str object at 0x7b9a4fde1460>('Deleted')
+E        +    where <built-in method startswith of str object at 0x7b9a4fde1460> = '{"ok": true, "status": "deleted", "operation": "DELETE_FACT", "query": "my old address", "count": 1, "deleted": [{"record_id": 7, "value": "My old address was 14 Willow Lane."}]}'.startswith
+
+test_evidence_defect_regressions.py:262: AssertionError
+=========================== short test summary info ============================
+FAILED test_evidence_defect_regressions.py::test_a_conversational_prediction_does_not_demote_a_due_write
+FAILED test_evidence_defect_regressions.py::test_a_stored_deadline_is_read_from_the_store_not_from_chat
+FAILED test_evidence_defect_regressions.py::test_a_conversational_turn_with_no_boundary_still_goes_to_chat
+FAILED test_evidence_defect_regressions.py::test_a_plain_statement_keeps_its_normal_path
+FAILED test_evidence_defect_regressions.py::test_a_composed_event_reply_may_not_move_the_date
+FAILED test_evidence_defect_regressions.py::test_a_fact_read_reply_may_not_invent_a_year
+FAILED test_evidence_defect_regressions.py::test_the_event_baseline_names_the_stored_date
+FAILED test_evidence_defect_regressions.py::test_a_fact_deletion_is_confirmed_before_it_deletes
+FAILED test_evidence_defect_regressions.py::test_a_declined_deletion_deletes_nothing
+FAILED test_evidence_defect_regressions.py::test_the_pending_delete_reply_names_the_fact_and_asks
+FAILED test_evidence_defect_regressions.py::test_the_delete_result_reports_what_was_removed
+11 failed, 1 passed in 0.19s

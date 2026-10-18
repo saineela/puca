@@ -123,6 +123,11 @@ def _learn_turn(engine: KnowledgeEngine, text: str, resolver: TemporalResolver):
             end=new_time.end.isoformat(),
             temporal_expression=arguments["new_temporal_expression"],
         )
+    elif name == "store_profile_keys":
+        # Residence statements route to the profile-key store (the same
+        # store_keys the replay above already ran). A repeated sentence is
+        # a NOOP there, which is exactly what these tests are about.
+        result = store_keys(engine, arguments["keys"])
     else:
         raise AssertionError(f"unhandled deterministic operation: {name}")
 

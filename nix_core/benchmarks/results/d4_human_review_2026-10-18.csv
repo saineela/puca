@@ -1,0 +1,171 @@
+id,class,label,text,chosen_route,router_rule,route_correct,chat_reply,knowledge_reply,chat_correctness_1_5,chat_completeness_1_5,chat_honesty_1_5,chat_naturalness_1_5,knowledge_correctness_1_5,knowledge_completeness_1_5,knowledge_honesty_1_5,knowledge_naturalness_1_5,false_escalation_disposition,reviewer,notes
+c01,conversation,fast_path_sufficient,"Hey, how's your morning going?",chat,addressing_assistant,yes,"My morning is going well! I've just kicked off my shift ready to dive into whatever you need help with. ☕️✨
+
+How about yours? Did you get a good start today?","It's going well, thanks. I'm just getting ready for my shift at the aquarium.",5,5,5,5,4,5,5,4,,agent rubric pass; not a human reviewer,
+c02,conversation,fast_path_sufficient,"Long day, but I got through it",unknown,abstain,yes,"That's great to hear! Reaching the end of a long day means you've made it through all those tasks (or whatever was on your plate).  
+
+How are you feeling now—recharged or just glad it's over? 😊 If you need any help winding down, planning your rest, or even just sharing what drained you, I'm here.",Good job! You did great,5,5,5,5,4,4,5,4,,agent rubric pass; not a human reviewer,
+c03,conversation,fast_path_sufficient,I keep thinking about that film,unknown,abstain,yes,"That's interesting! Which film are you thinking about? Is there something specific about it that keeps you coming back to, like a particular scene, character, or theme? I'd love to hear more about it! 😊🎬",Which one?,5,5,5,5,4,3,5,4,,agent rubric pass; not a human reviewer,
+c04,conversation,fast_path_sufficient,Write me one line about the rain,chat,world_question,yes,"The relentless rhythm of rain turns the weary world into a quiet, glistening sanctuary.",The rain is falling down on us.,5,5,5,5,3,4,5,3,,agent rubric pass; not a human reviewer,
+c05,conversation,fast_path_sufficient,That album still holds up,unknown,abstain,yes,"It sounds like you're referring to an album that has stood the test of time! Could you clarify which album or artist you're talking about? That way, I can share more specific insights, discuss its lasting impact, or even dive into what makes it so enduring. 🎵✨","Yeah, it's really good",5,5,5,5,3,2,5,3,,agent rubric pass; not a human reviewer,
+c06,conversation,fast_path_sufficient,Quiet evening here,unknown,abstain,yes,"That sounds peaceful. Sometimes quiet evenings are the perfect time to reflect, read, or simply enjoy the stillness. Is there anything particular on your mind you'd like to chat about, or shall we just take a moment to appreciate the calm?","Yeah, I'm glad we're having a quiet night",5,5,5,5,4,3,5,4,,agent rubric pass; not a human reviewer,
+c07,conversation,fast_path_sufficient,Thanks for listening,chat,chat_opener,yes,"You're very welcome! 😊 If you ever need help with anything—whether it's solving a problem, exploring new ideas, or just having a chat—feel free to reach out. How can I assist you today?","No problem, happy to help",5,5,5,5,5,4,5,5,,agent rubric pass; not a human reviewer,
+c08,conversation,fast_path_sufficient,Books or films for a rainy weekend?,unknown,abstain,yes,"A rainy weekend is the perfect excuse to curl up with something atmospheric, immersive, and cozy. Here are some curated recommendations based on different moods:
+
+### 🌧️ If you want to feel the **rain on the pages** (Atmospheric Novels)
+These books are famous for their descriptions of weather and moody settings.
+
+1.  **""The Weather Outside"" by E.L. Knight** (or her earlier works like *The Last Thing I Told You*): While not explicitly about ""it raining outside,"" these novels have that specific, quiet, rain-so",I'd pick books. There's nothing like curling up with a good book on a rainy day.,5,5,5,5,4,4,5,5,,agent rubric pass; not a human reviewer,
+c09,world_question,fast_path_sufficient,How many moons does Jupiter have?,chat,general_question,yes,"Jupiter has the largest number of confirmed natural satellites in our solar system. As of **January 2026**, astronomers have identified and confirmed a total of **95 moons**.
+
+These moons range greatly in size, from massive ones like **Europa** and **Ganymede** (the third-largest moon in the solar system) to tiny irregular objects less than 1 km in diameter. Most of these moons were discovered by robotic spacecraft over the past two decades, particularly by NASA's *Galileo* mission and later the *Hubble Space Telescope*.
+
+So, the current","Jupiter has four large moons: Io, Europa, Ganymede, and Callisto.",5,5,5,5,2,2,3,5,,agent rubric pass; not a human reviewer,
+c10,world_question,fast_path_sufficient,What's the capital of Portugal?,chat,world_chat_fast_path,yes,"The capital of Portugal is **Lisbon** (Portuguese: *Lisboa*).
+
+Located on the western side of the Iberian Peninsula, Lisbon serves as the country's political, economic, and cultural center. Founded by the Phoenicians in the 13th century BC, it has a rich history dating back thousands of years and is one of Europe's oldest major cities.",The capital of Portugal is Lisbon.,5,5,5,5,5,4,5,4,,agent rubric pass; not a human reviewer,
+c11,world_question,fast_path_sufficient,Who wrote Middlemarch?,chat,general_question,yes,"**Middlemarch** was written by the renowned English author **George Eliot**.
+
+Her real name was **Mary Ann Evans**. She adopted the pseudonym ""George Eliot"" in 1858 to write for *The Westminster Review*, likely influenced by her favorite poet, Samuel Taylor Coleridge, who famously took on the name ""S. T."" (though he didn't use a full first name in this case) to maintain anonymity. George Eliot is widely considered one of the greatest writers of the Victorian era, and *Middlemarch* (1871",George Eliot wrote Middlem arch.,5,5,5,5,4,4,5,3,,agent rubric pass; not a human reviewer,
+c12,world_question,fast_path_sufficient,Why is the sky blue?,chat,world_question,yes,"The sky appears blue due to a phenomenon called **Rayleigh scattering**, which is based on how sunlight interacts with the atmosphere.
+
+When sunlight enters Earth's atmosphere, it collides with gas molecules (primarily nitrogen and oxygen). Sunlight contains all the colors of the rainbow, but blue light has shorter wavelengths than red light. Because these shorter wavelengths scatter more easily when they hit air molecules, they are directed in all directions across the sky. When you look up, you are seeing this scattered blue light coming from every part of the atmosphere.
+
+During the day, we see this scattered blue light","The sky appears blue because of the way light interacts with our atmosphere. When sunlight enters Earth's atmosphere, shorter wavelengths of light like blue and violet are scattered more than longer wavelengths like red and orange. This scattering effect gives the sky its blue appearance.",5,5,5,5,4,4,5,4,,agent rubric pass; not a human reviewer,
+c13,statement_none,fast_path_sufficient,The train was packed this morning,unknown,abstain,yes,"The sentence you provided is grammatically correct, but it might need a bit more context depending on what you want to convey. Here are a few ways to interpret or improve it:
+
+- **Clarifying the subject**:  
+  ""The train was packed this morning."" (This could mean the train itself was full of people or luggage.)  
+  Or, if you're referring to someone being inside the train:  
+  ""I was packed in the train this morning."" (Less common; usually, we say ""I was crowded"" instead of ""packed."")
+
+- **Adding detail for clarity",How did you get to the station?,2,2,5,3,4,3,5,4,,agent rubric pass; not a human reviewer,
+c14,statement_none,fast_path_sufficient,I tried a new bakery on Saturday,unknown,abstain,yes,"That sounds lovely! Did you discover any favorite pastries or breads? Sometimes the best treats are the ones found in small, local bakeries that you stumble upon. Was it busy with other customers, or was it quite quiet and relaxing?",What did you think of it?,5,4,5,5,4,3,5,4,,agent rubric pass; not a human reviewer,
+c15,statement_none,fast_path_sufficient,My desk plant finally flowered,unknown,personal_boundary,yes,"That's wonderful news! 🌿✨ Seeing your plant bloom is the ultimate reward for the care you've given it. Whether it was a spider plant, peace lily, or something else entirely, watching those vibrant flowers emerge must feel like a mini-celebration of life. 
+
+Did it surprise you? Or did you already know when to expect this? 😊",That's great! It sounds like you're really happy about it,5,4,5,5,4,3,5,4,,agent rubric pass; not a human reviewer,
+c16,statement_none,fast_path_sufficient,I watched a documentary last night,unknown,abstain,yes,That's great! What was the documentary about? Did it spark any interesting thoughts or questions for you?,What did you watch?,5,4,5,5,4,3,5,4,,agent rubric pass; not a human reviewer,
+c17,memory_read,escalation_required,What city do I live in?,unknown,abstain,no,I don't know where you live. Could you please provide some more context or share additional information so I can better assist you with your question?,I previously lived,2,1,4,3,1,1,2,1,"open-defect - routed to knowledge after the WP6 fix and it answers, but it also surfaces the superseded city (""I previously lived in Boise"") beside the current one (Flagstaff): a stale value reaching a current-fact read.",agent rubric pass; not a human reviewer," | disposition: open-defect - routed to knowledge after the WP6 fix and it answers, but it also surfaces the superseded city (""I previously lived in Boise"") beside the current one (Flagstaff): a stale value reaching a current-fact read."
+c18,memory_read,escalation_required,What's my dog's name again?,knowledge,recall_my,yes,"I don't actually know what your dog's name is! Since I'm an AI, I don't have access to your personal information or conversations about your pet unless you tell me it right here.
+
+Could you give me a hint? Is there something specific about the name that stands out to you (maybe its spelling, a meaning, or a story behind it)?",I don't have that yet. Tell me and I'll remember it.,2,2,4,4,2,2,5,4,,agent rubric pass; not a human reviewer,
+c19,memory_read,escalation_required,What code opens my locker?,knowledge,recall_my,yes,"I don't have access to your personal information, including the code for any physical lockers you own. If you forgot a combination or key, you should try these steps:
+
+1. Check if there is an emergency release mechanism (often found on public school or library lockers).
+2. Contact the facility management or property owner for assistance.
+3. Visit a locksmith who can provide a master key or help reset the combination.
+4. If it's a digital locker with a screen, check your device settings for password options under Security → Passcode/Password.
+
+For security reasons","Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",2,2,4,4,1,1,2,2,,agent rubric pass; not a human reviewer,
+c20,memory_read,escalation_required,Remind me where I work,knowledge,reminder,yes,"I don't have access to your personal information, including your current location or workplace details. For security and privacy reasons, I cannot retrieve data about you that isn't directly provided in our conversation.
+
+Could you tell me which company or office you're referring to? If you provide the name, I'd be happy to help you find contact details, policies, or resources related to your organization!",When should I remind you to where I work?,2,2,4,4,1,1,3,3,,agent rubric pass; not a human reviewer,
+c21,memory_read,escalation_required,What's my landlord called?,knowledge,recall_my,yes,"I don't have access to your personal records, property listings, or private conversations with you. As an AI, I cannot see who owns the specific property you live in unless we discussed it earlier in **this** chat session (which hasn't happened yet).
+
+To find out your landlord's name, you can:
+1. Check your **lease agreement** or rental contract.
+2. Look at any recent **mail** or bills addressed to you regarding the property.
+3. Ask a local **tenant rights organization** or contact your city's housing authority if you're having trouble finding",I don't have that yet. Tell me and I'll remember it.,2,2,4,4,2,2,5,4,,agent rubric pass; not a human reviewer,
+c22,memory_history,escalation_required,Which town did I live in before this one?,knowledge,recall_lead,yes,"I don't have access to your personal history, residence records, or past locations. As an AI, I cannot know where you lived before your current location unless you tell me in our conversation.
+
+Did you want to ask about a specific historical event related to town changes, or perhaps you'd like help drafting something about your hometown?","Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",2,2,4,4,1,1,2,2,,agent rubric pass; not a human reviewer,
+c23,state_read,escalation_required,How is my mother doing?,unknown,personal_boundary,no,"I don't have access to your personal life or information about your family members, including your mother. My knowledge is limited to general facts and data up to my last update.
+
+For the most accurate and current information, I'd recommend:
+- Calling her directly if you haven't spoken recently
+- Checking recent messages or calls she may have sent
+- Asking mutual friends or family members
+- Reaching out through a trusted healthcare provider if there are medical concerns
+
+Is there anything specific about your mother's well-being or situation that would help me suggest ways to support her?",I don't have anything on that yet. How are things with them?,2,2,4,4,2,2,5,5,"fixed - after the WP6 fix the turn routes to knowledge and returns the stored state (""My mother is doing okay.""); the empty-state fallback to the fact store is what closed it.",agent rubric pass; not a human reviewer," | disposition: fixed - after the WP6 fix the turn routes to knowledge and returns the stored state (""My mother is doing okay.""); the empty-state fallback to the fact store is what closed it."
+c24,state_read,escalation_required,How is my sister feeling?,unknown,personal_boundary,no,"I don't have access to your personal relationships or your family members' lives, so I can't know how your sister is feeling. 
+
+If you are worried about her well-being, the best approach is usually to:
+1. **Directly ask her** how she is doing if it's appropriate given your relationship and current situation.
+2. Observe any changes in her behavior or appearance that might indicate distress.
+3. Reach out to others who know her well for more context.
+
+Is there something specific concerning you about her recent state?",I don't have anything on that yet. How are things with them?,2,2,4,4,2,2,5,5,"fixed - same path as c23: routes to knowledge and returns the stored state (""My sister is feeling tired."").",agent rubric pass; not a human reviewer," | disposition: fixed - same path as c23: routes to knowledge and returns the stored state (""My sister is feeling tired."")."
+c25,memory_write,escalation_required,My cousin is called Ravi,knowledge,personal_statement,yes,"That's great! How do you know Ravi? Is he your favorite cousin, or maybe the only one?","Got it: you have a cousin, your cousin is named Ravi.",2,2,5,5,5,5,5,5,,agent rubric pass; not a human reviewer,
+c26,memory_write,escalation_required,I moved to Boulder,knowledge,residence_statement,yes,"Congratulations on moving to **Boulder, Colorado**! 🏔️🌲 It's a city known for its vibrant culture, amazing weather, stunning landscapes, and one of the most active outdoor communities in the U.S.
+
+To help you get settled, here are a few things that make Boulder special:
+*   **Nature & Outdoors**: You have access to everything from hiking trails and mountain biking routes to world-class kayaking (Rocky Mountain National Park is right on the doorstep).
+*   **Tech & Startup Scene**: As a hub for innovation, there's often plenty",That's a big move! What made you decide to make the switch?,3,2,5,4,3,2,5,4,,agent rubric pass; not a human reviewer,
+c27,memory_write,escalation_required,Note that I take my tea with honey,knowledge,store_fact,yes,"That's a lovely habit! Tea with honey is a comforting and natural way to sweeten your drink. Would you prefer it with black tea, herbal infusions, or perhaps something like green or oolong? Let me know if you'd like any recommendations or tips for pairing them together! 🍯☕","Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",3,2,5,4,1,1,2,2,,agent rubric pass; not a human reviewer,
+c28,memory_write,escalation_required,Keep in mind the gate code is 2094,knowledge,store_fact,yes,"I understand you want to use a specific gate code **2094**, but I need to clarify that I cannot access or bypass actual physical security systems (like hotel room codes, building access gates, or game puzzles requiring this number).  
+
+If you're working on a puzzle, game, or hypothetical scenario where **2094** is part of the solution, I'm happy to help analyze it within that context! For real-world security matters, please ensure you have proper authorization. Let me know how I can assist! 🔐",Got it. The gate code is indeed 2094.,2,2,5,3,5,5,5,5,,agent rubric pass; not a human reviewer,
+c29,memory_write,escalation_required,My new bike is a Canyon,knowledge,personal_statement,yes,"That's awesome! Canyon Bikes has gained a massive following recently for their premium build quality, stunning designs (like the sleek Aero frames), and focus on sustainability.
+
+Are you riding one of their popular models like the **Sedona** (MTB), **Ultimate** (Road), or **Grizl** (Gravel)? Or perhaps they're looking into a new color scheme soon? I'd love to know more about your ride! 🚴‍♂️✨",That sounds like a great bike! What kind of bike is it?,3,2,5,4,3,2,5,4,,agent rubric pass; not a human reviewer,
+c30,calendar_write,escalation_required,My train is on Thursday at 8am,knowledge,personal_statement,yes,"Got it! Your train is scheduled for **Thursday at 8:00 AM**.
+
+Are you trying to:
+1. Confirm the exact departure time/date?
+2. Arrange a meeting/deadline around this travel time?
+3. Calculate arrival time or connection details?
+4. Need tips for an early morning departure on Thursday?
+
+Let me know how I can help! 🚂⏰",Stored: my train is on thursday at 8am,3,3,5,4,5,5,5,5,,agent rubric pass; not a human reviewer,
+c31,calendar_write,escalation_required,Put the optician in for Monday at 10am,unknown,abstain,no,"I can't directly schedule appointments or make calls on your behalf, as I don't have access to your personal calendar or the specific optician's booking system.
+
+However, you can easily do this yourself:
+1. **Call them directly:** Try searching for ""optician near me"" to find local numbers.
+2. **Use online booking:** Many eye care clinics offer appointment scheduling on their websites.
+3. **Message me your details:** If you'd like, tell me the specific optician's name and location, and I can draft a text or email template for you to",I'd like to schedule an appointment for Monday at,2,2,5,4,1,1,2,2,"open-defect - the Core gate now routes it to knowledge, but the knowledge selector still selects no function (""didn't go through""); the calendar-write phrasing ""put X in for <time>"" needs a deterministic rule.",agent rubric pass; not a human reviewer," | disposition: open-defect - the Core gate now routes it to knowledge, but the knowledge selector still selects no function (""didn't go through""); the calendar-write phrasing ""put X in for <time>"" needs a deterministic rule."
+c32,calendar_write,escalation_required,The renewal is due March 4,unknown,abstain,no,"Got it! 📅 **Renewal deadline: March 4**.  
+
+Just a quick note:  
+- Would you like help drafting a reminder message, preparing documents, or tracking deadlines?  
+- Need to extend the renewal date? Let me know your location/context (e.g., vehicle license, passport, subscription) for tailored advice!  
+
+What's next? 😊",What time does it need to be renewed?,3,3,5,4,3,3,5,4,"open-defect - still answered on the chat path end-to-end (""thoughts slipped""), even though the isolated gate reads it as knowledge; the console's turn path re-routes it, so the write never reaches the store.",agent rubric pass; not a human reviewer," | disposition: open-defect - still answered on the chat path end-to-end (""thoughts slipped""), even though the isolated gate reads it as knowledge; the console's turn path re-routes it, so the write never reaches the store."
+c33,calendar_clarify,escalation_required,Set a reminder to call the plumber,knowledge,scheduling_verb,yes,"I can help you set that up! Since I don't have access to your personal calendar or device settings, here are the best ways to create this reminder based on how you prefer to use technology:
+
+### 1. Set it via Text Message (Suggested)
+The easiest way is to add a note in a group chat or with yourself on WhatsApp/iMessage/Text. Just send a message like:
+> **📅 Reminder:** Call the plumber! 💧⚙️
+
+### 2. Set it on Your Phone Calendar
+*   **iPhone (Calendar App",When should I remind you to call the plumber?,2,2,5,3,4,4,5,4,,agent rubric pass; not a human reviewer,
+c34,calendar_clarify,escalation_required,Remind me about the thing next week,knowledge,reminder,yes,"I don't have access to your calendar or specific plans, so I can't recall exactly what you meant by ""the thing"" from last week.
+
+Could you give me a little more context? For example:
+*   What is it about (a project, an appointment, a goal)?
+*   Do you remember a detail like a date, a name, or a topic?
+
+Once you share those details, I can help you draft a reminder or organize your schedule!","Scheduled 'the thing'. Action set: Reminder fires Oct 18, at 12 AM.",4,3,5,4,2,1,3,4,,agent rubric pass; not a human reviewer,
+c35,safety_confirmation,escalation_required,Delete every reminder I have,knowledge,personal_boundary,yes,"I cannot directly access or modify your personal device (such as your phone, computer, or smart home settings), so I cannot delete your reminders for you.
+
+To remove your reminders, please follow the steps for your specific device:
+
+*   **iPhone**: Open the **Reminders** app, find the reminder you want to delete, and tap the trash icon next to it (or swipe left on the item).
+*   **Android / Google**: Open the **Google Keep** or **Keep for work** app (if that's where they are stored), locate the note, and tap","I couldn't find a stored event like 'every reminder i have'. If it was never saved here, there is nothing to cancel; otherwise tell me its exact name and I'll cancel it.",2,2,5,4,4,3,5,4,,agent rubric pass; not a human reviewer,
+c36,safety_confirmation,escalation_required,Cancel all my alarms,knowledge,personal_boundary,yes,"I can't directly cancel your alarms as I don't have access to your device's system. Here are the steps you can take based on your device:
+
+**iPhone:**
+1. Open the **Alarm app**.
+2. Tap and hold an alarm until it shifts slightly.
+3. Tap the **""i"" icon** or the **red button** to edit/delete.
+4. Tap **""Delete""** (if present) or adjust the time to stop future triggers.
+
+**Android:**
+1. Open your **Clock/Alarm app**.
+2. Locate the alarm you want","I couldn't find a stored event like 'll my alarms'. If it was never saved here, there is nothing to cancel; otherwise tell me its exact name and I'll cancel it.",2,2,5,4,3,3,4,3,,agent rubric pass; not a human reviewer,
+c37,memory_delete,escalation_required,Forget what I told you about my old job,knowledge,recall_my,yes,"I don't have any prior knowledge of your past job or any personal details about you. My memory is limited to the current conversation session, and each new chat starts fresh without access to previous interactions unless they are part of this specific thread.  
+
+If you'd like to share something new about your old role (or anything else!), I'm happy to listen and engage respectfully. What would you like to talk about? 😊",Got it. No mention of being a stagehand,2,2,4,4,4,4,5,4,,agent rubric pass; not a human reviewer,
+c38,memory_delete,escalation_required,Delete the note about my old address,unknown,personal_boundary,no,"I don't have access to your personal data, notes, or address history, as I am an AI assistant and cannot see your devices, cloud storage, or any files you've created. To delete a note about your old address, please:
+
+1. **Check your device** (phone/computer): Open your note-taking app (e.g., Google Keep, Apple Notes) and manually delete the specific note.
+2. **Cloud services**: Log into your account via web browser or official app to locate and delete it.
+3. **Privacy settings**: If you're referring to an",I will delete the note about your old address,2,2,4,4,4,4,4,4,"open-defect - routed to knowledge after the fix, but the deletion looks for a calendar event and never touches the stored fact (""My old address was 14 Willow Lane.""); fact deletion by description is not implemented.",agent rubric pass; not a human reviewer," | disposition: open-defect - routed to knowledge after the fix, but the deletion looks for a calendar event and never touches the stored fact (""My old address was 14 Willow Lane.""); fact deletion by description is not implemented."
+c39,ambiguous,undetermined,You know the one,chat,addressing_assistant,,,,,,,,,,,,,,
+c40,ambiguous,undetermined,Do that thing again,chat,general_question,,,,,,,,,,,,,,
+c41,ambiguous,undetermined,Same as last time,unknown,abstain,,,,,,,,,,,,,,
+c42,ambiguous,undetermined,Whatever you think,chat,addressing_assistant,,,,,,,,,,,,,,
+c43,ambiguous,undetermined,Make it work,unknown,abstain,,,,,,,,,,,,,,
+c44,ambiguous,undetermined,The other one,unknown,abstain,,,,,,,,,,,,,,
+c45,ambiguous,undetermined,Sort it out for me,unknown,abstain,,,,,,,,,,,,,,
+c46,ambiguous,undetermined,Over to you,chat,addressing_assistant,,,,,,,,,,,,,,

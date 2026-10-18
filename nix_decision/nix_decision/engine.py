@@ -17,9 +17,17 @@ class DecisionEngine:
     after considering the supplied UserStateSnapshot.
     """
 
-    def __init__(self, core_callback: CoreCallback | None = None) -> None:
+    def __init__(
+        self,
+        core_callback: CoreCallback | None = None,
+        proactivity_policy=None,
+    ) -> None:
         self._rules: dict[str, Callable[[DecisionTrigger, UserStateSnapshot], CorePromptRequest | None]] = {}
         self._core_callback = core_callback
+        # D8: off unless a policy object is supplied. With no policy the
+        # engine behaves exactly as before (the foundation keeps no default
+        # rules), so existing callers cannot become proactive by accident.
+        self._proactivity_policy = proactivity_policy
 
     @property
     def registered_triggers(self) -> tuple[str, ...]:
@@ -50,6 +58,16 @@ class DecisionEngine:
         """
         if user_state.presence is not Presence.HOME:
             return DecisionOutcome("ignored", "user_not_home")
+        if self._proactivity_policy is not None:
+            from datetime import datetime
+
+            decision = self._proactivity_policy.evaluate(
+                tier=str(getattr(trigger, "tier", None) or "routine"),
+                at=datetime.now().time(),
+                owner_speaking=bool(getattr(user_state, "speaking", False)),
+            )
+            if not decision.get("notify"):
+                return DecisionOutcome("ignored", str(decision.get("reason") or "policy"))
         rule = self._rules.get(trigger.name)
         if rule is None:
             return DecisionOutcome("ignored", "trigger_not_registered")

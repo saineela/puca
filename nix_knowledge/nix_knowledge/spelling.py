@@ -82,6 +82,17 @@ _DOMAIN_VOCAB = frozenset(
         "grandma", "grandmas", "grandpa", "grandpas",
         "nana", "papa", "sibling", "siblings",
         "cousin", "cousins", "aunt", "aunts", "uncle", "uncles",
+        # Real words the shipped en dictionary is missing or only holds in
+        # US spelling. Measured: "cafe" snapped to "came" and "colour" was
+        # rewritten to "color" in healthy D2 questions - the corrector must
+        # not edit a word a person actually wrote.
+        "cafe", "cafes", "café", "wi-fi", "wifi", "locker", "landlord",
+        "passport", "insurance", "renewal", "optician", "hyphen",
+        "colour", "colours", "coloured", "favourite", "favourites",
+        "neighbour", "neighbours", "neighbourhood", "honour", "honours",
+        "behaviour", "behaviours", "centre", "centres", "metre", "litre",
+        "realise", "realised", "organise", "organised", "practise",
+        "travelling", "cancelling", "labelled", "modelling",
     }
 )
 

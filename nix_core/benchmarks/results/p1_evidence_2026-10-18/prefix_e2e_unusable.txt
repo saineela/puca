@@ -1,0 +1,54 @@
+--- seed
+USER: Remember that I previously lived in Boise.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: i previously lived in boise
+--- seed
+USER: Remember that my home city is Flagstaff.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: my home city is flagstaff
+--- seed
+USER: Remember that my old address was 14 Willow Lane.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: my old address was 14 willow lane
+
+== facts after seeding: [(1, 'active'), (2, 'active'), (3, 'active')]
+--- D1 stale value
+USER: What city do I live in?
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)
+--- unknown
+USER: What is my blood type?
+ROUTE: knowledge / knowledge_process
+REPLY: I don't have that in my knowledge base yet.
+FACT ROWS before=3 after=3 (unknown must not write)
+--- D2 put-in-for
+USER: Put the optician in for Monday at 10am
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)
+--- D3 due statement
+USER: The renewal is due March 4
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)
+== facts after due: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'active', 'my old address was 14 willow lane')]
+--- D4 delete request
+USER: Delete the note about my old address
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)
+== facts after request: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'active', 'my old address was 14 willow lane')]
+--- D4 confirm
+USER: yes
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)
+== facts after confirm: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'active', 'my old address was 14 willow lane')]
+--- D4 after delete read
+USER: What was my old address?
+ROUTE: knowledge / knowledge_process
+REPLY: From your knowledge base: - my old address was 14 willow lane
+--- event check
+USER: When is my optician appointment?
+ROUTE: knowledge / knowledge_process
+REPLY: No matching events found.
+--- renewal read
+USER: When is the renewal due?
+ROUTE: chat / luna-v6-contextual-v1_unreachable
+REPLY: Luna Alert: Unable to reach the chat model (luna-v6-contextual-v1) right now. (FileNotFoundError)

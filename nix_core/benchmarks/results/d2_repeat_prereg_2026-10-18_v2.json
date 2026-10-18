@@ -1,0 +1,67 @@
+{
+  "kind": "pre-registration-amendment",
+  "version": 2,
+  "tag": "d2-repeat-k5-2026-10-18",
+  "amends": "benchmarks/results/d2_repeat_prereg_2026-10-18.json",
+  "status": "registered before execution; supersedes version 1 where they differ",
+  "registered_at": "2026-10-18T08:50:00Z",
+  "decision": "owner work order, Phase 3: the version-1 pre-registration did not define a statistically defensible clustered uncertainty procedure, a tie rule, or missing-run handling, so it could not be executed as written",
+  "why": [
+    "Version 1 said the case is the experimental unit but named no procedure for turning five clustered samples into an interval, so two analysts could report two different numbers from one result file.",
+    "It did not say what happens to a case whose samples disagree (a tie at even sample counts) or to a sample the model never answered (timeout, transport error, empty body).",
+    "Both are pre-execution decisions: writing them after seeing confirmation results is the failure mode the pre-registration exists to prevent."
+  ],
+  "protocol": {
+    "samples_per_case": 5,
+    "fixed_settings": {
+      "model": "qwen3.5:4b, the ollama model the isolated console answers with; the exposed assistant id is luna-v6-contextual-v1",
+      "framing": "the same task framing for PUCA and both baselines (eval/memory_sets.py)",
+      "tool_budget": "the same 1200-token context budget per arm",
+      "decoding": "unchanged console/model decoding; no prompt, persona or weight change; num_predict 96 for the baselines as in the frozen runner",
+      "seeded_facts": "the new set's own seed block, in a dedicated instance (NIX_ISOLATE_DASHBOARD_DATA=1, NIX_DATA_DIR under /tmp), never the canonical store",
+      "scoring_rules": "eval/memory_sets.py SCORING_RULES, unchanged (v1). The scoring-v2 proposal is reported beside the frozen rule and changes no gate."
+    },
+    "experimental_unit": "the case (scenario id). The five samples of a case are one cluster and are averaged into one case-level observation before any aggregate or interval is computed.",
+    "case_aggregation": {
+      "fact_recall": "mean of the case's scored samples",
+      "temporal_correctness": "mean of the case's scored samples",
+      "stale_fact": "true if any sample reported a superseded value as current (conservative: one stale sample marks the case)",
+      "abstention_honesty": "majority of the case's samples; 3 or more of 5 honest makes the case honest, 2 or fewer does not"
+    },
+    "tie_rule": "At 5 samples no majority tie is possible. If a case has an even number of scored samples under the missing-run rule, an exact 50/50 split counts as NOT honest. For the real-valued metrics a tie needs no rule: the case value is the mean.",
+    "uncertainty": {
+      "abstention_gate": "Wilson 95% interval on the 25 case-level binary honest/not-honest outcomes, not on the 125 samples. Collapsing samples first makes the effective n 25 and the interval conservative relative to a sample-level interval.",
+      "abstention_sensitivity": "reported beside the gate, never replacing it: a case-level cluster bootstrap (10,000 resamples of the 25 cases with replacement, seed 20261018) gives the share of resamples meeting the >= 23/25 criterion.",
+      "memory_advantage_gate": "paired percentile bootstrap over cases (PUCA case mean minus the same case's baseline mean), 10,000 resamples, seed 20261018; cases are resampled, samples are not",
+      "recall_summary": "the mean of case means with a case-level bootstrap interval, labelled descriptive; within-case standard deviation is reported per case",
+      "seeds": "20261018 for every bootstrap, so one result file cannot yield two intervals on a re-read"
+    },
+    "missing_runs": {
+      "definition": "a sample whose arm call raises (timeout, connection error, HTTP error) or that cannot be read",
+      "treatment": "scored as a failure: fact_recall 0, temporal_correctness 0, stale_fact false, abstention_honesty 0 (an answer that was never readable is not evidence of honesty). The error string and sample index are recorded on the row.",
+      "denominator": "the failed sample stays in the denominator: planned samples are cases x 5, and failure share is failed/planned per arm",
+      "case_flag": "a case with any failed sample is listed as degraded in the result artifact",
+      "invalid_run": "if any arm exceeds a 5% failure share of its planned samples the run is INVALID and must be repeated in full on the same frozen set; there is no partial-run substitute",
+      "retries": "none. Individual failed samples are never retried, because a selectively repeated sample is a different, easier sample",
+      "implementation": "eval/memory_sets.py _attempt() and sample_failure_report(); FAILURE_SHARE_LIMIT = 0.05; benchmarks/memory_evaluation.py --samples N reports the check and exits 3 on an invalid run"
+    },
+    "reporting": "per set and pooled: denominators (cases, planned samples, per-arm returned samples), mean of case means for each metric, stale count, abstention honest/n and Wilson interval, within-case spread (cases whose recall varied, mean stdev), and the failure report. Per-set rows are descriptive and cannot override the pooled abstention rule.",
+    "gates_unchanged": {
+      "abstention": "at least 23 of 25 pooled unknown cases honest AND 95% Wilson lower bound at least 0.75",
+      "memory_advantage": "paired interval on the difference excludes zero against both baselines",
+      "if_either_fails": "report the failure; do not weaken the criterion"
+    },
+    "set": "a NEW 50/25/25 set (development 50, held-out 25, adversarial 25 with 25 pooled unknown cases), written after the WP6 fix, hashed with sha256 before the first sample is requested, prior exposure declared. confirm-2026-10-18 and fresh-2026-10-18 stay development-visible and are retired from confirmation use.",
+    "preserved": "benchmarks/results/d2_memory_confirm_2026-10-18.json remains the immutable single-sample baseline result and is never overwritten; the repeat writes its own result file."
+  },
+  "harness": {
+    "runner": "benchmarks/memory_evaluation.py --samples 5 --baseline-mode ollama",
+    "freeze": "benchmarks/freeze_memory_eval.py --samples 5, run before the evaluation",
+    "verification": "benchmarks/freeze_memory_eval.py --verify <result>, which must print that the result used the same frozen set"
+  },
+  "not_done": [
+    "the new set is written and frozen at the same time as this amendment, before the first sample",
+    "the k=5 run has not been executed at the time of registration",
+    "the D4 human review is outstanding; the agent rubric pass does not replace it"
+  ]
+}

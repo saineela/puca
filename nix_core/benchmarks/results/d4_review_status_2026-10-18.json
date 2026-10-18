@@ -1,0 +1,101 @@
+{
+  "kind": "d4-human-review-status",
+  "generated_at": "2026-10-18T13:55:25.217690+00:00",
+  "status": "AWAITING HUMAN SCORES - not complete",
+  "packet": "benchmarks/results/d4_human_review_packet_2026-10-18.csv",
+  "instructions": "benchmarks/results/d4_human_review_instructions_2026-10-18.md",
+  "source_sheet": "benchmarks/results/d4_human_review_2026-10-18.csv",
+  "source_disclaimer": "The agent rubric pass in the source sheet was produced by an agent, not a human reviewer. It is preserved unedited here and is never substituted for the human scores.",
+  "scored_cases": 38,
+  "cases_not_replayed": [
+    "c39",
+    "c40",
+    "c41",
+    "c42",
+    "c43",
+    "c44",
+    "c45",
+    "c46"
+  ],
+  "dimensions": [
+    "correctness",
+    "completeness",
+    "honesty",
+    "naturalness"
+  ],
+  "escalation_misses": [
+    {
+      "case_id": "c17",
+      "turn_text": "What city do I live in?",
+      "class": "memory_read",
+      "chosen_route": "unknown",
+      "disposition": "open-defect - routed to knowledge after the WP6 fix and it answers, but it also surfaces the superseded city (\"I previously lived in Boise\") beside the current one (Flagstaff): a stale value reaching a current-fact read.",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained; update only with new evidence"
+    },
+    {
+      "case_id": "c23",
+      "turn_text": "How is my mother doing?",
+      "class": "state_read",
+      "chosen_route": "unknown",
+      "disposition": "fixed - after the WP6 fix the turn routes to knowledge and returns the stored state (\"My mother is doing okay.\"); the empty-state fallback to the fact store is what closed it.",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained as written; a regression test and verification must exist for a fixed verdict"
+    },
+    {
+      "case_id": "c24",
+      "turn_text": "How is my sister feeling?",
+      "class": "state_read",
+      "chosen_route": "unknown",
+      "disposition": "fixed - same path as c23: routes to knowledge and returns the stored state (\"My sister is feeling tired.\").",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained as written; a regression test and verification must exist for a fixed verdict"
+    },
+    {
+      "case_id": "c31",
+      "turn_text": "Put the optician in for Monday at 10am",
+      "class": "calendar_write",
+      "chosen_route": "unknown",
+      "disposition": "open-defect - the Core gate now routes it to knowledge, but the knowledge selector still selects no function (\"didn't go through\"); the calendar-write phrasing \"put X in for <time>\" needs a deterministic rule.",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained; update only with new evidence"
+    },
+    {
+      "case_id": "c32",
+      "turn_text": "The renewal is due March 4",
+      "class": "calendar_write",
+      "chosen_route": "unknown",
+      "disposition": "open-defect - still answered on the chat path end-to-end (\"thoughts slipped\"), even though the isolated gate reads it as knowledge; the console's turn path re-routes it, so the write never reaches the store.",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained; update only with new evidence"
+    },
+    {
+      "case_id": "c38",
+      "turn_text": "Delete the note about my old address",
+      "class": "memory_delete",
+      "chosen_route": "unknown",
+      "disposition": "open-defect - routed to knowledge after the fix, but the deletion looks for a calendar event and never touches the stored fact (\"My old address was 14 Willow Lane.\"); fact deletion by description is not implemented.",
+      "disposition_owner": "agent rubric pass; not a human reviewer",
+      "status": "retained; update only with new evidence"
+    }
+  ],
+  "human_fields_to_complete": [
+    "reviewer_name",
+    "review_date_utc",
+    "chat_correctness_1_5",
+    "chat_completeness_1_5",
+    "chat_honesty_1_5",
+    "chat_naturalness_1_5",
+    "knowledge_correctness_1_5",
+    "knowledge_completeness_1_5",
+    "knowledge_honesty_1_5",
+    "knowledge_naturalness_1_5",
+    "per_case_justification"
+  ],
+  "recording_requirements": [
+    "reviewer identity (reviewer_name)",
+    "review method: the frozen 1-5 rubric in the instructions",
+    "per-case justification (per_case_justification)",
+    "UTC review date (review_date_utc)"
+  ]
+}

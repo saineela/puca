@@ -29,6 +29,37 @@ def test_world_question_is_fast_chat_even_with_personal_word():
     assert decision.requires_model is False
 
 
+def test_question_about_the_users_own_data_is_a_knowledge_read():
+    """D4 confirmation replay: 15 of 38 decidable turns came back `unknown`
+    for this shape, so the gate must read the question, not the classifier."""
+    engine = CoreRoutingEngine()
+    for text in (
+        "Which city do I live in?",
+        "Who do I rent from?",
+        "What medication should I avoid?",
+        "What days am I at the gym now?",
+        "What tea did I used to drink?",
+        "What's the Wi-Fi key at home?",
+        "What colour is my laptop?",
+        "What is my garage code?",
+        "what is my schedule",
+    ):
+        decision = engine.decide(text)
+        assert decision.route == KNOWLEDGE, (text, decision.route, decision.rule)
+
+
+def test_world_questions_are_still_chat():
+    engine = CoreRoutingEngine()
+    for text in (
+        "How do I make bread?",
+        "Can you tell me a joke?",
+        "How many moons does Jupiter have?",
+        "How do I get home?",
+    ):
+        decision = engine.decide(text)
+        assert decision.route == CHAT, (text, decision.route, decision.rule)
+
+
 def test_ambiguous_request_abstains_without_model_call():
     decision = CoreRoutingEngine().decide("maybe later")
     assert decision.route in {CHAT, UNKNOWN}

@@ -285,6 +285,88 @@ def _rms(samples: Any) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Turn-taking (D7)
+# ---------------------------------------------------------------------------
+
+#: Frames the energy VAD is built from. 20 ms is the usual speech frame: short
+#: enough to see a stop, long enough that a single click is not a word.
+VAD_FRAME_MS = 20
+
+
+def vad_frames(samples: Any, rate: int, *, frame_ms: int = VAD_FRAME_MS) -> list[tuple[float, bool]]:
+    """Energy VAD frames as ``(at_ms, speech)`` pairs.
+
+    The threshold is not a fixed number: the quiet tenth of the clip is taken
+    as the room and every frame is judged against a floor above it, so a
+    recording made on a noisier box does not read as continuous speech. The
+    absolute ``SILENCE_RMS`` is still a floor, so a dead-silent clip stays
+    silent.
+    """
+    import numpy as np
+
+    step = max(1, int(rate * frame_ms / 1000))
+    energies: list[float] = []
+    for start in range(0, len(samples), step):
+        chunk = samples[start:start + step]
+        if chunk.size == 0:
+            break
+        energies.append(float(np.sqrt(np.mean(np.square(chunk)))))
+    if not energies:
+        return []
+    floor = max(SILENCE_RMS, float(np.percentile(energies, 10)) * 2.0)
+    return [
+        (round(index * frame_ms, 1), energy >= floor)
+        for index, energy in enumerate(energies)
+    ]
+
+
+def _last_speech_ms(frames: list[tuple[float, bool]]) -> float | None:
+    return next((at for at, speech in reversed(frames) if speech), None)
+
+
+def turn_taking_profile(payload: bytes, *, endpoint_ms: float = 300.0) -> dict[str, Any]:
+    """Measure one recorded clip's turn-taking: VAD, endpointing, trailing silence.
+
+    This is the console's own measurement, taken from the same clip the local
+    recogniser is about to read, so the numbers are for this box and this
+    microphone rather than a reference machine. Barge-in needs two audio
+    streams at once and is not measurable from one upload; it is reported as
+    unmeasured here instead of being guessed.
+    """
+    from eval.turn_taking import Frame, TurnTaker
+
+    samples, rate, seconds = decode_wav(payload)
+    frames = vad_frames(samples, rate)
+    taker = TurnTaker(endpoint_ms=endpoint_ms)
+    for at, speech in frames:
+        taker.feed(Frame(at, speech))
+    summary = taker.summary()
+    last_speech = _last_speech_ms(frames)
+    # The clip's own length, not the last frame's start: the frame that carries
+    # the final word starts one frame before the speech actually stops.
+    audio_ms = (len(samples) / rate * 1000.0) if rate else 0.0
+    trailing = (
+        None
+        if last_speech is None
+        else round(max(0.0, audio_ms - last_speech - VAD_FRAME_MS), 1)
+    )
+    return {
+        "frames": len(frames),
+        "frame_ms": VAD_FRAME_MS,
+        "speech_frames": sum(1 for _at, speech in frames if speech),
+        "endpoint_ms": endpoint_ms,
+        "end_of_turn_p50_ms": summary["end_of_turn_p50_ms"],
+        "end_of_turn_p95_ms": summary["end_of_turn_p95_ms"],
+        "trailing_silence_ms": trailing,
+        "endpoint_reached": bool(trailing is not None and trailing >= endpoint_ms),
+        "barge_ins": None,
+        "barge_in_note": "not measurable from a single upload",
+        "audio_seconds": round(seconds, 2),
+        "model_delay_ms": None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Recognise
 # ---------------------------------------------------------------------------
 
@@ -292,8 +374,18 @@ def _rms(samples: Any) -> float:
 def transcribe(payload: bytes, *, wanted_language: str | None = None) -> dict[str, Any]:
     """Turn recorded speech into text, on this machine."""
     samples, rate, seconds = decode_wav(payload)
+    profile: dict[str, Any] | None = None
+    try:
+        profile = turn_taking_profile(payload)
+    except Exception:
+        # A measurement that cannot be taken must not stop the transcription
+        # the user actually asked for.
+        profile = None
     if _rms(samples) < SILENCE_RMS:
-        return {"text": "", "seconds": round(seconds, 2), "silent": True, **available()}
+        return {
+            "text": "", "seconds": round(seconds, 2), "silent": True,
+            "turn_taking": profile, **available(),
+        }
     samples, rate = _resample(samples, rate)
     recognizer = _build()
     # An English-only checkpoint refuses to be told a task or a language at all
@@ -314,10 +406,32 @@ def transcribe(payload: bytes, *, wanted_language: str | None = None) -> dict[st
             "stt_failed",
         ) from exc
     text = str((result or {}).get("text") or "").strip()
+    if profile is not None:
+        # The split the review asks for: how much of the wait was the audio
+        # endpoint and how much was the model, not one combined latency.
+        profile["model_delay_ms"] = round((time.time() - started) * 1000, 1)
+        _remember_turn_taking(profile)
     return {
         "text": text,
         "seconds": round(seconds, 2),
         "took_seconds": round(time.time() - started, 2),
         "silent": not text,
+        "turn_taking": profile,
         **available(),
     }
+
+
+_turn_taking_lock = threading.Lock()
+_last_turn_taking: dict[str, Any] | None = None
+
+
+def _remember_turn_taking(profile: dict[str, Any]) -> None:
+    global _last_turn_taking
+    with _turn_taking_lock:
+        _last_turn_taking = dict(profile)
+
+
+def last_turn_taking() -> dict[str, Any] | None:
+    """The most recent clip's turn-taking measurement, or None if none was taken."""
+    with _turn_taking_lock:
+        return dict(_last_turn_taking) if _last_turn_taking else None

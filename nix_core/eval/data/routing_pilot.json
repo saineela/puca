@@ -1,0 +1,38 @@
+{
+  "tag": "routing-pilot-2026-10-17",
+  "kind": "pilot",
+  "note": "A hand-labelled pilot for D4. It is not the frozen final evaluation set: it was written after the router and turn prediction existed, so it is development-visible. The final set must be written and frozen before the reported run, and this set retired once it has informed a design decision. Labels describe the route the request needs, not the answer quality. `escalation_required` means a chat-only answer would miss a stored fact or a required action; `fast_path_sufficient` means chat (including the chat pipeline's own skill handling) is correct.",
+  "labels": {
+    "escalation_required": "the turn needs personal memory, a state read, or a device/memory action",
+    "fast_path_sufficient": "the turn is answered correctly by chat itself",
+    "undetermined": "the request is too vague to score without a human judgement call"
+  },
+  "cases": [
+    {"id": "r01", "text": "Hey, how's your day going?", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r02", "text": "I had a really long day today", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r03", "text": "I'm exhausted, honestly", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r04", "text": "Tell me a short story about a lighthouse", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r05", "text": "That reminds me of a song I used to love", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r06", "text": "What's the capital of Australia?", "label": "fast_path_sufficient", "class": "world_question"},
+    {"id": "r07", "text": "Thanks, that actually helped", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r08", "text": "Do you think rain is better than snow?", "label": "fast_path_sufficient", "class": "opinion"},
+    {"id": "r09", "text": "I started a pottery class last week", "label": "fast_path_sufficient", "class": "conversation"},
+    {"id": "r10", "text": "Good night, talk tomorrow", "label": "fast_path_sufficient", "class": "conversation"},
+
+    {"id": "r11", "text": "Where do I live?", "label": "escalation_required", "class": "memory_read"},
+    {"id": "r12", "text": "Where did I live before that?", "label": "escalation_required", "class": "memory_history"},
+    {"id": "r13", "text": "What's my dog called?", "label": "escalation_required", "class": "memory_read"},
+    {"id": "r14", "text": "How is my mother doing?", "label": "escalation_required", "class": "state_read"},
+    {"id": "r15", "text": "My sister's name is Priya", "label": "escalation_required", "class": "memory_write"},
+    {"id": "r16", "text": "I live in Austin", "label": "escalation_required", "class": "memory_write"},
+    {"id": "r17", "text": "I have a TSA meeting tomorrow from 4pm to 6pm", "label": "escalation_required", "class": "calendar_write"},
+    {"id": "r18", "text": "Remind me to call mom", "label": "escalation_required", "class": "calendar_clarify"},
+    {"id": "r19", "text": "Delete all my reminders", "label": "escalation_required", "class": "safety_confirmation"},
+    {"id": "r20", "text": "Remember that my locker code is 4471", "label": "escalation_required", "class": "memory_write"},
+
+    {"id": "r21", "text": "What about that thing from before?", "label": "undetermined", "class": "ambiguous"},
+    {"id": "r22", "text": "Can you do the usual?", "label": "undetermined", "class": "ambiguous"},
+    {"id": "r23", "text": "Sort it out for me", "label": "undetermined", "class": "ambiguous"},
+    {"id": "r24", "text": "Same as last time", "label": "undetermined", "class": "ambiguous"}
+  ]
+}

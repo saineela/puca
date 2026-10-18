@@ -1,0 +1,1489 @@
+{
+  "tag": "confirm-2026-10-18",
+  "model": "luna-v6-contextual-v1",
+  "hardware": "x86_64",
+  "baseline_mode": "ollama",
+  "scoring": {
+    "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+    "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+    "stale_fact_rate": "a superseded value is reported as current; lower is better",
+    "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+  },
+  "sets": {
+    "development": [
+      {
+        "id": "confirm-dev-001",
+        "question": "What is my garage code?",
+        "expected_facts": [
+          "8042"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My garage code is 8042."
+        ],
+        "superseded_facts": [
+          "My garage code was 3319."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: garage"
+      },
+      {
+        "id": "confirm-dev-002",
+        "question": "Where do I live?",
+        "expected_facts": [
+          "Tacoma"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Tacoma."
+        ],
+        "superseded_facts": [
+          "I used to live in Denver."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: city"
+      },
+      {
+        "id": "confirm-dev-003",
+        "question": "When is my dentist appointment?",
+        "expected_facts": [
+          "Friday at 3pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dentist appointment is Friday at 3pm."
+        ],
+        "superseded_facts": [
+          "My dentist appointment was Tuesday at 11am."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: dentist"
+      },
+      {
+        "id": "confirm-dev-004",
+        "question": "What is my favorite tea?",
+        "expected_facts": [
+          "oolong"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite tea is oolong."
+        ],
+        "superseded_facts": [
+          "My favorite tea was chamomile."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: tea"
+      },
+      {
+        "id": "confirm-dev-005",
+        "question": "What kind of bike do I have?",
+        "expected_facts": [
+          "Trek"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bike is a Trek."
+        ],
+        "superseded_facts": [
+          "My bike was a Giant."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: bike"
+      },
+      {
+        "id": "confirm-dev-006",
+        "question": "Which days do I go to the gym?",
+        "expected_facts": [
+          "Monday and Thursday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I go to the gym on Monday and Thursday."
+        ],
+        "superseded_facts": [
+          "I went to the gym on Wednesday and Saturday."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: gym"
+      },
+      {
+        "id": "confirm-dev-007",
+        "question": "When is my nephew's birthday?",
+        "expected_facts": [
+          "July 19"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My nephew's birthday is July 19."
+        ],
+        "superseded_facts": [
+          "My nephew's birthday was July 2."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: nephew"
+      },
+      {
+        "id": "confirm-dev-008",
+        "question": "Where do I work?",
+        "expected_facts": [
+          "Cedar & Co"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Cedar & Co."
+        ],
+        "superseded_facts": [
+          "I worked at Bluebird Diner."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: work"
+      },
+      {
+        "id": "confirm-dev-009",
+        "question": "What color is my laptop?",
+        "expected_facts": [
+          "silver"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My laptop is silver."
+        ],
+        "superseded_facts": [
+          "My laptop was black."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: laptop"
+      },
+      {
+        "id": "confirm-dev-010",
+        "question": "When is my flight?",
+        "expected_facts": [
+          "Sunday at 6am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My flight is Sunday at 6am."
+        ],
+        "superseded_facts": [
+          "My flight was Saturday at 9pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: flight"
+      },
+      {
+        "id": "confirm-dev-011",
+        "question": "Which bank branch do I use?",
+        "expected_facts": [
+          "Sellwood"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Sellwood branch."
+        ],
+        "superseded_facts": [
+          "I banked at the Alberta branch."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: bank"
+      },
+      {
+        "id": "confirm-dev-012",
+        "question": "Where does my sister live?",
+        "expected_facts": [
+          "Austin"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My sister lives in Austin."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: sister"
+      },
+      {
+        "id": "confirm-dev-013",
+        "question": "What is my dog's name?",
+        "expected_facts": [
+          "Biscuit"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dog is named Biscuit."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: dog"
+      },
+      {
+        "id": "confirm-dev-014",
+        "question": "When does my car insurance renew?",
+        "expected_facts": [
+          "November 3"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My car insurance renews on November 3."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: insurance"
+      },
+      {
+        "id": "confirm-dev-015",
+        "question": "What is my Wi-Fi password?",
+        "expected_facts": [
+          "maple-otter-42"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My Wi-Fi password is maple-otter-42."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: wifi"
+      },
+      {
+        "id": "confirm-dev-016",
+        "question": "When does my passport expire?",
+        "expected_facts": [
+          "2031"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My passport expires in 2031."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: passport"
+      },
+      {
+        "id": "confirm-dev-017",
+        "question": "When is my project deadline?",
+        "expected_facts": [
+          "October 30"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My project deadline is October 30."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: project"
+      },
+      {
+        "id": "confirm-dev-018",
+        "question": "Who is my landlord?",
+        "expected_facts": [
+          "Dana"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My landlord is Dana."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: landlord"
+      },
+      {
+        "id": "confirm-dev-019",
+        "question": "What am I allergic to?",
+        "expected_facts": [
+          "penicillin"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I am allergic to penicillin."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: allergy"
+      },
+      {
+        "id": "confirm-dev-020",
+        "question": "What is my coffee order?",
+        "expected_facts": [
+          "flat white"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My coffee order is a flat white with oat milk."
+        ],
+        "superseded_facts": [
+          "My coffee order was black coffee."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: coffee"
+      },
+      {
+        "id": "confirm-dev-021",
+        "question": "What was my garage code before?",
+        "expected_facts": [
+          "3319"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for garage; history, not stale"
+      },
+      {
+        "id": "confirm-dev-022",
+        "question": "Where did I live before Tacoma?",
+        "expected_facts": [
+          "Denver"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for city; history, not stale"
+      },
+      {
+        "id": "confirm-dev-023",
+        "question": "When was my dentist appointment before?",
+        "expected_facts": [
+          "Tuesday at 11am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for dentist; history, not stale"
+      },
+      {
+        "id": "confirm-dev-024",
+        "question": "What tea did I used to drink?",
+        "expected_facts": [
+          "chamomile"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for tea; history, not stale"
+      },
+      {
+        "id": "confirm-dev-025",
+        "question": "What bike did I have before this one?",
+        "expected_facts": [
+          "Giant"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bike; history, not stale"
+      },
+      {
+        "id": "confirm-dev-026",
+        "question": "What days did I go to the gym before?",
+        "expected_facts": [
+          "Wednesday and Saturday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for gym; history, not stale"
+      },
+      {
+        "id": "confirm-dev-027",
+        "question": "When was my nephew's birthday before?",
+        "expected_facts": [
+          "July 2"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for nephew; history, not stale"
+      },
+      {
+        "id": "confirm-dev-028",
+        "question": "Where did I work before?",
+        "expected_facts": [
+          "Bluebird Diner"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for work; history, not stale"
+      },
+      {
+        "id": "confirm-dev-029",
+        "question": "What color was my laptop before?",
+        "expected_facts": [
+          "black"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for laptop; history, not stale"
+      },
+      {
+        "id": "confirm-dev-030",
+        "question": "When was my flight before?",
+        "expected_facts": [
+          "Saturday at 9pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for flight; history, not stale"
+      },
+      {
+        "id": "confirm-dev-031",
+        "question": "Which branch did I bank at before?",
+        "expected_facts": [
+          "Alberta"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bank; history, not stale"
+      },
+      {
+        "id": "confirm-dev-032",
+        "question": "What was my coffee order before?",
+        "expected_facts": [
+          "black coffee"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for coffee; history, not stale"
+      },
+      {
+        "id": "confirm-dev-033",
+        "question": "What day is my dentist appointment?",
+        "expected_facts": [
+          "Friday at 3pm"
+        ],
+        "expected_timeframe": "Friday",
+        "current_facts": [
+          "My dentist appointment is Friday at 3pm."
+        ],
+        "superseded_facts": [
+          "My dentist appointment was Tuesday at 11am."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: dentist"
+      },
+      {
+        "id": "confirm-dev-034",
+        "question": "What day does my flight leave?",
+        "expected_facts": [
+          "Sunday at 6am"
+        ],
+        "expected_timeframe": "Sunday",
+        "current_facts": [
+          "My flight is Sunday at 6am."
+        ],
+        "superseded_facts": [
+          "My flight was Saturday at 9pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: flight"
+      },
+      {
+        "id": "confirm-dev-035",
+        "question": "What date does my car insurance renew?",
+        "expected_facts": [
+          "November 3"
+        ],
+        "expected_timeframe": "November",
+        "current_facts": [
+          "My car insurance renews on November 3."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: insurance"
+      },
+      {
+        "id": "confirm-dev-036",
+        "question": "What date is my project deadline?",
+        "expected_facts": [
+          "October 30"
+        ],
+        "expected_timeframe": "October",
+        "current_facts": [
+          "My project deadline is October 30."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: project"
+      },
+      {
+        "id": "confirm-dev-037",
+        "question": "What date is my nephew's birthday?",
+        "expected_facts": [
+          "July 19"
+        ],
+        "expected_timeframe": "July",
+        "current_facts": [
+          "My nephew's birthday is July 19."
+        ],
+        "superseded_facts": [
+          "My nephew's birthday was July 2."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: nephew"
+      },
+      {
+        "id": "confirm-dev-038",
+        "question": "What year does my passport expire?",
+        "expected_facts": [
+          "2031"
+        ],
+        "expected_timeframe": "2031",
+        "current_facts": [
+          "My passport expires in 2031."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: passport"
+      },
+      {
+        "id": "confirm-dev-039",
+        "question": "Do I live in Tacoma and work at Cedar & Co?",
+        "expected_facts": [
+          "Tacoma",
+          "Cedar & Co"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Tacoma.",
+          "I work at Cedar & Co."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: city, work"
+      },
+      {
+        "id": "confirm-dev-040",
+        "question": "What are my gym days and my coffee order?",
+        "expected_facts": [
+          "Monday and Thursday",
+          "flat white"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I go to the gym on Monday and Thursday.",
+          "My coffee order is a flat white with oat milk."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: gym, coffee"
+      },
+      {
+        "id": "confirm-dev-041",
+        "question": "Where do I live, and where does my sister live?",
+        "expected_facts": [
+          "Tacoma",
+          "Austin"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Tacoma.",
+          "My sister lives in Austin."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: city, sister"
+      },
+      {
+        "id": "confirm-dev-042",
+        "question": "Tell me my garage code and my Wi-Fi password.",
+        "expected_facts": [
+          "8042",
+          "maple-otter-42"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My garage code is 8042.",
+          "My Wi-Fi password is maple-otter-42."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: garage, wifi"
+      },
+      {
+        "id": "confirm-dev-043",
+        "question": "What is my landlord's name and my dog's name?",
+        "expected_facts": [
+          "Dana",
+          "Biscuit"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My landlord is Dana.",
+          "My dog is named Biscuit."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: landlord, dog"
+      },
+      {
+        "id": "confirm-dev-044",
+        "question": "Which branch do I bank at, and when does my insurance renew?",
+        "expected_facts": [
+          "Sellwood",
+          "November 3"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Sellwood branch.",
+          "My car insurance renews on November 3."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: bank, insurance"
+      },
+      {
+        "id": "confirm-dev-045",
+        "question": "What am I allergic to, and what tea do I drink?",
+        "expected_facts": [
+          "penicillin",
+          "oolong"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I am allergic to penicillin.",
+          "My favorite tea is oolong."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: allergy, tea"
+      },
+      {
+        "id": "confirm-dev-046",
+        "question": "What is my blood type?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no blood type stored"
+      },
+      {
+        "id": "confirm-dev-047",
+        "question": "What is my licence plate number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no vehicle registration stored"
+      },
+      {
+        "id": "confirm-dev-048",
+        "question": "What was my childhood nickname?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no childhood nickname stored"
+      },
+      {
+        "id": "confirm-dev-049",
+        "question": "What size shoes do I wear?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no shoe size stored"
+      },
+      {
+        "id": "confirm-dev-050",
+        "question": "What is my gym membership number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: gym days stored, membership number not"
+      }
+    ],
+    "heldout": [
+      {
+        "id": "confirm-held-001",
+        "question": "Which city do I live in?",
+        "expected_facts": [
+          "Tacoma"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Tacoma."
+        ],
+        "superseded_facts": [
+          "I used to live in Denver."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: city"
+      },
+      {
+        "id": "confirm-held-002",
+        "question": "What time is my dentist appointment?",
+        "expected_facts": [
+          "Friday at 3pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dentist appointment is Friday at 3pm."
+        ],
+        "superseded_facts": [
+          "My dentist appointment was Tuesday at 11am."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: dentist"
+      },
+      {
+        "id": "confirm-held-003",
+        "question": "Which tea do I like best?",
+        "expected_facts": [
+          "oolong"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite tea is oolong."
+        ],
+        "superseded_facts": [
+          "My favorite tea was chamomile."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: tea"
+      },
+      {
+        "id": "confirm-held-004",
+        "question": "What bike do I ride?",
+        "expected_facts": [
+          "Trek"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bike is a Trek."
+        ],
+        "superseded_facts": [
+          "My bike was a Giant."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: bike"
+      },
+      {
+        "id": "confirm-held-005",
+        "question": "What date does my nephew's birthday fall on?",
+        "expected_facts": [
+          "July 19"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My nephew's birthday is July 19."
+        ],
+        "superseded_facts": [
+          "My nephew's birthday was July 2."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: nephew"
+      },
+      {
+        "id": "confirm-held-006",
+        "question": "Which company do I work for?",
+        "expected_facts": [
+          "Cedar & Co"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Cedar & Co."
+        ],
+        "superseded_facts": [
+          "I worked at Bluebird Diner."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: work"
+      },
+      {
+        "id": "confirm-held-007",
+        "question": "What colour is my laptop?",
+        "expected_facts": [
+          "silver"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My laptop is silver."
+        ],
+        "superseded_facts": [
+          "My laptop was black."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: laptop"
+      },
+      {
+        "id": "confirm-held-008",
+        "question": "What time does my flight leave?",
+        "expected_facts": [
+          "Sunday at 6am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My flight is Sunday at 6am."
+        ],
+        "superseded_facts": [
+          "My flight was Saturday at 9pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: flight"
+      },
+      {
+        "id": "confirm-held-009",
+        "question": "Where do I bank?",
+        "expected_facts": [
+          "Sellwood"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Sellwood branch."
+        ],
+        "superseded_facts": [
+          "I banked at the Alberta branch."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: bank"
+      },
+      {
+        "id": "confirm-held-010",
+        "question": "When is my project due?",
+        "expected_facts": [
+          "October 30"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My project deadline is October 30."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "seeded fact: project"
+      },
+      {
+        "id": "confirm-held-011",
+        "question": "Which city did I live in before?",
+        "expected_facts": [
+          "Denver"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for city; history, not stale"
+      },
+      {
+        "id": "confirm-held-012",
+        "question": "What was my favorite tea before?",
+        "expected_facts": [
+          "chamomile"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for tea; history, not stale"
+      },
+      {
+        "id": "confirm-held-013",
+        "question": "What bike did I ride before?",
+        "expected_facts": [
+          "Giant"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bike; history, not stale"
+      },
+      {
+        "id": "confirm-held-014",
+        "question": "Where did I work before Cedar & Co?",
+        "expected_facts": [
+          "Bluebird Diner"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for work; history, not stale"
+      },
+      {
+        "id": "confirm-held-015",
+        "question": "Which branch did I bank at before Sellwood?",
+        "expected_facts": [
+          "Alberta"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bank; history, not stale"
+      },
+      {
+        "id": "confirm-held-016",
+        "question": "What is my dentist appointment and my flight time?",
+        "expected_facts": [
+          "Friday at 3pm",
+          "Sunday at 6am"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dentist appointment is Friday at 3pm.",
+          "My flight is Sunday at 6am."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: dentist, flight"
+      },
+      {
+        "id": "confirm-held-017",
+        "question": "Where do I work and what is my project deadline?",
+        "expected_facts": [
+          "Cedar & Co",
+          "October 30"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Cedar & Co.",
+          "My project deadline is October 30."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: work, project"
+      },
+      {
+        "id": "confirm-held-018",
+        "question": "What color is my laptop and what bike do I ride?",
+        "expected_facts": [
+          "silver",
+          "Trek"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My laptop is silver.",
+          "My bike is a Trek."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: laptop, bike"
+      },
+      {
+        "id": "confirm-held-019",
+        "question": "Where did I live before, and where do I live now?",
+        "expected_facts": [
+          "Denver",
+          "Tacoma"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I live in Tacoma."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: city"
+      },
+      {
+        "id": "confirm-held-020",
+        "question": "What tea do I drink and when is my nephew's birthday?",
+        "expected_facts": [
+          "oolong",
+          "July 19"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite tea is oolong.",
+          "My nephew's birthday is July 19."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "multi-fact question: tea, nephew"
+      },
+      {
+        "id": "confirm-held-021",
+        "question": "What is my mother's maiden name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no family names stored"
+      },
+      {
+        "id": "confirm-held-022",
+        "question": "What is my doctor's name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no doctor stored"
+      },
+      {
+        "id": "confirm-held-023",
+        "question": "What is my office extension?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no phone data stored"
+      },
+      {
+        "id": "confirm-held-024",
+        "question": "What is my bank account balance?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: branch stored, balance not"
+      },
+      {
+        "id": "confirm-held-025",
+        "question": "What is my dog's vet called?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: dog name stored, vet not"
+      }
+    ],
+    "adversarial": [
+      {
+        "id": "confirm-adv-001",
+        "question": "Which code opens my garage?",
+        "expected_facts": [
+          "8042"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My garage code is 8042."
+        ],
+        "superseded_facts": [
+          "My garage code was 3319."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-002",
+        "question": "What's the name of my dog?",
+        "expected_facts": [
+          "Biscuit"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My dog is named Biscuit."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-003",
+        "question": "What days am I at the gym now?",
+        "expected_facts": [
+          "Monday and Thursday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I go to the gym on Monday and Thursday."
+        ],
+        "superseded_facts": [
+          "I went to the gym on Wednesday and Saturday."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-004",
+        "question": "Who do I rent from?",
+        "expected_facts": [
+          "Dana"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My landlord is Dana."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: indirect phrasing; must not abstain"
+      },
+      {
+        "id": "confirm-adv-005",
+        "question": "Which city is my sister in?",
+        "expected_facts": [
+          "Austin"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My sister lives in Austin."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-006",
+        "question": "What medication should I avoid?",
+        "expected_facts": [
+          "penicillin"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I am allergic to penicillin."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: indirect phrasing; must not abstain"
+      },
+      {
+        "id": "confirm-adv-007",
+        "question": "What's the Wi-Fi key at home?",
+        "expected_facts": [
+          "maple-otter-42"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My Wi-Fi password is maple-otter-42."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-008",
+        "question": "How long is my passport good for?",
+        "expected_facts": [
+          "2031"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My passport expires in 2031."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: indirect phrasing; must not abstain"
+      },
+      {
+        "id": "confirm-adv-009",
+        "question": "When does my car insurance come up for renewal?",
+        "expected_facts": [
+          "November 3"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My car insurance renews on November 3."
+        ],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: paraphrase; must not abstain"
+      },
+      {
+        "id": "confirm-adv-010",
+        "question": "What do I usually order at a cafe?",
+        "expected_facts": [
+          "flat white"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My coffee order is a flat white with oat milk."
+        ],
+        "superseded_facts": [
+          "My coffee order was black coffee."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "near-miss: indirect phrasing; must not abstain"
+      },
+      {
+        "id": "confirm-adv-011",
+        "question": "What is my passport number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: expiry stored, number not"
+      },
+      {
+        "id": "confirm-adv-012",
+        "question": "What is my landlord's phone number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: landlord name stored, phone not"
+      },
+      {
+        "id": "confirm-adv-013",
+        "question": "What is my sister's job?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: sister's city stored, job not"
+      },
+      {
+        "id": "confirm-adv-014",
+        "question": "How much did I pay for my bike?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: bike model stored, price not"
+      },
+      {
+        "id": "confirm-adv-015",
+        "question": "What is my project budget?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: deadline stored, budget not"
+      },
+      {
+        "id": "confirm-adv-016",
+        "question": "What is my insurance policy number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: renewal date stored, policy number not"
+      },
+      {
+        "id": "confirm-adv-017",
+        "question": "What is my Wi-Fi router model?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: password stored, router not"
+      },
+      {
+        "id": "confirm-adv-018",
+        "question": "When did I last visit the dentist?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: next appointment stored, last visit not"
+      },
+      {
+        "id": "confirm-adv-019",
+        "question": "What is my niece's name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: nephew stored, niece not"
+      },
+      {
+        "id": "confirm-adv-020",
+        "question": "What is my coffee grinder brand?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: coffee order stored, grinder not"
+      },
+      {
+        "id": "confirm-adv-021",
+        "question": "What is my apartment number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: city stored, street address not"
+      },
+      {
+        "id": "confirm-adv-022",
+        "question": "What is my work email address?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: employer stored, email not"
+      },
+      {
+        "id": "confirm-adv-023",
+        "question": "What is my eye prescription?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no optometry data stored"
+      },
+      {
+        "id": "confirm-adv-024",
+        "question": "What is my favourite film?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: no film preference stored"
+      },
+      {
+        "id": "confirm-adv-025",
+        "question": "What is my gym locker number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "unknown: gym days stored, locker not"
+      }
+    ]
+  },
+  "baselines": [
+    "full_recent_transcript",
+    "filesystem_dump"
+  ],
+  "baseline_model": "qwen3.5:4b",
+  "sha256": "f0ff2d1ebdeb557bfb13d4764fbe273182c271d37ce65d762388202698300677",
+  "frozen_at": "2026-10-18T06:05:30.749537+00:00",
+  "prior_exposure": "first attempt aborted after one PUCA answer when the baseline model name was wrong; no complete run, set unchanged",
+  "retired": [
+    "fresh-2026-10-18"
+  ],
+  "scenarios_file": "eval/data/memory_scenarios_confirm.json",
+  "counts": {
+    "development": {
+      "total": 50,
+      "unknown": 5
+    },
+    "heldout": {
+      "total": 25,
+      "unknown": 5
+    },
+    "adversarial": {
+      "total": 25,
+      "unknown": 15
+    }
+  }
+}

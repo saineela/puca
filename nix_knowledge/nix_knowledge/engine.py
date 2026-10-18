@@ -8,6 +8,7 @@ from .database import KnowledgeDatabase
 from .history import KnowledgeHistory
 from .models import KnowledgeRecord
 from .operations import KnowledgeOperation
+from .provenance import require_turn_reference
 from .retrieval import KnowledgeRetrieval
 from .validation import KnowledgeValidator
 
@@ -99,6 +100,7 @@ class KnowledgeEngine:
         reason: str | None = None,
     ) -> KnowledgeRecord:
 
+        require_turn_reference(source, source_id)
         operation = KnowledgeOperation(
             operation="create",
             knowledge_type=knowledge_type,
@@ -121,6 +123,105 @@ class KnowledgeEngine:
         )
 
         return self.apply(operation)
+
+    # ---------------------------------------------------------
+    # SUPERSEDE (turn-level provenance)
+    # ---------------------------------------------------------
+
+    def supersede(
+        self,
+        record_id: int,
+        *,
+        data: dict[str, Any] | None = None,
+        knowledge_type: str | None = None,
+        confidence: float | None = None,
+        certainty: str | None = None,
+        source: str = "system",
+        source_id: str | None = None,
+        reason: str | None = None,
+    ) -> KnowledgeRecord:
+        """Replace a live record and keep the replacement link.
+
+        The old row is never deleted: it is marked ``superseded`` and
+        points at its replacement through ``superseded_by``, so the
+        chain explains *why* the current value is current. Callers can
+        still read the old value with ``get`` and the full history with
+        ``supersede_chain``.
+        """
+        with self.database.transaction():
+            old = self.get(record_id)
+            if old.status != "active":
+                raise ValueError(
+                    f"Knowledge record {record_id} is {old.status}, not active"
+                )
+            if old.id == record_id and source_id and str(old.id) == str(source_id):
+                raise ValueError("a record cannot supersede itself")
+
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
+            replacement = self.create(
+                knowledge_type or old.knowledge_type,
+                dict(old.data) if data is None else data,
+                confidence=old.confidence if confidence is None else confidence,
+                certainty=old.certainty if certainty is None else certainty,
+                source=source,
+                source_id=source_id,
+                reason=reason or f"supersedes knowledge record {record_id}",
+            )
+            if replacement.id == old.id:
+                raise ValueError("a record cannot supersede itself")
+
+            self.database.execute(
+                """
+                UPDATE knowledge
+                SET status = 'superseded',
+                    superseded_by = ?,
+                    valid_until = COALESCE(valid_until, ?),
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (replacement.id, now.isoformat(), now.isoformat(), record_id),
+            )
+
+            self._audit(
+                record_id=record_id,
+                operation="supersede",
+                knowledge_type=old.knowledge_type,
+                before=old.data,
+                after=replacement.data,
+                source=source,
+                reason=reason or f"superseded by {replacement.id}",
+            )
+
+        # The old text must stop competing in recall; the audit trail
+        # keeps the history instead of the vector index.
+        if self.semantic is not None:
+            try:
+                self.semantic.delete_record(record_id)
+            except Exception:
+                pass
+
+        return replacement
+
+    def supersede_chain(self, record_id: int) -> list[KnowledgeRecord]:
+        """Walk a supersede chain from ``record_id`` to its newest record."""
+        record = self.get(record_id)
+        chain: list[KnowledgeRecord] = []
+        seen: set[int] = set()
+        while record is not None and record.id not in seen:
+            chain.append(record)
+            seen.add(record.id)
+            record = (
+                self.get(record.superseded_by)
+                if record.superseded_by
+                else None
+            )
+        return chain
+
+    def current_record(self, record_id: int) -> KnowledgeRecord:
+        """Resolve a stale id to the newest record in its chain."""
+        return self.supersede_chain(record_id)[-1]
 
     # ---------------------------------------------------------
     # GET

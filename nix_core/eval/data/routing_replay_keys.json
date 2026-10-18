@@ -1,0 +1,160 @@
+{
+  "set_tag": "routing-heldout-2026-10-17",
+  "tag": "routing-replay-keys-2026-10-18",
+  "note": "Controlled replay keys for the frozen held-out set. Seeds go into a dedicated evaluation store, never the owner's memory. The rubric is a deterministic proxy: 'memory' requires the seeded value to appear; 'open' requires a non-empty, non-uncertain answer; 'write' requires an acknowledgement; 'clarify' and 'confirm' require a question; 'delete' requires a deletion acknowledgement or a confirmation question.",
+  "cases": {
+    "h01": {
+      "rubric": "open"
+    },
+    "h02": {
+      "rubric": "open"
+    },
+    "h03": {
+      "rubric": "open"
+    },
+    "h04": {
+      "rubric": "open"
+    },
+    "h05": {
+      "rubric": "open"
+    },
+    "h06": {
+      "rubric": "open"
+    },
+    "h07": {
+      "rubric": "open"
+    },
+    "h08": {
+      "rubric": "open"
+    },
+    "h09": {
+      "rubric": "open"
+    },
+    "h10": {
+      "rubric": "open"
+    },
+    "h11": {
+      "rubric": "open"
+    },
+    "h12": {
+      "rubric": "open"
+    },
+    "h13": {
+      "rubric": "open"
+    },
+    "h14": {
+      "rubric": "open"
+    },
+    "h15": {
+      "rubric": "memory",
+      "seed": [
+        "My home city is Ashland."
+      ],
+      "expected": [
+        "Ashland"
+      ]
+    },
+    "h16": {
+      "rubric": "memory",
+      "seed": [
+        "I previously lived in Bend."
+      ],
+      "expected": [
+        "Bend"
+      ]
+    },
+    "h17": {
+      "rubric": "memory",
+      "seed": [
+        "My dog is called Mochi."
+      ],
+      "expected": [
+        "Mochi"
+      ]
+    },
+    "h18": {
+      "rubric": "memory",
+      "seed": [
+        "My mum is doing well."
+      ],
+      "expected": [
+        "well"
+      ]
+    },
+    "h19": {
+      "rubric": "write"
+    },
+    "h20": {
+      "rubric": "write"
+    },
+    "h21": {
+      "rubric": "write"
+    },
+    "h22": {
+      "rubric": "clarify"
+    },
+    "h23": {
+      "rubric": "confirm"
+    },
+    "h24": {
+      "rubric": "write"
+    },
+    "h25": {
+      "rubric": "memory",
+      "seed": [
+        "My locker code is 8842."
+      ],
+      "expected": [
+        "8842"
+      ]
+    },
+    "h26": {
+      "rubric": "memory",
+      "seed": [
+        "My sister is feeling better."
+      ],
+      "expected": [
+        "better"
+      ]
+    },
+    "h27": {
+      "rubric": "memory",
+      "seed": [
+        "I work at the observatory."
+      ],
+      "expected": [
+        "observatory"
+      ]
+    },
+    "h28": {
+      "rubric": "write"
+    },
+    "h29": {
+      "rubric": "delete",
+      "seed": [
+        "I used to live in Seattle."
+      ]
+    },
+    "h30": {
+      "rubric": "memory",
+      "seed": [
+        "My landlord is Mr. Patel."
+      ],
+      "expected": [
+        "Patel"
+      ]
+    },
+    "h31": {
+      "rubric": "write"
+    },
+    "h32": {
+      "rubric": "memory",
+      "seed": [
+        "My dad is recovering."
+      ],
+      "expected": [
+        "recovering"
+      ]
+    }
+  }
+}

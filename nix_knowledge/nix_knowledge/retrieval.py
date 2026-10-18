@@ -167,4 +167,10 @@ class KnowledgeRetrieval:
             updated_at=datetime.fromisoformat(
                 row["updated_at"]
             ),
+
+            superseded_by=(
+                row["superseded_by"]
+                if "superseded_by" in row.keys()
+                else None
+            ),
         )

@@ -1,0 +1,303 @@
+FFFFF.FFFFFFFFF                                                          [100%]
+=================================== FAILURES ===================================
+______________ test_current_city_read_excludes_a_historical_fact _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_current_city_read_exclude0')
+
+    def test_current_city_read_excludes_a_historical_fact(tmp_path):
+        """The D4 c17 failure: the current read returned the old city too.
+    
+        The store keeps history on purpose, but a question without a past frame
+        asks for today's value only.
+        """
+        engine = _engine(tmp_path, "stale.db")
+        try:
+            create_fact(engine, "I previously lived in Boise.", source="test")
+            create_fact(engine, "My home city is Flagstaff.", source="test")
+            needle = KnowledgeNeedle(engine)
+    
+>           current, result = _values(needle, "What city do I live in?")
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_evidence_defects.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+needle = <nix_knowledge.needle.KnowledgeNeedle object at 0x719830d52e40>
+text = 'What city do I live in?'
+
+    def _values(needle, text):
+>       name, arguments = _selected(text)
+        ^^^^^^^^^^^^^^^
+E       TypeError: cannot unpack non-iterable NoneType object
+
+tests/test_evidence_defects.py:54: TypeError
+_________ test_a_past_frame_question_still_reaches_the_historical_fact _________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_a_past_frame_question_sti0')
+
+    def test_a_past_frame_question_still_reaches_the_historical_fact(tmp_path):
+        """Removing history from the current read must not remove it entirely."""
+        engine = _engine(tmp_path, "history.db")
+        try:
+            create_fact(engine, "I previously lived in Boise.", source="test")
+            create_fact(engine, "My home city is Flagstaff.", source="test")
+            needle = KnowledgeNeedle(engine)
+    
+>           current, _ = _values(needle, "What city do I live in?")
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_evidence_defects.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+needle = <nix_knowledge.needle.KnowledgeNeedle object at 0x719830c36490>
+text = 'What city do I live in?'
+
+    def _values(needle, text):
+>       name, arguments = _selected(text)
+        ^^^^^^^^^^^^^^^
+E       TypeError: cannot unpack non-iterable NoneType object
+
+tests/test_evidence_defects.py:54: TypeError
+________________ test_an_unknown_city_question_invents_nothing _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_an_unknown_city_question_0')
+
+    def test_an_unknown_city_question_invents_nothing(tmp_path):
+        """Fail-closed: an empty store answers empty rather than borrowing a fact."""
+        engine = _engine(tmp_path, "unknown.db")
+        try:
+            create_fact(engine, "My dog is named Biscuit.", source="test")
+            needle = KnowledgeNeedle(engine)
+>           current, result = _values(needle, "What city do I live in?")
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_evidence_defects.py:107: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+needle = <nix_knowledge.needle.KnowledgeNeedle object at 0x719830c37ed0>
+text = 'What city do I live in?'
+
+    def _values(needle, text):
+>       name, arguments = _selected(text)
+        ^^^^^^^^^^^^^^^
+E       TypeError: cannot unpack non-iterable NoneType object
+
+tests/test_evidence_defects.py:54: TypeError
+__________________ test_put_x_in_for_selects_a_calendar_write __________________
+
+    def test_put_x_in_for_selects_a_calendar_write():
+        """The D4 c31 failure: "put the optician in for Monday at 10am"."""
+        selected = _selected("Put the optician in for Monday at 10am")
+>       assert selected is not None, selected
+E       AssertionError: None
+E       assert None is not None
+
+tests/test_evidence_defects.py:118: AssertionError
+______ test_put_in_for_handles_an_indefinite_article_and_a_leading_put_in ______
+
+    def test_put_in_for_handles_an_indefinite_article_and_a_leading_put_in():
+        for text, title in (
+            ("put my dentist appointment in for friday at 3pm", "dentist"),
+            ("put in a haircut for tomorrow at 9", "haircut"),
+            ("Put the gym in for Monday", "gym"),
+        ):
+            selected = _selected(text)
+>           assert selected is not None, text
+E           AssertionError: put my dentist appointment in for friday at 3pm
+E           assert None is not None
+
+tests/test_evidence_defects.py:135: AssertionError
+___________________ test_a_put_in_for_event_can_be_read_back ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_a_put_in_for_event_can_be0')
+
+    def test_a_put_in_for_event_can_be_read_back(tmp_path):
+        """Write then read: the new rule earns its place only if the event is
+        reachable afterwards. The stored title is the user's noun ("optician"),
+        and the follow-up question adds the generic word "appointment"."""
+        engine = _engine(tmp_path, "put_read.db")
+        try:
+            needle = KnowledgeNeedle(engine)
+            created = needle.tool_functions["create_calendar_event"](
+                title="optician", temporal_expression="Monday at 10am"
+            )
+            assert created.get("record_id"), created
+    
+            name, arguments = _selected("When is my optician appointment?")
+            assert name == "find_calendar_events", (name, arguments)
+            found = needle.tool_functions[name](**arguments)
+>           assert found["events"], found
+E           AssertionError: {'ok': True, 'count': 0, 'events': []}
+E           assert []
+
+tests/test_evidence_defects.py:160: AssertionError
+___________________ test_a_due_statement_is_stored_as_a_fact ___________________
+
+    def test_a_due_statement_is_stored_as_a_fact():
+        """The D4 c32 knowledge half: a durable deadline must reach a write."""
+        selected = _selected("The renewal is due March 4")
+>       assert selected is not None, selected
+E       AssertionError: None
+E       assert None is not None
+
+tests/test_evidence_defects.py:170: AssertionError
+__________________ test_a_due_question_is_a_read_not_a_write ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_a_due_question_is_a_read_0')
+
+    def test_a_due_question_is_a_read_not_a_write(tmp_path):
+        """The stored deadline must be readable, and the question must not write.
+    
+        The selector may read it as a calendar lookup; the read-only fallback then
+        reaches the fact store. What matters is that the answer comes back and the
+        store does not grow a second record for a question.
+        """
+        engine = _engine(tmp_path, "due_read.db")
+        try:
+            create_fact(engine, "The renewal is due March 4", source="test")
+            needle = KnowledgeNeedle(engine)
+            before = len(engine.search("fact"))
+    
+            result = needle.process("When is the renewal due?")
+            payload = result.get("result") or {}
+            facts = payload.get("facts") or []
+>           assert any("March 4" in str(row.get("value", "")) for row in facts), payload
+E           AssertionError: {'ok': True, 'count': 0, 'events': [], 'temporal_context': {'now': '2026-10-18T09:23:45.977390-05:00', 'timezone': 'America/Chicago', 'current_date': '2026-10-18', 'current_time': '09:23:45', ...}}
+E           assert False
+E            +  where False = any(<generator object test_a_due_question_is_a_read_not_a_write.<locals>.<genexpr> at 0x7198302aa200>)
+
+tests/test_evidence_defects.py:191: AssertionError
+______________ test_delete_by_description_asks_before_it_deletes _______________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_delete_by_description_ask0')
+
+    def test_delete_by_description_asks_before_it_deletes(tmp_path):
+        """The D4 c38 failure: deletion must target the fact, and only on confirm."""
+        engine = _engine(tmp_path, "delete.db")
+        try:
+            create_fact(engine, "My old address was 14 Willow Lane.", source="test")
+            needle = KnowledgeNeedle(engine)
+    
+            # routing: a note/fact deletion is not a calendar cancel
+            name, arguments = _selected("Delete the note about my old address")
+>           assert name == "delete_fact", (name, arguments)
+E           AssertionError: ('cancel_calendar_event', {'title': 'note about my old address'})
+E           assert 'cancel_calendar_event' == 'delete_fact'
+E             
+E             - delete_fact
+E             + cancel_calendar_event
+
+tests/test_evidence_defects.py:207: AssertionError
+_________ test_delete_fails_closed_on_an_unknown_or_broad_description __________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_delete_fails_closed_on_an0')
+
+    def test_delete_fails_closed_on_an_unknown_or_broad_description(tmp_path):
+        engine = _engine(tmp_path, "delete_guard.db")
+        try:
+            create_fact(engine, "My old address was 14 Willow Lane.", source="test")
+            create_fact(engine, "My old address was 8 Mill Road.", source="test")
+            create_fact(engine, "My old address was 2 Quay Street.", source="test")
+            create_fact(engine, "My old address was 77 Elm Close.", source="test")
+            needle = KnowledgeNeedle(engine)
+    
+            # No match: nothing is deleted, and no record is invented.
+>           missing = needle.tool_functions["delete_fact"](
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                query="the note about my boat licence", confirm=True
+            )
+E           KeyError: 'delete_fact'
+
+tests/test_evidence_defects.py:237: KeyError
+___________ test_a_deletion_paraphrase_still_targets_the_fact_store ____________
+
+    def test_a_deletion_paraphrase_still_targets_the_fact_store():
+        """The same request in the shapes people actually use.
+    
+        "Delete the note about my old address" was the fixed row; these are its
+        neighbours. Two of them still reached the calendar-cancel rule after the
+        first fix, which is the same defect class, so they are pinned here.
+        """
+        for text, expected in (
+            ("Can you remove the saved note about where I used to live?", "live"),
+            ("Remove the note I saved about my old address", "address"),
+            ("Delete my old address note", "address"),
+            ("Delete the note about my old address", "address"),
+            ("Forget my old address", "address"),
+        ):
+            name, arguments = _selected(text)
+>           assert name == "delete_fact", (text, name)
+E           AssertionError: ('Can you remove the saved note about where I used to live?', 'cancel_calendar_event')
+E           assert 'cancel_calendar_event' == 'delete_fact'
+E             
+E             - delete_fact
+E             + cancel_calendar_event
+
+tests/test_evidence_defects.py:269: AssertionError
+____________ test_a_book_in_for_paraphrase_selects_a_calendar_write ____________
+
+    def test_a_book_in_for_paraphrase_selects_a_calendar_write():
+        """\"put X in for Y\" with a different verb is the same calendar write."""
+        for text, title in (
+            ("Book the plumber in for Wednesday at 8am", "plumber"),
+            ("Slot the dentist in for Monday", "dentist"),
+            ("put my mother in for Tuesday at noon", "mother"),
+        ):
+            selected = _selected(text)
+>           assert selected is not None, text
+E           AssertionError: Book the plumber in for Wednesday at 8am
+E           assert None is not None
+
+tests/test_evidence_defects.py:287: AssertionError
+_______________ test_a_paraphrased_deadline_statement_is_stored ________________
+
+    def test_a_paraphrased_deadline_statement_is_stored():
+        """A durable deadline in the user's own words must reach a write."""
+        for text in ("The permit is due April 2", "My passport renewal is due June 1"):
+            selected = _selected(text)
+>           assert selected is not None, text
+E           AssertionError: The permit is due April 2
+E           assert None is not None
+
+tests/test_evidence_defects.py:299: AssertionError
+____________ test_a_multi_fact_question_returns_both_stored_values _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-77/test_a_multi_fact_question_ret0')
+
+    def test_a_multi_fact_question_returns_both_stored_values(tmp_path):
+        """\"Tell me my city and my dog\" is two reads, not one.
+    
+        The selector splits it into two find_facts actions and the needle runs both;
+        a reply that returns one value would silently drop half the question.
+        Measured limitation: the \"What is my X and my Y?\" shape is not split, and
+        is recorded as a residual defect rather than asserted here.
+        """
+        engine = _engine(tmp_path, "multi.db")
+        try:
+            create_fact(engine, "My home city is Flagstaff.", source="test")
+            create_fact(engine, "My dog is called Miso.", source="test")
+            needle = KnowledgeNeedle(engine)
+    
+            result = needle.process("Tell me my city and my dog")
+            values = " | ".join(_all_values(result))
+>           assert "Flagstaff" in values, values
+E           AssertionError: 
+E           assert 'Flagstaff' in ''
+
+tests/test_evidence_defects.py:333: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_evidence_defects.py::test_current_city_read_excludes_a_historical_fact
+FAILED tests/test_evidence_defects.py::test_a_past_frame_question_still_reaches_the_historical_fact
+FAILED tests/test_evidence_defects.py::test_an_unknown_city_question_invents_nothing
+FAILED tests/test_evidence_defects.py::test_put_x_in_for_selects_a_calendar_write
+FAILED tests/test_evidence_defects.py::test_put_in_for_handles_an_indefinite_article_and_a_leading_put_in
+FAILED tests/test_evidence_defects.py::test_a_put_in_for_event_can_be_read_back
+FAILED tests/test_evidence_defects.py::test_a_due_statement_is_stored_as_a_fact
+FAILED tests/test_evidence_defects.py::test_a_due_question_is_a_read_not_a_write
+FAILED tests/test_evidence_defects.py::test_delete_by_description_asks_before_it_deletes
+FAILED tests/test_evidence_defects.py::test_delete_fails_closed_on_an_unknown_or_broad_description
+FAILED tests/test_evidence_defects.py::test_a_deletion_paraphrase_still_targets_the_fact_store
+FAILED tests/test_evidence_defects.py::test_a_book_in_for_paraphrase_selects_a_calendar_write
+FAILED tests/test_evidence_defects.py::test_a_paraphrased_deadline_statement_is_stored
+FAILED tests/test_evidence_defects.py::test_a_multi_fact_question_returns_both_stored_values
+14 failed, 1 passed in 12.99s

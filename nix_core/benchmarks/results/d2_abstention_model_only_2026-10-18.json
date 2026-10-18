@@ -1,0 +1,560 @@
+{
+  "results": {
+    "adversarial": {
+      "scenarios": [
+        {
+          "id": "fresh-adv-001",
+          "tokens": 13,
+          "latency_ms": 139.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 5216.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1750.5
+          }
+        },
+        {
+          "id": "fresh-adv-002",
+          "tokens": 13,
+          "latency_ms": 128.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1748.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1133.1
+          }
+        },
+        {
+          "id": "fresh-adv-003",
+          "tokens": 13,
+          "latency_ms": 127.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1784.1
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1761.3
+          }
+        },
+        {
+          "id": "fresh-adv-004",
+          "tokens": 13,
+          "latency_ms": 126.6,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1143.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1758.2
+          }
+        },
+        {
+          "id": "fresh-adv-005",
+          "tokens": 13,
+          "latency_ms": 126.3,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1304.0
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1610.1
+          }
+        },
+        {
+          "id": "fresh-adv-006",
+          "tokens": 13,
+          "latency_ms": 124.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1696.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1749.2
+          }
+        },
+        {
+          "id": "fresh-adv-007",
+          "tokens": 13,
+          "latency_ms": 125.4,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1756.8
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1672.4
+          }
+        },
+        {
+          "id": "fresh-adv-008",
+          "tokens": 13,
+          "latency_ms": 127.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1743.1
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1751.2
+          }
+        },
+        {
+          "id": "fresh-adv-009",
+          "tokens": 13,
+          "latency_ms": 121.6,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1739.0
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 1754.4
+          }
+        },
+        {
+          "id": "fresh-adv-010",
+          "tokens": 13,
+          "latency_ms": 124.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1756.7
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1804.1
+          }
+        },
+        {
+          "id": "fresh-adv-011",
+          "tokens": 13,
+          "latency_ms": 125.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1749.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1759.6
+          }
+        },
+        {
+          "id": "fresh-adv-012",
+          "tokens": 13,
+          "latency_ms": 124.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1452.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1762.4
+          }
+        },
+        {
+          "id": "fresh-adv-013",
+          "tokens": 13,
+          "latency_ms": 126.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1771.9
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1770.3
+          }
+        },
+        {
+          "id": "fresh-adv-014",
+          "tokens": 13,
+          "latency_ms": 122.8,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1762.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1740.7
+          }
+        },
+        {
+          "id": "fresh-adv-015",
+          "tokens": 13,
+          "latency_ms": 127.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 1.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1742.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 1.0,
+            "latency_ms": 1749.2
+          }
+        }
+      ],
+      "accuracy": 1.0,
+      "temporal_correctness": 1.0,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 1.0,
+      "tokens": 195,
+      "budget": 1200,
+      "scenarios_count": 15,
+      "latency_ms_p50": 126.0,
+      "baselines": {
+        "transcript": {
+          "accuracy": 1.0,
+          "temporal_correctness": 1.0
+        },
+        "filesystem": {
+          "accuracy": 1.0,
+          "temporal_correctness": 1.0
+        }
+      }
+    }
+  },
+  "freeze": {
+    "tag": "fresh-2026-10-18-model-only-baseline",
+    "model": "qwen3.5:4b",
+    "hardware": "x86_64",
+    "baseline_mode": "ollama",
+    "scoring": {
+      "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+      "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+      "stale_fact_rate": "a superseded value is reported as current; lower is better",
+      "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+    },
+    "sets": {
+      "adversarial": [
+        {
+          "id": "fresh-adv-001",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about locker; must abstain"
+        },
+        {
+          "id": "fresh-adv-002",
+          "question": "What is my mother's maiden name?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about city; must abstain"
+        },
+        {
+          "id": "fresh-adv-003",
+          "question": "What is my blood type?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about dentist; must abstain"
+        },
+        {
+          "id": "fresh-adv-004",
+          "question": "What is my license plate?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about tea; must abstain"
+        },
+        {
+          "id": "fresh-adv-005",
+          "question": "What is my student ID?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about car; must abstain"
+        },
+        {
+          "id": "fresh-adv-006",
+          "question": "What is my office number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about gym; must abstain"
+        },
+        {
+          "id": "fresh-adv-007",
+          "question": "What is my niece's school?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about niece; must abstain"
+        },
+        {
+          "id": "fresh-adv-008",
+          "question": "What is my employee badge number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about work; must abstain"
+        },
+        {
+          "id": "fresh-adv-009",
+          "question": "What is my router password?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about phone; must abstain"
+        },
+        {
+          "id": "fresh-adv-010",
+          "question": "What is my seat number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about flight; must abstain"
+        },
+        {
+          "id": "fresh-adv-011",
+          "question": "What is my account number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about bank; must abstain"
+        },
+        {
+          "id": "fresh-adv-012",
+          "question": "What is my favorite dessert?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about cuisine; must abstain"
+        },
+        {
+          "id": "fresh-adv-013",
+          "question": "What is my garage code?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about wifi; must abstain"
+        },
+        {
+          "id": "fresh-adv-014",
+          "question": "What is my bike lock combination?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about parking; must abstain"
+        },
+        {
+          "id": "fresh-adv-015",
+          "question": "What is my dentist's phone number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about coffee; must abstain"
+        }
+      ]
+    },
+    "baselines": [
+      "full_recent_transcript",
+      "filesystem_dump"
+    ],
+    "sha256": "11658a8ecf38772892575efb07b9509b6231014cc5c27e1a4c9749031a7d806a",
+    "frozen_at": "2026-10-18T05:56:52.200525+00:00",
+    "prior_exposure": "adversarial subset, scorer fixed, model-only baselines",
+    "retired": []
+  }
+}

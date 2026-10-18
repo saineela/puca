@@ -1,0 +1,1548 @@
+{
+  "tag": "k5-confirm-2026-10-18",
+  "model": "luna-v6-contextual-v1",
+  "hardware": "x86_64",
+  "baseline_mode": "ollama",
+  "scoring": {
+    "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+    "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+    "stale_fact_rate": "a superseded value is reported as current; lower is better",
+    "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+  },
+  "sets": {
+    "development": [
+      {
+        "id": "k5-dev-001",
+        "question": "What is my storage unit code?",
+        "expected_facts": [
+          "6391"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My storage unit code is 6391."
+        ],
+        "superseded_facts": [
+          "My storage unit code was 2874."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: storage"
+      },
+      {
+        "id": "k5-dev-002",
+        "question": "Where did I grow up?",
+        "expected_facts": [
+          "Missoula"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I grew up in Missoula."
+        ],
+        "superseded_facts": [
+          "I grew up in Reno."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: hometown"
+      },
+      {
+        "id": "k5-dev-003",
+        "question": "When is my optician appointment?",
+        "expected_facts": [
+          "Tuesday at 9am"
+        ],
+        "expected_timeframe": "Tuesday",
+        "current_facts": [
+          "My optician appointment is Tuesday at 9am."
+        ],
+        "superseded_facts": [
+          "My optician appointment was Monday at 1pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: optician"
+      },
+      {
+        "id": "k5-dev-004",
+        "question": "What do I order at the coffee shop?",
+        "expected_facts": [
+          "cortado"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My coffee order is a cortado."
+        ],
+        "superseded_facts": [
+          "My coffee order was a cappuccino."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: coffee"
+      },
+      {
+        "id": "k5-dev-005",
+        "question": "What kind of bicycle do I have?",
+        "expected_facts": [
+          "Bianchi"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bicycle is a Bianchi."
+        ],
+        "superseded_facts": [
+          "My bicycle was a Specialized."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: bicycle"
+      },
+      {
+        "id": "k5-dev-006",
+        "question": "What days do I swim?",
+        "expected_facts": [
+          "Wednesday and Sunday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I swim on Wednesday and Sunday."
+        ],
+        "superseded_facts": [
+          "I swam on Tuesday and Saturday."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: swimming"
+      },
+      {
+        "id": "k5-dev-007",
+        "question": "When is my grandmother's birthday?",
+        "expected_facts": [
+          "August 14"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My grandmother's birthday is August 14."
+        ],
+        "superseded_facts": [
+          "My grandmother's birthday was August 3."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: grandmother"
+      },
+      {
+        "id": "k5-dev-008",
+        "question": "Where do I work?",
+        "expected_facts": [
+          "Lumen Studio"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Lumen Studio."
+        ],
+        "superseded_facts": [
+          "I worked at Harbor Print."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: office"
+      },
+      {
+        "id": "k5-dev-009",
+        "question": "What colour is my backpack?",
+        "expected_facts": [
+          "orange"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My backpack is orange."
+        ],
+        "superseded_facts": [
+          "My backpack was grey."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: backpack"
+      },
+      {
+        "id": "k5-dev-010",
+        "question": "When does my train leave?",
+        "expected_facts": [
+          "Thursday at 8am"
+        ],
+        "expected_timeframe": "Thursday",
+        "current_facts": [
+          "My train is Thursday at 8am."
+        ],
+        "superseded_facts": [
+          "My train was Wednesday at 5pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: train"
+      },
+      {
+        "id": "k5-dev-011",
+        "question": "Which bank branch do I use?",
+        "expected_facts": [
+          "Fremont"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Fremont branch."
+        ],
+        "superseded_facts": [
+          "I banked at the Powell branch."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: bank"
+      },
+      {
+        "id": "k5-dev-012",
+        "question": "What is my favorite cuisine?",
+        "expected_facts": [
+          "Korean"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite cuisine is Korean."
+        ],
+        "superseded_facts": [
+          "My favorite cuisine was Mexican."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: cuisine"
+      },
+      {
+        "id": "k5-dev-013",
+        "question": "What is my printer called?",
+        "expected_facts": [
+          "office-jet"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My printer is called office-jet."
+        ],
+        "superseded_facts": [
+          "My printer was called home-jet."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: printer"
+      },
+      {
+        "id": "k5-dev-014",
+        "question": "What is my bike locker number?",
+        "expected_facts": [
+          "D24"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bike locker is D24."
+        ],
+        "superseded_facts": [
+          "My bike locker was A11."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: bike-locker"
+      },
+      {
+        "id": "k5-dev-015",
+        "question": "What is my smoothie order?",
+        "expected_facts": [
+          "mango and spinach"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My smoothie order is mango and spinach."
+        ],
+        "superseded_facts": [
+          "My smoothie order was berry and banana."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: smoothie"
+      },
+      {
+        "id": "k5-dev-016",
+        "question": "When does my lease end?",
+        "expected_facts": [
+          "February 9"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My lease ends on February 9."
+        ],
+        "superseded_facts": [
+          "My lease ended on January 12."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: lease"
+      },
+      {
+        "id": "k5-dev-017",
+        "question": "Who is my neighbor?",
+        "expected_facts": [
+          "Priya"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My neighbor is Priya."
+        ],
+        "superseded_facts": [
+          "My neighbor was Tomas."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: neighbor"
+      },
+      {
+        "id": "k5-dev-018",
+        "question": "What is my cat called?",
+        "expected_facts": [
+          "Miso"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My cat is named Miso."
+        ],
+        "superseded_facts": [
+          "My cat was named Pepper."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: cat"
+      },
+      {
+        "id": "k5-dev-019",
+        "question": "When does my renters insurance renew?",
+        "expected_facts": [
+          "December 1"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My renters insurance renews on December 1."
+        ],
+        "superseded_facts": [
+          "My renters insurance renewed on November 1."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: renters-insurance"
+      },
+      {
+        "id": "k5-dev-020",
+        "question": "What is my router password?",
+        "expected_facts": [
+          "river-stone-58"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My router password is river-stone-58."
+        ],
+        "superseded_facts": [
+          "My router password was oak-leaf-31."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: router"
+      },
+      {
+        "id": "k5-dev-021",
+        "question": "When does my driver's license expire?",
+        "expected_facts": [
+          "2029"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My driver's license expires in 2029."
+        ],
+        "superseded_facts": [
+          "My driver's license expired in 2019."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: license"
+      },
+      {
+        "id": "k5-dev-022",
+        "question": "When is my grant deadline?",
+        "expected_facts": [
+          "November 17"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My grant deadline is November 17."
+        ],
+        "superseded_facts": [
+          "My grant deadline was October 20."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: grant"
+      },
+      {
+        "id": "k5-dev-023",
+        "question": "Who is my accountant?",
+        "expected_facts": [
+          "Rafael"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My accountant is Rafael."
+        ],
+        "superseded_facts": [
+          "My accountant was Vera."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: accountant"
+      },
+      {
+        "id": "k5-dev-024",
+        "question": "What am I allergic to?",
+        "expected_facts": [
+          "sulfa drugs"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I am allergic to sulfa drugs."
+        ],
+        "superseded_facts": [
+          "I was allergic to penicillin."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: allergy"
+      },
+      {
+        "id": "k5-dev-025",
+        "question": "What do I usually have for lunch?",
+        "expected_facts": [
+          "turkey wrap"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My usual lunch is a turkey wrap."
+        ],
+        "superseded_facts": [
+          "My usual lunch was a chicken salad."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "current fact: lunch"
+      },
+      {
+        "id": "k5-dev-026",
+        "question": "What's the code for my storage unit?",
+        "expected_facts": [
+          "6391"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My storage unit code is 6391."
+        ],
+        "superseded_facts": [
+          "My storage unit code was 2874."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: storage"
+      },
+      {
+        "id": "k5-dev-027",
+        "question": "Which town did I grow up in?",
+        "expected_facts": [
+          "Missoula"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I grew up in Missoula."
+        ],
+        "superseded_facts": [
+          "I grew up in Reno."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: hometown"
+      },
+      {
+        "id": "k5-dev-028",
+        "question": "What day is my optician appointment?",
+        "expected_facts": [
+          "Tuesday at 9am"
+        ],
+        "expected_timeframe": "Tuesday",
+        "current_facts": [
+          "My optician appointment is Tuesday at 9am."
+        ],
+        "superseded_facts": [
+          "My optician appointment was Monday at 1pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: optician"
+      },
+      {
+        "id": "k5-dev-029",
+        "question": "What's my usual coffee order?",
+        "expected_facts": [
+          "cortado"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My coffee order is a cortado."
+        ],
+        "superseded_facts": [
+          "My coffee order was a cappuccino."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: coffee"
+      },
+      {
+        "id": "k5-dev-030",
+        "question": "Which bicycle do I ride?",
+        "expected_facts": [
+          "Bianchi"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bicycle is a Bianchi."
+        ],
+        "superseded_facts": [
+          "My bicycle was a Specialized."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: bicycle"
+      },
+      {
+        "id": "k5-dev-031",
+        "question": "When do I swim?",
+        "expected_facts": [
+          "Wednesday and Sunday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I swim on Wednesday and Sunday."
+        ],
+        "superseded_facts": [
+          "I swam on Tuesday and Saturday."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: swimming"
+      },
+      {
+        "id": "k5-dev-032",
+        "question": "What date is my grandmother's birthday?",
+        "expected_facts": [
+          "August 14"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My grandmother's birthday is August 14."
+        ],
+        "superseded_facts": [
+          "My grandmother's birthday was August 3."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: grandmother"
+      },
+      {
+        "id": "k5-dev-033",
+        "question": "What's the name of the place I work at?",
+        "expected_facts": [
+          "Lumen Studio"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Lumen Studio."
+        ],
+        "superseded_facts": [
+          "I worked at Harbor Print."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: office"
+      },
+      {
+        "id": "k5-dev-034",
+        "question": "What color is my backpack?",
+        "expected_facts": [
+          "orange"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My backpack is orange."
+        ],
+        "superseded_facts": [
+          "My backpack was grey."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: backpack"
+      },
+      {
+        "id": "k5-dev-035",
+        "question": "What time is my train?",
+        "expected_facts": [
+          "Thursday at 8am"
+        ],
+        "expected_timeframe": "Thursday",
+        "current_facts": [
+          "My train is Thursday at 8am."
+        ],
+        "superseded_facts": [
+          "My train was Wednesday at 5pm."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: train"
+      },
+      {
+        "id": "k5-dev-036",
+        "question": "Where do I do my banking?",
+        "expected_facts": [
+          "Fremont"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Fremont branch."
+        ],
+        "superseded_facts": [
+          "I banked at the Powell branch."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: bank"
+      },
+      {
+        "id": "k5-dev-037",
+        "question": "What kind of food do I like best?",
+        "expected_facts": [
+          "Korean"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My favorite cuisine is Korean."
+        ],
+        "superseded_facts": [
+          "My favorite cuisine was Mexican."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: cuisine"
+      },
+      {
+        "id": "k5-dev-038",
+        "question": "What's the name of my printer?",
+        "expected_facts": [
+          "office-jet"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My printer is called office-jet."
+        ],
+        "superseded_facts": [
+          "My printer was called home-jet."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: printer"
+      },
+      {
+        "id": "k5-dev-039",
+        "question": "What's my bike locker?",
+        "expected_facts": [
+          "D24"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My bike locker is D24."
+        ],
+        "superseded_facts": [
+          "My bike locker was A11."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: bike-locker"
+      },
+      {
+        "id": "k5-dev-040",
+        "question": "What do I get in my smoothie?",
+        "expected_facts": [
+          "mango and spinach"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My smoothie order is mango and spinach."
+        ],
+        "superseded_facts": [
+          "My smoothie order was berry and banana."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: smoothie"
+      },
+      {
+        "id": "k5-dev-041",
+        "question": "What date does my lease end?",
+        "expected_facts": [
+          "February 9"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My lease ends on February 9."
+        ],
+        "superseded_facts": [
+          "My lease ended on January 12."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: lease"
+      },
+      {
+        "id": "k5-dev-042",
+        "question": "What's my neighbor's name?",
+        "expected_facts": [
+          "Priya"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My neighbor is Priya."
+        ],
+        "superseded_facts": [
+          "My neighbor was Tomas."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: neighbor"
+      },
+      {
+        "id": "k5-dev-043",
+        "question": "What's my cat's name?",
+        "expected_facts": [
+          "Miso"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My cat is named Miso."
+        ],
+        "superseded_facts": [
+          "My cat was named Pepper."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: cat"
+      },
+      {
+        "id": "k5-dev-044",
+        "question": "What date does my renters insurance renew?",
+        "expected_facts": [
+          "December 1"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My renters insurance renews on December 1."
+        ],
+        "superseded_facts": [
+          "My renters insurance renewed on November 1."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: renters-insurance"
+      },
+      {
+        "id": "k5-dev-045",
+        "question": "What's the password for my router?",
+        "expected_facts": [
+          "river-stone-58"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My router password is river-stone-58."
+        ],
+        "superseded_facts": [
+          "My router password was oak-leaf-31."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "paraphrase of the current fact: router"
+      },
+      {
+        "id": "k5-dev-046",
+        "question": "What is my blood type?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-dev-047",
+        "question": "What is my passport number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-dev-048",
+        "question": "What is my mother's maiden name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-dev-049",
+        "question": "What is my license plate?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-dev-050",
+        "question": "What is my shoe size?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      }
+    ],
+    "heldout": [
+      {
+        "id": "k5-held-001",
+        "question": "What was my storage unit code before?",
+        "expected_facts": [
+          "2874"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for storage; history, not stale"
+      },
+      {
+        "id": "k5-held-002",
+        "question": "Where did I live before?",
+        "expected_facts": [
+          "Reno"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for hometown; history, not stale"
+      },
+      {
+        "id": "k5-held-003",
+        "question": "When was my optician appointment before this one?",
+        "expected_facts": [
+          "Monday at 1pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for optician; history, not stale"
+      },
+      {
+        "id": "k5-held-004",
+        "question": "What did I used to order at the coffee shop?",
+        "expected_facts": [
+          "cappuccino"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for coffee; history, not stale"
+      },
+      {
+        "id": "k5-held-005",
+        "question": "What bicycle did I have before?",
+        "expected_facts": [
+          "Specialized"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bicycle; history, not stale"
+      },
+      {
+        "id": "k5-held-006",
+        "question": "When did I swim before?",
+        "expected_facts": [
+          "Tuesday and Saturday"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for swimming; history, not stale"
+      },
+      {
+        "id": "k5-held-007",
+        "question": "What date was my grandmother's birthday before I corrected it?",
+        "expected_facts": [
+          "August 3"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for grandmother; history, not stale"
+      },
+      {
+        "id": "k5-held-008",
+        "question": "Where did I work before?",
+        "expected_facts": [
+          "Harbor Print"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for office; history, not stale"
+      },
+      {
+        "id": "k5-held-009",
+        "question": "What colour was my backpack before?",
+        "expected_facts": [
+          "grey"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for backpack; history, not stale"
+      },
+      {
+        "id": "k5-held-010",
+        "question": "When was my train before?",
+        "expected_facts": [
+          "Wednesday at 5pm"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for train; history, not stale"
+      },
+      {
+        "id": "k5-held-011",
+        "question": "Which bank branch did I use before?",
+        "expected_facts": [
+          "Powell"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bank; history, not stale"
+      },
+      {
+        "id": "k5-held-012",
+        "question": "What was my favorite cuisine before?",
+        "expected_facts": [
+          "Mexican"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for cuisine; history, not stale"
+      },
+      {
+        "id": "k5-held-013",
+        "question": "What was my printer called before?",
+        "expected_facts": [
+          "home-jet"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for printer; history, not stale"
+      },
+      {
+        "id": "k5-held-014",
+        "question": "What was my bike locker before?",
+        "expected_facts": [
+          "A11"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for bike-locker; history, not stale"
+      },
+      {
+        "id": "k5-held-015",
+        "question": "What was my smoothie order before?",
+        "expected_facts": [
+          "berry and banana"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for smoothie; history, not stale"
+      },
+      {
+        "id": "k5-held-016",
+        "question": "When did my lease end before?",
+        "expected_facts": [
+          "January 12"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for lease; history, not stale"
+      },
+      {
+        "id": "k5-held-017",
+        "question": "Who was my neighbor before?",
+        "expected_facts": [
+          "Tomas"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for neighbor; history, not stale"
+      },
+      {
+        "id": "k5-held-018",
+        "question": "What was my cat called before?",
+        "expected_facts": [
+          "Pepper"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for cat; history, not stale"
+      },
+      {
+        "id": "k5-held-019",
+        "question": "When did my renters insurance renew before?",
+        "expected_facts": [
+          "November 1"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for renters-insurance; history, not stale"
+      },
+      {
+        "id": "k5-held-020",
+        "question": "What was my router password before?",
+        "expected_facts": [
+          "oak-leaf-31"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "superseded value for router; history, not stale"
+      },
+      {
+        "id": "k5-held-021",
+        "question": "What was my childhood nickname?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-held-022",
+        "question": "What was my first pet's name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-held-023",
+        "question": "What is my frequent flyer number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-held-024",
+        "question": "What is my library card number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-held-025",
+        "question": "What is my car's VIN?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      }
+    ],
+    "adversarial": [
+      {
+        "id": "k5-adv-001",
+        "question": "What is my storage unit code and what do I order at the coffee shop?",
+        "expected_facts": [
+          "6391",
+          "cortado"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My storage unit code is 6391.",
+          "My coffee order is a cortado."
+        ],
+        "superseded_facts": [
+          "My storage unit code was 2874.",
+          "My coffee order was a cappuccino."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: storage + coffee"
+      },
+      {
+        "id": "k5-adv-002",
+        "question": "Where did I grow up and what kind of bicycle do I have?",
+        "expected_facts": [
+          "Missoula",
+          "Bianchi"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I grew up in Missoula.",
+          "My bicycle is a Bianchi."
+        ],
+        "superseded_facts": [
+          "I grew up in Reno.",
+          "My bicycle was a Specialized."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: hometown + bicycle"
+      },
+      {
+        "id": "k5-adv-003",
+        "question": "Where do I work and what colour is my backpack?",
+        "expected_facts": [
+          "Lumen Studio",
+          "orange"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I work at Lumen Studio.",
+          "My backpack is orange."
+        ],
+        "superseded_facts": [
+          "I worked at Harbor Print.",
+          "My backpack was grey."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: office + backpack"
+      },
+      {
+        "id": "k5-adv-004",
+        "question": "Which bank branch do I use and what is my favorite cuisine?",
+        "expected_facts": [
+          "Fremont",
+          "Korean"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I bank at the Fremont branch.",
+          "My favorite cuisine is Korean."
+        ],
+        "superseded_facts": [
+          "I banked at the Powell branch.",
+          "My favorite cuisine was Mexican."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: bank + cuisine"
+      },
+      {
+        "id": "k5-adv-005",
+        "question": "When does my lease end and when does my renters insurance renew?",
+        "expected_facts": [
+          "February 9",
+          "December 1"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My lease ends on February 9.",
+          "My renters insurance renews on December 1."
+        ],
+        "superseded_facts": [
+          "My lease ended on January 12.",
+          "My renters insurance renewed on November 1."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: lease + renters-insurance"
+      },
+      {
+        "id": "k5-adv-006",
+        "question": "Who is my neighbor and what is my cat called?",
+        "expected_facts": [
+          "Priya",
+          "Miso"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My neighbor is Priya.",
+          "My cat is named Miso."
+        ],
+        "superseded_facts": [
+          "My neighbor was Tomas.",
+          "My cat was named Pepper."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: neighbor + cat"
+      },
+      {
+        "id": "k5-adv-007",
+        "question": "What is my router password and when does my driver's license expire?",
+        "expected_facts": [
+          "river-stone-58",
+          "2029"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My router password is river-stone-58.",
+          "My driver's license expires in 2029."
+        ],
+        "superseded_facts": [
+          "My router password was oak-leaf-31.",
+          "My driver's license expired in 2019."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: router + license"
+      },
+      {
+        "id": "k5-adv-008",
+        "question": "When is my grant deadline and who is my accountant?",
+        "expected_facts": [
+          "November 17",
+          "Rafael"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My grant deadline is November 17.",
+          "My accountant is Rafael."
+        ],
+        "superseded_facts": [
+          "My grant deadline was October 20.",
+          "My accountant was Vera."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: grant + accountant"
+      },
+      {
+        "id": "k5-adv-009",
+        "question": "What am I allergic to and what do I usually have for lunch?",
+        "expected_facts": [
+          "sulfa drugs",
+          "turkey wrap"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "I am allergic to sulfa drugs.",
+          "My usual lunch is a turkey wrap."
+        ],
+        "superseded_facts": [
+          "I was allergic to penicillin.",
+          "My usual lunch was a chicken salad."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: allergy + lunch"
+      },
+      {
+        "id": "k5-adv-010",
+        "question": "When does my train leave and what is my printer called?",
+        "expected_facts": [
+          "Thursday at 8am",
+          "office-jet"
+        ],
+        "expected_timeframe": "",
+        "current_facts": [
+          "My train is Thursday at 8am.",
+          "My printer is called office-jet."
+        ],
+        "superseded_facts": [
+          "My train was Wednesday at 5pm.",
+          "My printer was called home-jet."
+        ],
+        "permitted_record_ids": [],
+        "unknown": false,
+        "notes": "two-fact read: train + printer"
+      },
+      {
+        "id": "k5-adv-011",
+        "question": "When is my spouse's birthday?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-012",
+        "question": "Which school does my niece attend?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-013",
+        "question": "What is my gym locker combination?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-014",
+        "question": "What is my insurance policy number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-015",
+        "question": "What is my dentist's phone number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-016",
+        "question": "What is my alarm code?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-017",
+        "question": "What is my storage unit size?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-018",
+        "question": "What is my tax identification number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-019",
+        "question": "What is my employer's phone number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-020",
+        "question": "What is my bank account balance?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-021",
+        "question": "What is my doctor's name?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-022",
+        "question": "What is my internet provider?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-023",
+        "question": "What is my Amazon order number?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-024",
+        "question": "What is my wedding anniversary?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      },
+      {
+        "id": "k5-adv-025",
+        "question": "What is my student loan balance?",
+        "expected_facts": [],
+        "expected_timeframe": "",
+        "current_facts": [],
+        "superseded_facts": [],
+        "permitted_record_ids": [],
+        "unknown": true,
+        "notes": "not in the seeded store; must abstain"
+      }
+    ]
+  },
+  "baselines": [
+    "full_recent_transcript",
+    "filesystem_dump"
+  ],
+  "baseline_model": "qwen3.5:4b",
+  "samples_per_case": 5,
+  "sha256": "6c3fdb2842f0931ccd8753bc947a14eac5877e23e684ffab9c35bb0a5bebd67e",
+  "frozen_at": "2026-10-18T13:45:31.959708+00:00",
+  "prior_exposure": "none: written by benchmarks/build_memory_set.py after the WP6 fix, hashed before the first sample; the two earlier sets are retired from confirmation use",
+  "retired": [
+    "fresh-2026-10-18",
+    "confirm-2026-10-18"
+  ],
+  "scenarios_file": "eval/data/memory_scenarios_k5_2026-10-18.json",
+  "counts": {
+    "development": {
+      "total": 50,
+      "unknown": 5
+    },
+    "heldout": {
+      "total": 25,
+      "unknown": 5
+    },
+    "adversarial": {
+      "total": 25,
+      "unknown": 15
+    }
+  }
+}

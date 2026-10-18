@@ -494,13 +494,27 @@ _STUDY_FIELD = re.compile(
 
 _LOCATION = re.compile(
     r"\bi\s*(?:'m|am|\s+)?\s*"
-    r"(?:live\s+in|am\s+from|from|moved\s+to|relocated\s+to)\s+"
+    # "i'm back in Austin" is a residence statement like "i live in
+    # Austin": a return is still a move, and it is the value that wins
+    # in "i don't live in Seattle any more, i'm back in Austin".
+    r"(?:live\s+in|am\s+from|from|moved\s+to|relocated\s+to|back\s+in)\s+"
     r"(?P<value>[A-Za-z][\w .,'-]{1,40}?)"
     # stop before trailing companions: "live in Fremont with my
-    # parents" / "live in Munich now" / "moved to Austin last year"
+    # parents" / "live in Munich now" / "moved to Austin last year" /
+    # "don't live in Seattle any more"
     r"(?=\s*(?:,|and\b|but\b|with\b|now\b|these\s+days\b|currently\b"
+    r"|any\s*more\b|anymore\b"
     r"|last\s+(?:year|month|week|summer|fall|spring)"
     r"|[,.]?\s*$))",
+    re.IGNORECASE,
+)
+
+# Words that turn a residence phrase into a negation ("i don't live in
+# Seattle"). A negated phrase names the place being LEFT, never the
+# place the user lives, so extraction skips it.
+_LOCATION_NEGATED = re.compile(
+    r"\b(?:don'?t|doesn'?t|didn'?t|do\s+not|does\s+not|did\s+not|"
+    r"no\s+longer|not|never)\s+(?:really\s+|actually\s+)?$",
     re.IGNORECASE,
 )
 
@@ -1244,11 +1258,17 @@ def extract_keys(text: str) -> list[dict[str, Any]]:
         )
 
     # ---- 9. location / age --------------------------------------------
-    match = _LOCATION.search(core)
-    if match:
+    # The LAST non-negated mention wins: "i don't live in Seattle any
+    # more, i'm back in Austin" names one place the user lives in.
+    location_match = None
+    for candidate in _LOCATION.finditer(core):
+        if _LOCATION_NEGATED.search(core[:candidate.start()]):
+            continue
+        location_match = candidate
+    if location_match:
         keys.append(
-            _mk("user", "location", _title(match.group("value").strip()),
-                context)
+            _mk("user", "location",
+                _title(location_match.group("value").strip()), context)
         )
 
     match = _AGE.search(lowered)

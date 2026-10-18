@@ -10,6 +10,7 @@ import gc
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,25 @@ if str(LUNA_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(LUNA_SCRIPTS))
 from luna_format import IDENTITY_SYSTEM
 from luna_text import clean_response_text
+
+
+class _FirstStepStamp:
+    """D10: record the wall-clock time of the first decode step (TTFT).
+
+    The Transformers generate loop calls its logits processors once per step,
+    and the first call happens right after prefill, when the first token is
+    chosen. Stamping that call separates time-to-first-token from decode time
+    without generating twice and without changing the output.
+    """
+
+    def __init__(self, started: float) -> None:
+        self.started = started
+        self.ttft_ms: float | None = None
+
+    def __call__(self, input_ids: Any, scores: Any) -> Any:
+        if self.ttft_ms is None:
+            self.ttft_ms = (time.perf_counter() - self.started) * 1000
+        return scores
 
 LUNA_SYSTEM_PROMPT = IDENTITY_SYSTEM
 
@@ -73,8 +93,11 @@ class LunaTransformersClient:
         )
         self.model_instance = None
         self.tokenizer = None
+        self.load_ms = 0.0
+        started = time.perf_counter()
         with GPU_SLOT:
             self._load()
+        self.load_ms = (time.perf_counter() - started) * 1000
 
     def _load(self) -> None:
         import torch
@@ -173,6 +196,7 @@ class LunaTransformersClient:
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": user_text})
         prompt = render_messages(messages, generation=True, tokenizer=self.tokenizer)
+        started = time.perf_counter()
         with GPU_SLOT, self._torch.inference_mode():
             inputs = self.tokenizer(
                 prompt,
@@ -181,7 +205,13 @@ class LunaTransformersClient:
                 max_length=min(8192, CONTEXT_MAX_CHARS // 2),
                 add_special_tokens=False,
             ).to("cuda")
+            # D10: the first logits step is the moment prefill finished and the
+            # first token is chosen, which is what TTFT measures. Stamp it here
+            # so both the streaming and non-streaming paths report it without
+            # running the model twice.
+            first_step = _FirstStepStamp(started)
             gen_kwargs = {
+                "logits_processor": [first_step],
                 "max_new_tokens": min(max_new_tokens, 1024) if max_new_tokens is not None else LUNA_MAX_NEW_TOKENS,
                 "do_sample": False,
                 "use_cache": True,
@@ -242,6 +272,7 @@ class LunaTransformersClient:
                     **inputs,
                     **gen_kwargs,
                 )
+        elapsed_ms = (time.perf_counter() - started) * 1000
         generated = output[0][inputs["input_ids"].shape[1]:]
         decoded = self.tokenizer.decode(
             generated,
@@ -249,7 +280,42 @@ class LunaTransformersClient:
             clean_up_tokenization_spaces=False,
         )
         decoded = strip_v7_reasoning_markup(self.model, decoded)
-        return clean_response_text(decoded)
+        reply = clean_response_text(decoded)
+        try:
+            from eval import inference_metrics
+
+            prefix_key = ""
+            try:
+                prefix_key = inference_metrics.ImmutablePrefix(
+                    model=self.model,
+                    tokenizer=str(getattr(self.tokenizer, "name_or_path", "unknown")),
+                    policy_version="luna-v6",
+                    policy_text=LUNA_SYSTEM_PROMPT,
+                ).key
+            except ValueError:
+                # A prompt carrying personal memory is intentionally not a
+                # cache key; the call is still measured, just not cacheable.
+                prefix_key = ""
+            ttft_ms = first_step.ttft_ms
+            inference_metrics.record(
+                inference_metrics.CallMetrics(
+                    model=self.model,
+                    backend="transformers",
+                    load_ms=self.load_ms,
+                    ttft_ms=ttft_ms,
+                    # Decode is the time after the first token, not the whole
+                    # call; reporting total time as decode would hide the part
+                    # that is being tuned. It stays the call when the stamp is
+                    # missing (an empty generation) rather than becoming a guess.
+                    decode_ms=(elapsed_ms - ttft_ms) if ttft_ms is not None else elapsed_ms,
+                    token_count=int(generated.shape[-1]),
+                    cache_hit=None,
+                    prefix_key=prefix_key,
+                )
+            )
+        except Exception:
+            pass
+        return reply
 
 
 def _evict_casper_client(*, slot_already_held: bool = False) -> None:

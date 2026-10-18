@@ -28,6 +28,7 @@ from test_music_api import (  # noqa: E402
     music_env,
     player_manifest,
     queue_calls,
+    queue_service,
     queue_result,
     queue_track,
     read_json,
@@ -498,6 +499,27 @@ def test_a_panel_state_read_advances_a_finished_queued_track(music_env, monkeypa
     # both moves the music on and says what is up next.
     assert queue_calls(runtime)[0] == {"action": "queue", "op": "next", "auto": True}
     assert [item["video_id"] for item in state["queue"]["queue"]] == ["a1", "b2"]
+
+
+def test_the_wall_shows_the_same_queue_the_page_reads(music_env, monkeypatch, queue_service):
+    """One speaker, one line-up: the display must not read a different one.
+
+    The panel used to ask the provider skill directly, so with a queue service
+    running the wall listed the provider's queue while the page and the phone
+    listed the service's: three devices, two answers, and the display insisting
+    on songs nobody else could see.
+    """
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], FakeRuntime(
+        results={"opendeck_music": lambda _matched: queue_result(
+            [queue_track("provider1", "From The Provider")], index=0)}))
+    service = queue_service()
+    service.queue.add_many([{"video_id": "service1", "title": "From The Queue",
+                            "artist": "Artist", "duration_sec": 100}])
+
+    state = puca_panel.panel_state()
+
+    assert [item["video_id"] for item in state["queue"]["queue"]] == ["service1"]
+    assert state["queue"]["total"] == 1
 
 
 def test_a_hardware_hiccup_does_not_blank_the_display(monkeypatch, panel):

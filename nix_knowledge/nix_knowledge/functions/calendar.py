@@ -73,6 +73,20 @@ def create_calendar_event(
         "action_policy": "once",
     }
 
+    # The same event said twice is one event. A user who gives the same
+    # title at the same start ("i have robotics practice tomorrow at 5pm"
+    # in two turns) must not accumulate copies on the calendar, and a
+    # re-run of the same sentence must not do it either. A different
+    # start is a different occurrence and is still created.
+    existing = _existing_event(engine, title, start)
+    if existing is not None:
+        return {
+            "ok": True,
+            "duplicate": True,
+            "record_id": existing.id,
+            "data": existing.data,
+        }
+
     record = engine.create(
         "calendar_event",
         data,
@@ -86,6 +100,26 @@ def create_calendar_event(
         "record_id": record.id,
         "data": record.data,
     }
+
+
+def _existing_event(engine: KnowledgeEngine, title: str, start: str):
+    """An active calendar event with the same title at the same start."""
+    wanted_title = " ".join(str(title or "").casefold().split())
+    wanted_start = str(start or "").strip()
+    if not wanted_title or not wanted_start:
+        return None
+    try:
+        records = engine.search("calendar_event")
+    except Exception:  # noqa: BLE001 - a lookup must never block the create
+        return None
+    for record in records:
+        data = record.data or {}
+        if " ".join(str(data.get("title") or "").casefold().split()) != wanted_title:
+            continue
+        if str(data.get("start") or "").strip() != wanted_start:
+            continue
+        return record
+    return None
 
 
 def _entry(
@@ -218,6 +252,40 @@ def _entries_for_record(
     ]
 
 
+#: Words a question adds around an event title without distinguishing it.
+#: They are dropped from the QUERY side only, and only for the reverse
+#: containment check above; a label that names a time or a weekday is not
+#: affected, so it cannot match a second event by accident.
+_GENERIC_TITLE_WORDS = frozenset({
+    "appointment", "appointments", "meeting", "meetings", "event", "events",
+    "thing", "things", "booking", "bookings", "session", "sessions",
+    "reminder", "reminders", "item", "items", "entry", "entries",
+})
+
+
+def _adds_only_generic_words(query_title: str, event_title: str) -> bool:
+    """True when the query is the event title plus generic nouns only.
+
+    Used for the reversed containment check. Any extra word that is not filler
+    (a weekday, a time, a label parenthetical) means the query is trying to say
+    more than the title does, and it must match through the ordinary path.
+    """
+    query_words = [word for word in str(query_title or "").split() if word]
+    event_words = [word for word in str(event_title or "").split() if word]
+    if not query_words or not event_words:
+        return False
+    remaining = list(event_words)
+    extras: list[str] = []
+    for word in query_words:
+        if remaining and word == remaining[0]:
+            remaining.pop(0)
+        else:
+            extras.append(word)
+    if remaining:
+        return False
+    return all(word.lower() in _GENERIC_TITLE_WORDS for word in extras)
+
+
 def find_calendar_events(
     engine: KnowledgeEngine,
     title: str | None = None,
@@ -322,9 +390,20 @@ def find_calendar_events(
         if title_key:
             event_title = str(data.get("title", ""))
 
-            if title_key == event_title.lower().strip():
+            event_lower = event_title.lower().strip()
+            if title_key == event_lower:
                 tier = exact
-            elif title_key in event_title.lower():
+            elif title_key in event_lower:
+                tier = substring
+            elif event_lower and _adds_only_generic_words(title_key, event_lower):
+                # The question adds a generic noun the title does not carry:
+                # "when is my optician appointment" against a stored
+                # "optician". The reversed containment is allowed only when
+                # every extra word is filler (see _GENERIC_TITLE_WORDS): a
+                # distinguishing label such as
+                # "piano lesson (2026-10-21 18:00)" carries a time, so it still
+                # resolves through the label path instead of matching two
+                # events at once (that path is what the ambiguity test pins).
                 tier = substring
             else:
                 continue

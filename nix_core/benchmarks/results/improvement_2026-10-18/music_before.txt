@@ -1,0 +1,5 @@
+BENCH {"variant": "state_rewritten", "polls": 3, "hand_offs": 3, "cursor_after": 0, "tracks_after": 2, "tracks_added": 5}
+.BENCH {"variant": "hand_off_fails", "polls": 3, "hand_offs": 3, "cursor_after": 0, "tracks_after": 2, "tracks_added": 5}
+.BENCH {"variant": "hand_off_fails_stale_state", "polls": 3, "hand_offs": 3, "cursor_after": 0, "tracks_after": 2, "tracks_added": 5}
+.
+3 passed in 1.71s

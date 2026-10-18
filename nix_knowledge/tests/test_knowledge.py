@@ -186,3 +186,28 @@ def test_temporal_relevance(engine):
     )
 
     assert record not in relevant
+
+
+def test_the_same_fact_twice_is_one_record_even_without_the_semantic_layer(tmp_path):
+    """Exact sameness is caught without a model.
+
+    Measured live: while the GPU was busy with the console the semantic layer
+    was silently unavailable, so every restatement of "my dog's name is
+    mochi" wrote another record - six identical rows answering one question.
+    """
+    from nix_knowledge.functions.facts import create_fact
+
+    engine = KnowledgeEngine(tmp_path / "facts.db")
+    try:
+        engine._semantic = None
+        engine._semantic_failed = True      # no embedding model in this test
+
+        first = create_fact(engine, "my dog's name is mochi")
+        again = create_fact(engine, "My dog's name is Mochi.")
+
+        assert first.get("duplicate") is not True
+        assert again.get("duplicate") is True
+        assert again["record_id"] == first["record_id"]
+        assert len(engine.search("fact")) == 1
+    finally:
+        engine.close()

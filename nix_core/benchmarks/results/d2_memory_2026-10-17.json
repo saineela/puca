@@ -1,0 +1,3887 @@
+{
+  "results": {
+    "development": {
+      "scenarios": [
+        {
+          "id": "dev-001",
+          "tokens": 5,
+          "latency_ms": 71.4,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 56.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 51.3
+          }
+        },
+        {
+          "id": "dev-002",
+          "tokens": 5,
+          "latency_ms": 978.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 951.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 955.7
+          }
+        },
+        {
+          "id": "dev-003",
+          "tokens": 19,
+          "latency_ms": 2072.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2736.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2075.3
+          }
+        },
+        {
+          "id": "dev-004",
+          "tokens": 7,
+          "latency_ms": 1034.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1030.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1039.2
+          }
+        },
+        {
+          "id": "dev-005",
+          "tokens": 8,
+          "latency_ms": 1304.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1329.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1294.9
+          }
+        },
+        {
+          "id": "dev-006",
+          "tokens": 28,
+          "latency_ms": 3912.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3895.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3804.9
+          }
+        },
+        {
+          "id": "dev-007",
+          "tokens": 13,
+          "latency_ms": 136.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 138.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 138.9
+          }
+        },
+        {
+          "id": "dev-008",
+          "tokens": 8,
+          "latency_ms": 104.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 96.1
+          }
+        },
+        {
+          "id": "dev-009",
+          "tokens": 28,
+          "latency_ms": 3421.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3374.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3369.3
+          }
+        },
+        {
+          "id": "dev-010",
+          "tokens": 21,
+          "latency_ms": 2324.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2364.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2350.9
+          }
+        },
+        {
+          "id": "dev-011",
+          "tokens": 6,
+          "latency_ms": 1024.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1020.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1021.3
+          }
+        },
+        {
+          "id": "dev-012",
+          "tokens": 7,
+          "latency_ms": 1026.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1021.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1032.5
+          }
+        },
+        {
+          "id": "dev-013",
+          "tokens": 28,
+          "latency_ms": 2914.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2874.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2861.6
+          }
+        },
+        {
+          "id": "dev-014",
+          "tokens": 13,
+          "latency_ms": 108.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 105.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.4
+          }
+        },
+        {
+          "id": "dev-015",
+          "tokens": 28,
+          "latency_ms": 3453.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3972.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3927.8
+          }
+        },
+        {
+          "id": "dev-016",
+          "tokens": 28,
+          "latency_ms": 2424.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3634.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3656.6
+          }
+        },
+        {
+          "id": "dev-017",
+          "tokens": 13,
+          "latency_ms": 169.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 97.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 97.6
+          }
+        },
+        {
+          "id": "dev-018",
+          "tokens": 13,
+          "latency_ms": 100.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 101.8
+          }
+        },
+        {
+          "id": "dev-019",
+          "tokens": 8,
+          "latency_ms": 105.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.3
+          }
+        },
+        {
+          "id": "dev-020",
+          "tokens": 28,
+          "latency_ms": 5150.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4608.2
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3962.8
+          }
+        },
+        {
+          "id": "dev-021",
+          "tokens": 13,
+          "latency_ms": 102.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 102.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 115.6
+          }
+        },
+        {
+          "id": "dev-022",
+          "tokens": 5,
+          "latency_ms": 959.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 962.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 954.7
+          }
+        },
+        {
+          "id": "dev-023",
+          "tokens": 13,
+          "latency_ms": 100.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 106.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 107.7
+          }
+        },
+        {
+          "id": "dev-024",
+          "tokens": 8,
+          "latency_ms": 1057.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1047.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1070.6
+          }
+        },
+        {
+          "id": "dev-025",
+          "tokens": 13,
+          "latency_ms": 121.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 104.2
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.0
+          }
+        },
+        {
+          "id": "dev-026",
+          "tokens": 28,
+          "latency_ms": 3041.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3417.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3351.9
+          }
+        },
+        {
+          "id": "dev-027",
+          "tokens": 13,
+          "latency_ms": 135.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 132.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 135.2
+          }
+        },
+        {
+          "id": "dev-028",
+          "tokens": 8,
+          "latency_ms": 98.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.2
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.4
+          }
+        },
+        {
+          "id": "dev-029",
+          "tokens": 28,
+          "latency_ms": 3954.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3920.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3978.9
+          }
+        },
+        {
+          "id": "dev-030",
+          "tokens": 6,
+          "latency_ms": 170.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.6
+          }
+        },
+        {
+          "id": "dev-031",
+          "tokens": 9,
+          "latency_ms": 1176.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1143.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1168.4
+          }
+        },
+        {
+          "id": "dev-032",
+          "tokens": 2,
+          "latency_ms": 576.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 559.1
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 551.4
+          }
+        },
+        {
+          "id": "dev-033",
+          "tokens": 28,
+          "latency_ms": 1506.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1478.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1499.7
+          }
+        },
+        {
+          "id": "dev-034",
+          "tokens": 13,
+          "latency_ms": 100.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 103.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.5
+          }
+        },
+        {
+          "id": "dev-035",
+          "tokens": 28,
+          "latency_ms": 4075.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4019.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4193.0
+          }
+        },
+        {
+          "id": "dev-036",
+          "tokens": 28,
+          "latency_ms": 11008.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 10448.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3509.5
+          }
+        },
+        {
+          "id": "dev-037",
+          "tokens": 28,
+          "latency_ms": 4476.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4198.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4277.0
+          }
+        },
+        {
+          "id": "dev-038",
+          "tokens": 6,
+          "latency_ms": 206.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 108.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 105.2
+          }
+        },
+        {
+          "id": "dev-039",
+          "tokens": 8,
+          "latency_ms": 99.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 115.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.7
+          }
+        },
+        {
+          "id": "dev-040",
+          "tokens": 28,
+          "latency_ms": 3624.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2481.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2365.4
+          }
+        },
+        {
+          "id": "dev-041",
+          "tokens": 13,
+          "latency_ms": 102.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.3
+          }
+        },
+        {
+          "id": "dev-042",
+          "tokens": 5,
+          "latency_ms": 960.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1007.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 999.6
+          }
+        },
+        {
+          "id": "dev-043",
+          "tokens": 13,
+          "latency_ms": 103.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 121.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.7
+          }
+        },
+        {
+          "id": "dev-044",
+          "tokens": 8,
+          "latency_ms": 1024.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1040.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1053.0
+          }
+        },
+        {
+          "id": "dev-045",
+          "tokens": 13,
+          "latency_ms": 105.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 105.0
+          }
+        },
+        {
+          "id": "dev-046",
+          "tokens": 28,
+          "latency_ms": 3960.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3435.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4964.3
+          }
+        },
+        {
+          "id": "dev-047",
+          "tokens": 13,
+          "latency_ms": 136.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 136.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 135.3
+          }
+        },
+        {
+          "id": "dev-048",
+          "tokens": 8,
+          "latency_ms": 99.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.2
+          }
+        },
+        {
+          "id": "dev-049",
+          "tokens": 28,
+          "latency_ms": 3894.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3788.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3744.0
+          }
+        },
+        {
+          "id": "dev-050",
+          "tokens": 13,
+          "latency_ms": 107.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 107.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 103.2
+          }
+        }
+      ],
+      "accuracy": 0.14,
+      "temporal_correctness": 0.84,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 769,
+      "budget": 1200,
+      "scenarios_count": 50,
+      "latency_ms_p50": 960.1,
+      "baselines": {
+        "transcript": {
+          "accuracy": 0.14,
+          "temporal_correctness": 0.84
+        },
+        "filesystem": {
+          "accuracy": 0.14,
+          "temporal_correctness": 0.84
+        }
+      }
+    },
+    "heldout": {
+      "scenarios": [
+        {
+          "id": "held-001",
+          "tokens": 5,
+          "latency_ms": 63.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 56.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 52.6
+          }
+        },
+        {
+          "id": "held-002",
+          "tokens": 5,
+          "latency_ms": 939.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 941.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 968.8
+          }
+        },
+        {
+          "id": "held-003",
+          "tokens": 15,
+          "latency_ms": 1896.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2678.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2645.2
+          }
+        },
+        {
+          "id": "held-004",
+          "tokens": 7,
+          "latency_ms": 1031.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1023.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1051.7
+          }
+        },
+        {
+          "id": "held-005",
+          "tokens": 8,
+          "latency_ms": 1341.8,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1317.0
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1329.2
+          }
+        },
+        {
+          "id": "held-006",
+          "tokens": 28,
+          "latency_ms": 3979.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3822.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4086.1
+          }
+        },
+        {
+          "id": "held-007",
+          "tokens": 13,
+          "latency_ms": 134.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 136.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 144.5
+          }
+        },
+        {
+          "id": "held-008",
+          "tokens": 8,
+          "latency_ms": 106.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 97.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 102.0
+          }
+        },
+        {
+          "id": "held-009",
+          "tokens": 28,
+          "latency_ms": 3921.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3852.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3357.1
+          }
+        },
+        {
+          "id": "held-010",
+          "tokens": 21,
+          "latency_ms": 2446.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2336.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2352.4
+          }
+        },
+        {
+          "id": "held-011",
+          "tokens": 6,
+          "latency_ms": 1023.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1063.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1072.5
+          }
+        },
+        {
+          "id": "held-012",
+          "tokens": 7,
+          "latency_ms": 1029.2,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1043.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1048.2
+          }
+        },
+        {
+          "id": "held-013",
+          "tokens": 28,
+          "latency_ms": 2880.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2872.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2838.0
+          }
+        },
+        {
+          "id": "held-014",
+          "tokens": 13,
+          "latency_ms": 98.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 102.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 112.6
+          }
+        },
+        {
+          "id": "held-015",
+          "tokens": 28,
+          "latency_ms": 3979.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3924.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 6346.7
+          }
+        },
+        {
+          "id": "held-016",
+          "tokens": 28,
+          "latency_ms": 3971.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3501.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3483.1
+          }
+        },
+        {
+          "id": "held-017",
+          "tokens": 13,
+          "latency_ms": 99.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 98.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 99.8
+          }
+        },
+        {
+          "id": "held-018",
+          "tokens": 13,
+          "latency_ms": 97.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 101.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 113.8
+          }
+        },
+        {
+          "id": "held-019",
+          "tokens": 8,
+          "latency_ms": 100.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 100.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 97.1
+          }
+        },
+        {
+          "id": "held-020",
+          "tokens": 28,
+          "latency_ms": 5375.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 5331.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 5393.3
+          }
+        },
+        {
+          "id": "held-021",
+          "tokens": 5,
+          "latency_ms": 54.8,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 52.2
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 50.2
+          }
+        },
+        {
+          "id": "held-022",
+          "tokens": 5,
+          "latency_ms": 939.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 953.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 960.4
+          }
+        },
+        {
+          "id": "held-023",
+          "tokens": 25,
+          "latency_ms": 2610.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2682.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2832.9
+          }
+        },
+        {
+          "id": "held-024",
+          "tokens": 7,
+          "latency_ms": 1037.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1030.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1040.8
+          }
+        },
+        {
+          "id": "held-025",
+          "tokens": 8,
+          "latency_ms": 1324.4,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1300.9
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1322.5
+          }
+        }
+      ],
+      "accuracy": 0.28,
+      "temporal_correctness": 0.8,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 360,
+      "budget": 1200,
+      "scenarios_count": 25,
+      "latency_ms_p50": 1031.3,
+      "baselines": {
+        "transcript": {
+          "accuracy": 0.28,
+          "temporal_correctness": 0.8
+        },
+        "filesystem": {
+          "accuracy": 0.28,
+          "temporal_correctness": 0.8
+        }
+      }
+    },
+    "adversarial": {
+      "scenarios": [
+        {
+          "id": "adv-001",
+          "tokens": 28,
+          "latency_ms": 4185.6,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4131.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4154.1
+          }
+        },
+        {
+          "id": "adv-002",
+          "tokens": 7,
+          "latency_ms": 935.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 969.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 974.3
+          }
+        },
+        {
+          "id": "adv-003",
+          "tokens": 7,
+          "latency_ms": 1031.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1053.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1054.5
+          }
+        },
+        {
+          "id": "adv-004",
+          "tokens": 21,
+          "latency_ms": 17.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 18.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.1
+          }
+        },
+        {
+          "id": "adv-005",
+          "tokens": 13,
+          "latency_ms": 96.6,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 96.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 93.0
+          }
+        },
+        {
+          "id": "adv-006",
+          "tokens": 28,
+          "latency_ms": 4165.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4097.2
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4153.8
+          }
+        },
+        {
+          "id": "adv-007",
+          "tokens": 7,
+          "latency_ms": 938.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 931.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 975.6
+          }
+        },
+        {
+          "id": "adv-008",
+          "tokens": 7,
+          "latency_ms": 1031.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1036.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1021.8
+          }
+        },
+        {
+          "id": "adv-009",
+          "tokens": 21,
+          "latency_ms": 20.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.3
+          }
+        },
+        {
+          "id": "adv-010",
+          "tokens": 13,
+          "latency_ms": 100.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 100.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 102.1
+          }
+        },
+        {
+          "id": "adv-011",
+          "tokens": 28,
+          "latency_ms": 4177.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4128.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4293.1
+          }
+        },
+        {
+          "id": "adv-012",
+          "tokens": 7,
+          "latency_ms": 934.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 983.5
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 949.8
+          }
+        },
+        {
+          "id": "adv-013",
+          "tokens": 7,
+          "latency_ms": 1043.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1046.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1045.1
+          }
+        },
+        {
+          "id": "adv-014",
+          "tokens": 21,
+          "latency_ms": 21.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.5
+          }
+        },
+        {
+          "id": "adv-015",
+          "tokens": 13,
+          "latency_ms": 101.3,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 97.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 98.4
+          }
+        },
+        {
+          "id": "adv-016",
+          "tokens": 28,
+          "latency_ms": 4220.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4188.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4329.3
+          }
+        },
+        {
+          "id": "adv-017",
+          "tokens": 7,
+          "latency_ms": 1083.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 943.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 932.8
+          }
+        },
+        {
+          "id": "adv-018",
+          "tokens": 7,
+          "latency_ms": 1020.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1037.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1114.6
+          }
+        },
+        {
+          "id": "adv-019",
+          "tokens": 21,
+          "latency_ms": 18.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 15.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 16.2
+          }
+        },
+        {
+          "id": "adv-020",
+          "tokens": 13,
+          "latency_ms": 95.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 91.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 95.9
+          }
+        },
+        {
+          "id": "adv-021",
+          "tokens": 28,
+          "latency_ms": 4139.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4900.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 4179.9
+          }
+        },
+        {
+          "id": "adv-022",
+          "tokens": 7,
+          "latency_ms": 944.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 946.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 967.4
+          }
+        },
+        {
+          "id": "adv-023",
+          "tokens": 7,
+          "latency_ms": 1041.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 0.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1076.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 0.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1039.0
+          }
+        },
+        {
+          "id": "adv-024",
+          "tokens": 21,
+          "latency_ms": 17.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 17.6
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 22.8
+          }
+        },
+        {
+          "id": "adv-025",
+          "tokens": 13,
+          "latency_ms": 97.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 96.6
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 95.9
+          }
+        }
+      ],
+      "accuracy": 0.2,
+      "temporal_correctness": 0.4,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 380,
+      "budget": 1200,
+      "scenarios_count": 25,
+      "latency_ms_p50": 938.3,
+      "baselines": {
+        "transcript": {
+          "accuracy": 0.2,
+          "temporal_correctness": 0.4
+        },
+        "filesystem": {
+          "accuracy": 0.2,
+          "temporal_correctness": 0.4
+        }
+      }
+    }
+  },
+  "freeze": {
+    "tag": "frozen-2026-10-17",
+    "model": "luna-v6-contextual-v1",
+    "hardware": "x86_64",
+    "scoring": {
+      "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+      "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+      "stale_fact_rate": "a superseded value is reported as current; lower is better",
+      "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+    },
+    "sets": {
+      "development": [
+        {
+          "id": "dev-001",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-002",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-003",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-004",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-005",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-006",
+          "question": "Where is my spare key?",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-007",
+          "question": "What is my favourite colour?",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-008",
+          "question": "When is my birthday?",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-009",
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-010",
+          "question": "What is my dog's name?",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-011",
+          "question": "What car do I drive?",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-012",
+          "question": "How do I take my coffee?",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-013",
+          "question": "What am I allergic to?",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-014",
+          "question": "What is my favourite book?",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-015",
+          "question": "Where did I grow up?",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-016",
+          "question": "When do I go to the gym?",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-017",
+          "question": "Who is my landlord?",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-018",
+          "question": "What is my home wifi called?",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-019",
+          "question": "When is my dentist appointment?",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-020",
+          "question": "What am I working on?",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-021",
+          "question": "What is my name? (asked again later)",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-022",
+          "question": "Where do I live? (asked again later)",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-023",
+          "question": "What is my sister's name? (asked again later)",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-024",
+          "question": "How is my mother doing right now? (asked again later)",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-025",
+          "question": "What is my locker code? (asked again later)",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-026",
+          "question": "Where is my spare key? (asked again later)",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-027",
+          "question": "What is my favourite colour? (asked again later)",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-028",
+          "question": "When is my birthday? (asked again later)",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-029",
+          "question": "Where do I work? (asked again later)",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-030",
+          "question": "What is my dog's name? (asked again later)",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-031",
+          "question": "What car do I drive? (asked again later)",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-032",
+          "question": "How do I take my coffee? (asked again later)",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-033",
+          "question": "What am I allergic to? (asked again later)",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-034",
+          "question": "What is my favourite book? (asked again later)",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-035",
+          "question": "Where did I grow up? (asked again later)",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-036",
+          "question": "When do I go to the gym? (asked again later)",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-037",
+          "question": "Who is my landlord? (asked again later)",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-038",
+          "question": "What is my home wifi called? (asked again later)",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-039",
+          "question": "When is my dentist appointment? (asked again later)",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-040",
+          "question": "What am I working on? (asked again later)",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-041",
+          "question": "What is my name? (asked again later)",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-042",
+          "question": "Where do I live? (asked again later)",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-043",
+          "question": "What is my sister's name? (asked again later)",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-044",
+          "question": "How is my mother doing right now? (asked again later)",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-045",
+          "question": "What is my locker code? (asked again later)",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-046",
+          "question": "Where is my spare key? (asked again later)",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-047",
+          "question": "What is my favourite colour? (asked again later)",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-048",
+          "question": "When is my birthday? (asked again later)",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-049",
+          "question": "Where do I work? (asked again later)",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "dev-050",
+          "question": "What is my dog's name? (asked again later)",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        }
+      ],
+      "heldout": [
+        {
+          "id": "held-001",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-002",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-003",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-004",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-005",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-006",
+          "question": "Where is my spare key?",
+          "expected_facts": [
+            "flowerpot"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "flowerpot"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-007",
+          "question": "What is my favourite colour?",
+          "expected_facts": [
+            "teal"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "teal"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-008",
+          "question": "When is my birthday?",
+          "expected_facts": [
+            "March 14"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "March 14"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-009",
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Acme"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Acme"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-010",
+          "question": "What is my dog's name?",
+          "expected_facts": [
+            "Pepper"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Pepper"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-011",
+          "question": "What car do I drive?",
+          "expected_facts": [
+            "Honda Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Honda Civic"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-012",
+          "question": "How do I take my coffee?",
+          "expected_facts": [
+            "black"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "black"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-013",
+          "question": "What am I allergic to?",
+          "expected_facts": [
+            "peanuts"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "peanuts"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-014",
+          "question": "What is my favourite book?",
+          "expected_facts": [
+            "Dune"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Dune"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-015",
+          "question": "Where did I grow up?",
+          "expected_facts": [
+            "Chennai"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Chennai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-016",
+          "question": "When do I go to the gym?",
+          "expected_facts": [
+            "6am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "6am"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-017",
+          "question": "Who is my landlord?",
+          "expected_facts": [
+            "Ravi"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Ravi"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-018",
+          "question": "What is my home wifi called?",
+          "expected_facts": [
+            "nix-home"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "nix-home"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-019",
+          "question": "When is my dentist appointment?",
+          "expected_facts": [
+            "October 30"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "October 30"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-020",
+          "question": "What am I working on?",
+          "expected_facts": [
+            "PUCA"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "PUCA"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-021",
+          "question": "What is my name?",
+          "expected_facts": [
+            "Sai"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Sai"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-022",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [
+            "Seattle"
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-023",
+          "question": "What is my sister's name?",
+          "expected_facts": [
+            "Maya"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "Maya"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-024",
+          "question": "How is my mother doing right now?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "held-025",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        }
+      ],
+      "adversarial": [
+        {
+          "id": "adv-001",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-002",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-003",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-004",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-005",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-006",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-007",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-008",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-009",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-010",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-011",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-012",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-013",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-014",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-015",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-016",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-017",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-018",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-019",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-020",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        },
+        {
+          "id": "adv-021",
+          "question": "I moved again \u2014 where do I live now?",
+          "expected_facts": [
+            "Austin"
+          ],
+          "expected_timeframe": "present",
+          "current_facts": [
+            "Austin"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-022",
+          "question": "Where was I living before?",
+          "expected_facts": [
+            "Seattle"
+          ],
+          "expected_timeframe": "past",
+          "current_facts": [
+            "Seattle"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-023",
+          "question": "How is my mother doing these days?",
+          "expected_facts": [
+            "fine"
+          ],
+          "expected_timeframe": "current",
+          "current_facts": [
+            "fine"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-024",
+          "question": "What did I say my locker code was?",
+          "expected_facts": [
+            "4471"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "4471"
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "derived from the owner's real chat topics; answer key reviewed by hand"
+        },
+        {
+          "id": "adv-025",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "correct answer is an honest I don't know"
+        }
+      ]
+    },
+    "baselines": [
+      "full_recent_transcript",
+      "filesystem_dump"
+    ],
+    "sha256": "bb5c17db81888de70b847867edad898cd6163902d7898202498cffb940a4c435",
+    "frozen_at": "2026-10-17T16:27:44.570831+00:00",
+    "prior_exposure": "none recorded",
+    "retired": []
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "set_tag": "routing-confirm-2026-10-18",
+  "tag": "routing-confirm-keys-2026-10-18",
+  "note": "Controlled replay keys for the WP3 confirmation set. Seeds go into a dedicated evaluation store, never the owner's memory. Rubric is the same deterministic proxy used for the held-out set (memory requires the seeded value, open requires a non-uncertain answer, write requires an acknowledgement, clarify/confirm require a question, delete requires a deletion acknowledgement or a confirmation question). The human sheet written next to the replay result is the primary answer-quality record.",
+  "cases": {
+    "c01": {
+      "rubric": "open"
+    },
+    "c02": {
+      "rubric": "open"
+    },
+    "c03": {
+      "rubric": "open"
+    },
+    "c04": {
+      "rubric": "open"
+    },
+    "c05": {
+      "rubric": "open"
+    },
+    "c06": {
+      "rubric": "open"
+    },
+    "c07": {
+      "rubric": "open"
+    },
+    "c08": {
+      "rubric": "open"
+    },
+    "c09": {
+      "rubric": "open"
+    },
+    "c10": {
+      "rubric": "open"
+    },
+    "c11": {
+      "rubric": "open"
+    },
+    "c12": {
+      "rubric": "open"
+    },
+    "c13": {
+      "rubric": "open"
+    },
+    "c14": {
+      "rubric": "open"
+    },
+    "c15": {
+      "rubric": "open"
+    },
+    "c16": {
+      "rubric": "open"
+    },
+    "c17": {
+      "rubric": "memory",
+      "seed": [
+        "My home city is Flagstaff."
+      ],
+      "expected": [
+        "Flagstaff"
+      ]
+    },
+    "c18": {
+      "rubric": "memory",
+      "seed": [
+        "My dog is called Pepper."
+      ],
+      "expected": [
+        "Pepper"
+      ]
+    },
+    "c19": {
+      "rubric": "memory",
+      "seed": [
+        "My locker code is 5507."
+      ],
+      "expected": [
+        "5507"
+      ]
+    },
+    "c20": {
+      "rubric": "memory",
+      "seed": [
+        "I work at the aquarium."
+      ],
+      "expected": [
+        "aquarium"
+      ]
+    },
+    "c21": {
+      "rubric": "memory",
+      "seed": [
+        "My landlord is Ms. Okafor."
+      ],
+      "expected": [
+        "Okafor"
+      ]
+    },
+    "c22": {
+      "rubric": "memory",
+      "seed": [
+        "I previously lived in Boise."
+      ],
+      "expected": [
+        "Boise"
+      ]
+    },
+    "c23": {
+      "rubric": "memory",
+      "seed": [
+        "My mother is doing okay."
+      ],
+      "expected": [
+        "okay"
+      ]
+    },
+    "c24": {
+      "rubric": "memory",
+      "seed": [
+        "My sister is feeling tired."
+      ],
+      "expected": [
+        "tired"
+      ]
+    },
+    "c25": {
+      "rubric": "write"
+    },
+    "c26": {
+      "rubric": "write"
+    },
+    "c27": {
+      "rubric": "write"
+    },
+    "c28": {
+      "rubric": "write"
+    },
+    "c29": {
+      "rubric": "write"
+    },
+    "c30": {
+      "rubric": "write"
+    },
+    "c31": {
+      "rubric": "write"
+    },
+    "c32": {
+      "rubric": "write"
+    },
+    "c33": {
+      "rubric": "clarify"
+    },
+    "c34": {
+      "rubric": "clarify"
+    },
+    "c35": {
+      "rubric": "confirm"
+    },
+    "c36": {
+      "rubric": "confirm"
+    },
+    "c37": {
+      "rubric": "delete",
+      "seed": [
+        "I used to work as a stagehand."
+      ]
+    },
+    "c38": {
+      "rubric": "delete",
+      "seed": [
+        "My old address was 14 Willow Lane."
+      ]
+    }
+  }
+}

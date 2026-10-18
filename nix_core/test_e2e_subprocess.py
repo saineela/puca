@@ -45,6 +45,13 @@ AUTH_TOKEN = os.environ.get("NIX_AUTH_TOKEN", "test-token")
 
 OLLAMA_HOST = os.environ.get("NIX_OLLAMA_HOST", "192.168.0.154")
 
+# These tests boot real services, use real ports, and may call a live model
+# backend. Keep them out of the default hermetic suite; opt in explicitly.
+pytestmark = pytest.mark.skipif(
+    os.environ.get("NIX_RUN_LIVE_E2E") != "1",
+    reason="set NIX_RUN_LIVE_E2E=1 to run live subprocess integration tests",
+)
+
 
 # ----------------------------------------------------------------------
 # Helpers

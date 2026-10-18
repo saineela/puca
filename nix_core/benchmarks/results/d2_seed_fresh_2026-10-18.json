@@ -1,0 +1,9 @@
+{
+  "clusters": 15,
+  "created_without_history": 0,
+  "superseded_updates": 15,
+  "active_facts": 15,
+  "db": "/tmp/d2_eval/data/knowledge.db",
+  "set": "fresh-2026-10-18",
+  "scenarios": "/root/nix_core/eval/data/memory_scenarios_fresh.json"
+}

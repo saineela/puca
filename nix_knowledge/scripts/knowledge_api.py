@@ -586,6 +586,27 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, 500)
             return
 
+        if path == "/delete_fact":
+            # Deleting stored facts by description. The service refuses to
+            # delete without an explicit confirm=true, so a client that skips
+            # the confirmation step cannot make the store destructive.
+            query = str(payload.get("query") or "").strip()
+            if not query:
+                self._json({"result": {"ok": False, "status": "refused_empty_query", "operation": "DELETE_FACT", "deleted": []}}, 400)
+                return
+            if payload.get("confirm") is not True:
+                self._json({"result": {"ok": False, "status": "confirmation_required", "operation": "DELETE_FACT", "query": query, "deleted": [], "detail": "A fact deletion must be confirmed; nothing was removed."}}, 400)
+                return
+            try:
+                needle = _get_needle()
+                with _state_lock:
+                    result = needle.tool_functions["delete_fact"](query=query, confirm=True)
+            except Exception as exc:
+                self._json({"result": {"ok": False, "status": "delete_failed", "operation": "DELETE_FACT", "query": query, "deleted": [], "error": f"{type(exc).__name__}: {exc}"}}, 500)
+                return
+            self._json({"result": result})
+            return
+
         if path == "/process":
             if not text:
                 self._json(

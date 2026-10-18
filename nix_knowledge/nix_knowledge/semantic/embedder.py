@@ -20,6 +20,35 @@ BATCH_SIZE = 64
 MAX_SEQ_LENGTH = 256
 
 
+#: Below this much GPU memory the embedder stays on the CPU. Measured live
+#: on an 8 GB card: the embedder took the GPU next to the conversation model
+#: and the chat model then had no room to load, so the assistant answered
+#: with no reply at all. Retrieval is a background job; the conversation is
+#: the product.
+_GPU_MEMORY_FLOOR_MB = 12_000
+
+
+def _pick_device() -> str:
+    """Where the embedder runs: cuda, cpu, or NIX_SEMANTIC_DEVICE to decide."""
+    import os
+
+    wanted = (os.environ.get("NIX_SEMANTIC_DEVICE") or "auto").strip().lower()
+    if wanted in {"cpu", "cuda"}:
+        return wanted
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return "cpu"
+        try:
+            total_mb = torch.cuda.get_device_properties(0).total_memory // (1024 * 1024)
+        except Exception:  # noqa: BLE001
+            return "cpu"
+        return "cuda" if total_mb >= _GPU_MEMORY_FLOOR_MB else "cpu"
+    except Exception:  # noqa: BLE001
+        return "cpu"
+
+
 class Embedder:
     """
     Thread-safe local embedding engine.
@@ -77,13 +106,14 @@ class Embedder:
         self.model = SentenceTransformer(source)
         self.dimension = int(self.model.get_embedding_dimension())
 
+        self.device = _pick_device()
         try:
-            import torch
-
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.model.to(self.device)
         except Exception:
+            # A GPU that cannot take the embedder must not take the
+            # conversation model down with it: fall back to CPU.
             self.device = "cpu"
+            self.model.to("cpu")
 
         self._lock = threading.Lock()
 

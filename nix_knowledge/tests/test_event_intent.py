@@ -272,3 +272,93 @@ def test_cancel_unknown_event_says_not_found(tmp_path):
     finally:
         actions.close()
         knowledge.close()
+
+
+def _needle(tmp_path):
+    knowledge = KnowledgeEngine(tmp_path / "knowledge.db")
+    actions = ActionsEngine(tmp_path / "actions.db", timezone="America/Chicago")
+    needle = object.__new__(KnowledgeNeedle)
+    needle.engine = knowledge
+    needle.actions_engine = actions
+    needle.timezone = "America/Chicago"
+    needle.temporal = TemporalResolver("America/Chicago")
+    needle.context = TemporalContext("America/Chicago")
+    needle.tools = needle._build_tool_schemas()
+    needle.tool_functions = needle._build_tool_functions()
+    return needle, knowledge, actions
+
+
+def test_saying_the_same_event_twice_creates_one_event(tmp_path):
+    """A repeated sentence is one appointment, not two rows.
+
+    Measured live: "I have robotics practice tomorrow at 5pm" in two turns
+    listed the same practice twice, because create never looked for an
+    identical (title, start). A different start is still a new occurrence.
+    """
+    needle, knowledge, actions = _needle(tmp_path)
+    try:
+        first = needle._process_route("I have robotics practice tomorrow at 5pm")["result"]
+        second = needle._process_route("I have robotics practice tomorrow at 5pm")["result"]
+
+        assert first["operation"] == "CREATE" and second["operation"] == "CREATE"
+        assert second.get("duplicate") is True
+        assert second["record_id"] == first["record_id"]
+
+        found = needle._find_calendar_events(window="tomorrow")
+        robotics = [
+            event for event in found["events"]
+            if "robotics" in str(event.get("title") or "").lower()
+        ]
+        assert len(robotics) == 1, "the same practice must not appear twice"
+    finally:
+        actions.close()
+        knowledge.close()
+
+
+def test_the_same_title_at_another_time_is_a_new_occurrence(tmp_path):
+    needle, knowledge, actions = _needle(tmp_path)
+    try:
+        needle._process_route("I have robotics practice tomorrow at 5pm")
+        other = needle._process_route("I have robotics practice tomorrow at 7pm")["result"]
+
+        assert other["operation"] == "CREATE"
+        assert not other.get("duplicate")
+    finally:
+        actions.close()
+        knowledge.close()
+
+
+def test_a_reminder_without_a_time_asks_for_the_time(tmp_path):
+    """A missing time is asked for, never guessed at.
+
+    Measured live: "Remind me to call mom." was answered "I'll remind you to
+    call your mom later." with nothing scheduled - a promise the system had
+    not made good on.
+    """
+    needle, knowledge, actions = _needle(tmp_path)
+    try:
+        payload = needle._process_route("Remind me to call mom.")
+        result = payload["result"]
+
+        assert result["operation"] == "NEEDS_CLARIFICATION"
+        assert result["question"].lower().startswith("when should i remind you")
+        assert "call mom" in result["question"]
+        # nothing was scheduled by asking the question
+        assert len(actions.list_actions(status="pending")) == 0
+    finally:
+        actions.close()
+        knowledge.close()
+
+
+def test_a_reminder_with_a_time_is_still_scheduled(tmp_path):
+    needle, knowledge, actions = _needle(tmp_path)
+    try:
+        payload = needle._process_route("Remind me tomorrow at 8 to call mom.")
+        result = payload["result"]
+
+        assert result.get("operation") == "CREATE"
+        assert result.get("record_type") == "event"
+        assert len(actions.list_actions(status="pending")) >= 1
+    finally:
+        actions.close()
+        knowledge.close()

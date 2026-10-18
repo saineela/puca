@@ -1,0 +1,31 @@
+{
+ "tree": "/var/tmp/bench_before",
+ "cases": 32,
+ "correct": 24,
+ "unrouted": 14,
+ "by_label": {
+  "escalation_required": {
+   "n": 18,
+   "correct": 11
+  },
+  "fast_path_sufficient": {
+   "n": 14,
+   "correct": 13
+  }
+ },
+ "rules": {
+  "abstain": 11,
+  "personal_boundary": 3,
+  "recall_lead": 3,
+  "personal_statement": 3,
+  "store_fact": 3,
+  "general_question": 2,
+  "scheduling_verb": 2,
+  "emotion_fast_path": 1,
+  "world_question": 1,
+  "opinion_of_assistant": 1,
+  "addressing_assistant": 1,
+  "recall_my": 1
+ },
+ "accuracy": 0.75
+}

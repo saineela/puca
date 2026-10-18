@@ -1,0 +1,1016 @@
+{
+  "summary": {
+    "note": "WP6 smoke check after the selection/retrieval fix, on the retired confirm set and its frozen store. Not a scored run: the owner asked for the repeat on a new independently frozen set with k=5 samples.",
+    "known_cases": 75,
+    "known_fact_recall": 0.573,
+    "known_zero_recall": 29,
+    "unknown_cases": 25,
+    "unknown_honest": 25,
+    "routes": {
+      "knowledge+chat": 4,
+      "knowledge": 96
+    }
+  },
+  "cases": [
+    {
+      "set": "development",
+      "id": "confirm-dev-001",
+      "question": "What is my garage code?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your garage code is indeed 8042.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-002",
+      "question": "Where do I live?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in Texas, and you live in Washington.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-003",
+      "question": "When is my dentist appointment?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-004",
+      "question": "What is my favorite tea?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your favorite tea is indeed oolong.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-005",
+      "question": "What kind of bike do I have?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-006",
+      "question": "Which days do I go to the gym?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You go to the g",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-007",
+      "question": "When is my nephew's birthday?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your nephew's birthday was July 19.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-008",
+      "question": "Where do I work?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I work at Cedars & Co.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-009",
+      "question": "What color is my laptop?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your laptop is silver.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-010",
+      "question": "When is my flight?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your flight is Sunday, October, 18th, at 6:00 AM.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-011",
+      "question": "Which bank branch do I use?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You can use the Sellwood bank branch.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-012",
+      "question": "Where does my sister live?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in Texas.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-013",
+      "question": "What is my dog's name?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your dog's name is Biscuit",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-014",
+      "question": "When does my car insurance renew?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your car insurance renewal is scheduled for November 3",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-015",
+      "question": "What is my Wi-Fi password?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your Wi-Fi password was found in our database. It is maple-OTTER-42.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-016",
+      "question": "When does my passport expire?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your passport expires in the year 2031",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-017",
+      "question": "When is my project deadline?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your project deadline is on October 30th.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-018",
+      "question": "Who is my landlord?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your landlord is Dana",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-019",
+      "question": "What am I allergic to?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You are allergic to penecillin.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-020",
+      "question": "What is my coffee order?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your coffee order is indeed a flat white made with oat milk!",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-021",
+      "question": "What was my garage code before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My garage code is 8042.. Before that: My garage code was 3319. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-022",
+      "question": "Where did I live before Tacoma?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My sister lives in Austin.; I live in Tacoma.. Before that: I used to live in Denver. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-023",
+      "question": "When was my dentist appointment before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-024",
+      "question": "What tea did I used to drink?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-025",
+      "question": "What bike did I have before this one?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-026",
+      "question": "What days did I go to the gym before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: I go to the gym on Monday and Thursday.. Before that: I went to the gym on Wednesday and Saturday. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-027",
+      "question": "When was my nephew's birthday before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My nephew's birthday is July 19.. Before that: My nephew's birthday was July 2. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-028",
+      "question": "Where did I work before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: I work at Cedar & Co.. Before that: I worked at Bluebird Diner. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-029",
+      "question": "What color was my laptop before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My laptop is silver.. Before that: My laptop was black. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-030",
+      "question": "When was my flight before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My flight is Sunday at 6am.. Before that: My flight was Saturday at 9pm. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-031",
+      "question": "Which branch did I bank at before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You banked at the Sell wood branch before.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-032",
+      "question": "What was my coffee order before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My coffee order is a flat white with oat milk.. Before that: My coffee order was black coffee. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-033",
+      "question": "What day is my dentist appointment?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again?",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-034",
+      "question": "What day does my flight leave?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "My flight is Sunday at 6am.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-035",
+      "question": "What date does my car insurance renew?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your car insurance renewal date is November 3",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-036",
+      "question": "What date is my project deadline?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your project deadline is on October 30, 2027.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-037",
+      "question": "What date is my nephew's birthday?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your nephew's birthday was July 19.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-038",
+      "question": "What year does my passport expire?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your passport expires in the year 2031",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-039",
+      "question": "Do I live in Tacoma and work at Cedar & Co?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Yes, you live in Tacoma, and yes, you work at Cedar and Co.",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-040",
+      "question": "What are my gym days and my coffee order?",
+      "unknown": false,
+      "route": "knowledge+chat",
+      "reply": "Your gym days are Monday and Thursday. a flat white with oats",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-041",
+      "question": "Where do I live, and where does my sister live?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in Texas, and you live in Washington. Your sister lives in Texas.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-042",
+      "question": "Tell me my garage code and my Wi-Fi password.",
+      "unknown": false,
+      "route": "knowledge+chat",
+      "reply": "Your garage code is #8042. Your Wi-Fi password remains unchanged. maple-otter",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-043",
+      "question": "What is my landlord's name and my dog's name?",
+      "unknown": false,
+      "route": "knowledge+chat",
+      "reply": "I don't have that yet. Tell me and I'll remember it. Biscuit",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-044",
+      "question": "Which branch do I bank at, and when does my insurance renew?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You bank at theSellwood branch. Your car insurance renewal is on November 03. Your car insurance renewal is scheduled for November 3, so mark that date on your calendar.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-045",
+      "question": "What am I allergic to, and what tea do I drink?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You are allergic to penecillin. I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-046",
+      "question": "What is my blood type?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-047",
+      "question": "What is my licence plate number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-048",
+      "question": "What was my childhood nickname?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-049",
+      "question": "What size shoes do I wear?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "development",
+      "id": "confirm-dev-050",
+      "question": "What is my gym membership number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-001",
+      "question": "Which city do I live in?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in Texas, but you live in Washington.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-002",
+      "question": "What time is my dentist appointment?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I can't find anything for that.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-003",
+      "question": "Which tea do I like best?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-004",
+      "question": "What bike do I ride?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-005",
+      "question": "What date does my nephew's birthday fall on?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-006",
+      "question": "Which company do I work for?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I work at Cedars & Co.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-007",
+      "question": "What colour is my laptop?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your laptop is silver.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-008",
+      "question": "What time does my flight leave?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "My flight is Sunday at 6am.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-009",
+      "question": "Where do I bank?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You bank at theSellwood branch.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-010",
+      "question": "When is my project due?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-011",
+      "question": "Which city did I live in before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in Texas, and you live in Washington.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-012",
+      "question": "What was my favorite tea before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My favorite tea is oolong.. Before that: My favorite tea was chamomile. (until 2026-10-18).",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-013",
+      "question": "What bike did I ride before?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-014",
+      "question": "Where did I work before Cedar & Co?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I work at Ced",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-015",
+      "question": "Which branch did I bank at before Sellwood?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You banked at the Sell wood branch.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-016",
+      "question": "What is my dentist appointment and my flight time?",
+      "unknown": false,
+      "route": "knowledge+chat",
+      "reply": "Hmm, that didn't go through on my end, and nothing was saved or changed. Say it another way and I'll try again? your flight leaves at 8:00 AM tomorrow morning",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-017",
+      "question": "Where do I work and what is my project deadline?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You work at Cedar and Co., and your project deadline is on October 30th. Your project deadline is set for October 30, 2027.",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-018",
+      "question": "What color is my laptop and what bike do I ride?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your laptop is silver. Your bike is black. I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-019",
+      "question": "Where did I live before, and where do I live now?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Now: My sister lives in Austin.; I live in Tacoma.. Before that: I used to live in Denver. (until 2026-10-18). Your sister lives in Texas, and you live in Washington.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-020",
+      "question": "What tea do I drink and when is my nephew's birthday?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it. Your nephew's birthday will be July 19.",
+      "fact_recall": 0.5,
+      "abstention_honesty": null
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-021",
+      "question": "What is my mother's maiden name?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-022",
+      "question": "What is my doctor's name?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-023",
+      "question": "What is my office extension?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-024",
+      "question": "What is my bank account balance?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "heldout",
+      "id": "confirm-held-025",
+      "question": "What is my dog's vet called?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-001",
+      "question": "Which code opens my garage?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your garage code is indeed 8042.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-002",
+      "question": "What's the name of my dog?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your dog's name is Biscuit",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-003",
+      "question": "What days am I at the gym now?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You go to the gynm on Monday and Thursdays.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-004",
+      "question": "Who do I rent from?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your landlord is Dana",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-005",
+      "question": "Which city is my sister in?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your sister lives in the city of Austin.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-006",
+      "question": "What medication should I avoid?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "You should avoid taking penicillin due to your allergy.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-007",
+      "question": "What's the Wi-Fi key at home?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your Wi-Fi password at home is maple-OTTER-42.",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-008",
+      "question": "How long is my passport good for?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "Your passport expires in the year 2031",
+      "fact_recall": 1.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-009",
+      "question": "When does my car insurance come up for renewal?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-010",
+      "question": "What do I usually order at a cafe?",
+      "unknown": false,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 0.0,
+      "abstention_honesty": null
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-011",
+      "question": "What is my passport number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-012",
+      "question": "What is my landlord's phone number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-013",
+      "question": "What is my sister's job?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-014",
+      "question": "How much did I pay for my bike?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-015",
+      "question": "What is my project budget?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-016",
+      "question": "What is my insurance policy number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-017",
+      "question": "What is my Wi-Fi router model?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-018",
+      "question": "When did I last visit the dentist?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-019",
+      "question": "What is my niece's name?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-020",
+      "question": "What is my coffee grinder brand?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-021",
+      "question": "What is my apartment number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-022",
+      "question": "What is my work email address?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-023",
+      "question": "What is my eye prescription?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-024",
+      "question": "What is my favourite film?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    },
+    {
+      "set": "adversarial",
+      "id": "confirm-adv-025",
+      "question": "What is my gym locker number?",
+      "unknown": true,
+      "route": "knowledge",
+      "reply": "I don't have that yet. Tell me and I'll remember it.",
+      "fact_recall": 1.0,
+      "abstention_honesty": 1.0
+    }
+  ]
+}

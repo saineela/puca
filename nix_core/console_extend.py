@@ -31,6 +31,7 @@ import console as base_console
 import mobile_app_api
 import music_api
 import puca_panel
+import system_model_api
 import voice
 import voice_api
 
@@ -98,6 +99,9 @@ register_route("POST", r"/api/music/queue", music_api.music_queue)
 # track it was handed as a bare id. It resolves and nothing else: no queue is
 # touched and nothing starts playing.
 register_route("POST", r"/api/music/queue/resolve", music_api.music_queue_resolve)
+# …and this is the player callback: the queue service has chosen the track, and
+# this end presses the speaker's button for it. Internal by name and by purpose.
+register_route("POST", r"/internal/music/queue/play", music_api.music_queue_play)
 register_route("POST", r"/api/music/save", music_api.music_save)
 register_route("GET", r"/api/music/lyrics", music_api.music_lyrics)
 # Covers come from the console's own cache, so the page paints them without a
@@ -133,6 +137,27 @@ def panel_index(handler, _match=None) -> bool:
 
 
 register_route("GET", r"/api/panel", panel_index)
+
+# PUCA system model v3 measurement surface (read-only, no personal prompts).
+register_route("GET", r"/api/system-model", system_model_api.system_model_index)
+register_route("GET", r"/api/system-model/inference", system_model_api.inference_metrics_view)
+register_route("GET", r"/api/system-model/privacy", system_model_api.privacy_view)
+register_route("GET", r"/api/system-model/proactivity", system_model_api.proactivity_view)
+register_route("GET", r"/api/system-model/context", system_model_api.context_view)
+register_route("GET", r"/api/system-model/turn-taking", system_model_api.turn_taking_view)
+
+
+def extensions_status(handler, _match=None) -> bool:
+    """Every route an extension has registered, for the docs and for support."""
+    with _routes_lock:
+        routes = [
+            {"method": route.method, "path": route.expression}
+            for route in _routes
+        ]
+    return music_api._respond(handler, {"ok": True, "count": len(routes), "routes": routes})
+
+
+register_route("GET", r"/api/extensions/status", extensions_status)
 
 
 def unregister_route(method: str, expression: str) -> bool:

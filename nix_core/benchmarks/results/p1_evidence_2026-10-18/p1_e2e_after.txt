@@ -1,0 +1,54 @@
+--- seed
+USER: Remember that I previously lived in Boise.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: i previously lived in boise
+--- seed
+USER: Remember that my home city is Flagstaff.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: my home city is flagstaff
+--- seed
+USER: Remember that my old address was 14 Willow Lane.
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: my old address was 14 willow lane
+
+== facts after seeding: [(1, 'active'), (2, 'active'), (3, 'active')]
+--- D1 stale value
+USER: What city do I live in?
+ROUTE: knowledge / knowledge_process_composed
+REPLY: Your home city is indeed Flagstaff. No other information is stored about your location.
+--- unknown
+USER: What is my blood type?
+ROUTE: knowledge / knowledge_process
+REPLY: I don't have that yet. Tell me and I'll remember it.
+FACT ROWS before=3 after=3 (unknown must not write)
+--- D2 put-in-for
+USER: Put the optician in for Monday at 10am
+ROUTE: knowledge / knowledge_process
+REPLY: Scheduled 'optician' Monday, October 19, 2026 at 10:00 AM. Action set: reminder fires Oct 19, 2026 at 10:00 AM.
+--- D3 due statement
+USER: The renewal is due March 4
+ROUTE: knowledge / knowledge_process
+REPLY: Stored: The renewal is due March 4
+== facts after due: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'active', 'my old address was 14 willow lane'), (5, 'active', 'The renewal is due March 4')]
+--- D4 delete request
+USER: Delete the note about my old address
+ROUTE: knowledge / knowledge_process
+REPLY: I found 'my old address was 14 willow lane'. Nothing has been deleted yet - say yes and I'll remove it, or no to keep it.
+== facts after request: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'active', 'my old address was 14 willow lane'), (5, 'active', 'The renewal is due March 4')]
+--- D4 confirm
+USER: yes
+ROUTE: knowledge / fact_deletion_confirmed
+REPLY: Deleted 'my old address was 14 willow lane'.
+== facts after confirm: [(1, 'active', 'i previously lived in boise'), (2, 'active', 'my home city is flagstaff'), (3, 'deleted', 'my old address was 14 willow lane'), (5, 'active', 'The renewal is due March 4')]
+--- D4 after delete read
+USER: What was my old address?
+ROUTE: knowledge / knowledge_process
+REPLY: I don't have that yet. Tell me and I'll remember it.
+--- event check
+USER: When is my optician appointment?
+ROUTE: knowledge / knowledge_process
+REPLY: 1 event(s) found: - optician: Monday, October 19, 2026 at 10:00:00 AM
+--- renewal read
+USER: When is the renewal due?
+ROUTE: knowledge / knowledge_process
+REPLY: The renewal is due March 4.

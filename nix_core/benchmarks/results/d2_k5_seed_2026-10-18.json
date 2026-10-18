@@ -1,0 +1,9 @@
+{
+  "clusters": 25,
+  "created_without_history": 0,
+  "superseded_updates": 25,
+  "active_facts": 25,
+  "db": "/tmp/d2_k5/data/knowledge.db",
+  "set": "k5-confirm-2026-10-18",
+  "scenarios": "eval/data/memory_scenarios_k5_2026-10-18.json"
+}

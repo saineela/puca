@@ -1235,7 +1235,7 @@ def test_regular_model_reply_is_preserved_when_it_is_not_a_command():
 
     response = brain.handle(text="What animation options are available on the Ring Light?")
 
-    assert response["reply"].startswith("I didn't send a device command")
+    assert response["reply"].startswith("I couldn't get that to the device")
     # The planner rejected the request, so nothing executed and there is no
     # post-execution acknowledgment call — only the rejected planner call ran.
     assert len(chat.calls) == 0
@@ -1336,7 +1336,7 @@ def test_descriptive_color_request_requires_color_action_not_power_only():
 
     assert response["details"].get("skill_execution_confirmed") is not True
     assert runtime.executions == []
-    assert "didn't send" in response["reply"]
+    assert "couldn't" in response["reply"] or "nothing was sent" in response["reply"]
 
 
 def test_compound_device_skill_request_bypasses_clause_split_and_stays_atomic():
@@ -1556,7 +1556,7 @@ def test_compound_color_does_not_report_success_on_missing_malformed_or_wrong_pr
         response = brain.handle(text="turn on the Studio Ring and make it yellow")
         assert response["details"].get("skill_execution_confirmed") is not True
         assert runtime.executions == []
-        assert "didn't send" in response["reply"] or "couldn't confirm" in response["reply"]
+        assert "couldn't" in response["reply"] or "nothing was sent" in response["reply"]
 
 
 def test_color_action_retry_after_declined_readback_can_complete_once():
@@ -1815,7 +1815,7 @@ def test_invalid_later_plan_action_prevents_all_dispatch():
 
     assert response["details"].get("skill_execution_confirmed") is not True
     assert runtime.executions == []
-    assert "complete plan" in response["reply"] or "didn't send" in response["reply"]
+    assert "couldn't" in response["reply"] or "nothing was sent" in response["reply"]
 
 
 def test_missing_plan_for_multi_action_request_never_falls_back_to_one_worker_match():
@@ -1898,7 +1898,7 @@ def test_multi_task_invalid_later_needle_proposal_blocks_all_simulated_dispatch(
     assert response["details"]["skill_plan_validated"] is False
     assert runtime.validations == []
     assert runtime.executions == []
-    assert "didn't send" in response["reply"] or "complete plan" in response["reply"]
+    assert "couldn't" in response["reply"] or "nothing was sent" in response["reply"]
 
 
 def test_multi_task_readback_mismatch_stops_before_later_simulated_actions():
@@ -2364,11 +2364,13 @@ def test_knowledge_failure_reply_hides_internal_status_codes():
     # leaked an internal status code to the user (3 reminder phrasings).
     from brain import format_knowledge_result
 
+    from voice_copy import KNOWLEDGE_FAILED
+
     payload = {"result": {"ok": False, "status": "no_function_selected"}}
     reply = format_knowledge_result(payload)
     assert "no_function_selected" not in reply
     assert "Knowledge engine" not in reply
-    assert reply.startswith("I couldn't complete that request")
+    assert reply == KNOWLEDGE_FAILED
 
 
 def test_a_stated_level_without_the_word_percent_is_grounded_by_core():
@@ -2552,7 +2554,7 @@ class MusicSkillRuntime:
             # A provider play resolves the track into a stream URL; only the
             # speaker skill can actually play it, which is the handoff under test.
             result.update({
-                "message": "Playing “The Fate of Ophelia” on OpenDeck.",
+                "message": "Playing “The Fate of Ophelia” — just for you.",
                 "video_id": "fate-ophelia",
                 "title": "The Fate of Ophelia",
                 "artist": "Taylor Swift",
@@ -2731,7 +2733,7 @@ def test_a_spoken_play_hands_the_resolved_stream_to_the_speaker(monkeypatch):
     assert handed[0]["skill_id"] == MUSIC_SKILL_ID
     assert handed[0]["result"]["play_url"].startswith("http")
     # The handoff succeeded, so the provider's own sentence stands.
-    assert response["reply"] == "Playing “The Fate of Ophelia” on OpenDeck."
+    assert response["reply"] == "Playing “The Fate of Ophelia” — just for you."
     assert response["details"]["playback_handoff"]["supported"] is True
 
 
@@ -2755,7 +2757,8 @@ def test_a_play_that_cannot_reach_the_speaker_is_reported_honestly(monkeypatch):
 
     # The provider says "Playing ..." — reporting that as playback while the
     # speaker never received the stream is exactly the claim to avoid.
-    assert "nothing is playing" in response["reply"]
+    assert "nothing's playing" in response["reply"]
+    assert "just for you" not in response["reply"]
     assert response["details"]["playback_handoff"]["supported"] is False
 
 
@@ -2781,8 +2784,16 @@ def test_a_speaker_that_refused_the_stream_is_not_reported_as_playing(monkeypatc
 
     monkeypatch.setattr(music_api, "_start_playback", fake_start_playback)
     response = brain.handle(text="play fate of ophelia by taylor swift")
-    assert "nothing is playing" in response["reply"]
-    assert "refused the stream" in response["reply"]
+    reply = response["reply"]
+    # The failure is said the way a person says it, and the machine reason is
+    # not repeated to the user.
+    assert reply.startswith("Ugh, the speaker wouldn't take it")
+    assert "nothing's playing" in reply
+    assert "Want me to try again?" in reply
+    assert "WorkerOperationError" not in reply
+    assert "http" not in reply
+    assert "the Dot could not decode the stream" not in reply
+    # ... but the reason is kept for whoever has to debug it.
     assert response["details"]["playback_handoff"]["error"]
 
 
@@ -3328,7 +3339,7 @@ def test_a_pronoun_play_uses_the_track_the_conversation_named(monkeypatch):
         asked.append((key, extra))
         return "github:example:opendeck", {
             "ok": True, "action": "play",
-            "message": "Playing “I Will Always Love You” by Whitney Houston on OpenDeck.",
+            "message": "Playing “I Will Always Love You” by Whitney Houston — just for you.",
             "video_id": "abc12345678", "title": "I Will Always Love You",
             "artist": "Whitney Houston", "duration_sec": 200, "artwork_url": "",
             "mime_type": "audio/mp4", "play_url": "http://speaker/stream",
@@ -3345,7 +3356,7 @@ def test_a_pronoun_play_uses_the_track_the_conversation_named(monkeypatch):
 
     assert asked == [("play", {"query": "I Will Always Love You"})]
     assert len(handed) == 1
-    assert response["reply"] == "Playing “I Will Always Love You” by Whitney Houston on OpenDeck."
+    assert response["reply"] == "Playing “I Will Always Love You” by Whitney Houston — just for you."
     assert response["details"]["music_play_followup"]["source"] == "conversation"
     assert response["details"]["skill_planner_called"] is False
     assert "init" not in captured
@@ -3410,7 +3421,7 @@ def test_a_pronoun_play_can_replay_the_track_the_speaker_has(monkeypatch):
     def fake_provider_call(key, extra=None):
         asked.append((key, extra))
         return "github:example:opendeck", {
-            "ok": True, "action": "play", "message": "Playing “Run It” by Jelly Roll on OpenDeck.",
+            "ok": True, "action": "play", "message": "Playing “Run It” by Jelly Roll — just for you.",
             "video_id": "abc12345678", "title": "Run It", "artist": "Jelly Roll",
             "duration_sec": 159, "artwork_url": "", "mime_type": "audio/mp4",
             "play_url": "http://speaker/stream",

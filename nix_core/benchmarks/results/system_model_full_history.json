@@ -1,0 +1,2413 @@
+{
+  "base_url": "http://127.0.0.1:49117",
+  "model": "luna-v6-contextual-v1",
+  "prompts": 124,
+  "routes": {
+    "chat": 116,
+    "knowledge": 8
+  },
+  "routing": {
+    "name": "routing-classify",
+    "requests": 124,
+    "ok": 124,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 0.9,
+      "p50": 0.9,
+      "p95": 1.0,
+      "min": 0.8,
+      "max": 1.2
+    },
+    "non_empty_replies": 0,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 1.0165823623538017,
+        "route": "chat"
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 0.9836922399699688,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 0.9196437895298004,
+        "route": "chat"
+      },
+      {
+        "prompt": "add Bohemian Rhapsody to the queue",
+        "status": 200,
+        "latency_ms": 0.9772186167538166,
+        "route": "chat"
+      },
+      {
+        "prompt": "what's in my queue?",
+        "status": 200,
+        "latency_ms": 0.844862312078476,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "shuffle the queue",
+        "status": 200,
+        "latency_ms": 0.9351000189781189,
+        "route": "chat"
+      },
+      {
+        "prompt": "repeat the queue",
+        "status": 200,
+        "latency_ms": 0.8758138865232468,
+        "route": "chat"
+      },
+      {
+        "prompt": "turn shuffle off",
+        "status": 200,
+        "latency_ms": 0.8692918345332146,
+        "route": "chat"
+      },
+      {
+        "prompt": "clear the queue",
+        "status": 200,
+        "latency_ms": 0.8628186769783497,
+        "route": "chat"
+      },
+      {
+        "prompt": "like this song",
+        "status": 200,
+        "latency_ms": 0.9012757800519466,
+        "route": "chat"
+      },
+      {
+        "prompt": "unlike this song",
+        "status": 200,
+        "latency_ms": 0.928632915019989,
+        "route": "chat"
+      },
+      {
+        "prompt": "create a playlist called Nix Voice Check",
+        "status": 200,
+        "latency_ms": 0.9799846448004246,
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Nix Voice Check playlist",
+        "status": 200,
+        "latency_ms": 0.9283139370381832,
+        "route": "chat"
+      },
+      {
+        "prompt": "play Bohemian Rhapsody",
+        "status": 200,
+        "latency_ms": 0.9562359191477299,
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Hindi Songs playlist",
+        "status": 200,
+        "latency_ms": 1.0159052908420563,
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Focus playlist",
+        "status": 200,
+        "latency_ms": 0.9632171131670475,
+        "route": "chat"
+      },
+      {
+        "prompt": "play fate of ophelia by taylor swift",
+        "status": 200,
+        "latency_ms": 1.0122782550752163,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the next queued track",
+        "status": 200,
+        "latency_ms": 0.9883749298751354,
+        "route": "chat"
+      },
+      {
+        "prompt": "pause",
+        "status": 200,
+        "latency_ms": 0.9302427060902119,
+        "route": "chat"
+      },
+      {
+        "prompt": "stop music on nix",
+        "status": 200,
+        "latency_ms": 0.906800851225853,
+        "route": "chat"
+      },
+      {
+        "prompt": "pause music",
+        "status": 200,
+        "latency_ms": 0.8989288471639156,
+        "route": "chat"
+      },
+      {
+        "prompt": "resume",
+        "status": 200,
+        "latency_ms": 0.8428771980106831,
+        "route": "chat"
+      },
+      {
+        "prompt": "stop music",
+        "status": 200,
+        "latency_ms": 0.9117531590163708,
+        "route": "chat"
+      },
+      {
+        "prompt": "stop the music",
+        "status": 200,
+        "latency_ms": 0.9088302031159401,
+        "route": "chat"
+      },
+      {
+        "prompt": "unpause",
+        "status": 200,
+        "latency_ms": 0.8805929683148861,
+        "route": "chat"
+      },
+      {
+        "prompt": "mute",
+        "status": 200,
+        "latency_ms": 0.886211171746254,
+        "route": "chat"
+      },
+      {
+        "prompt": "unmute",
+        "status": 200,
+        "latency_ms": 0.9513790719211102,
+        "route": "chat"
+      },
+      {
+        "prompt": "can you play that song on nix",
+        "status": 200,
+        "latency_ms": 0.9308378212153912,
+        "route": "chat"
+      },
+      {
+        "prompt": "what song did I ask you to play",
+        "status": 200,
+        "latency_ms": 0.9328611195087433,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "what sign did U ask you to play just now",
+        "status": 200,
+        "latency_ms": 0.9648003615438938,
+        "route": "chat"
+      },
+      {
+        "prompt": "I moved again \u2014 where do I live now?",
+        "status": 200,
+        "latency_ms": 0.8705500513315201,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "Where was I living before?",
+        "status": 200,
+        "latency_ms": 1.0227710008621216,
+        "route": "chat"
+      },
+      {
+        "prompt": "What is my name?",
+        "status": 200,
+        "latency_ms": 0.9373901411890984,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "Where do I live?",
+        "status": 200,
+        "latency_ms": 0.9389431215822697,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "What is my sister's name?",
+        "status": 200,
+        "latency_ms": 0.9133578278124332,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "What is my locker code?",
+        "status": 200,
+        "latency_ms": 0.8813557215034962,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "Hi Luna, say hello in one short sentence.",
+        "status": 200,
+        "latency_ms": 0.9529241360723972,
+        "route": "chat"
+      },
+      {
+        "prompt": "hi",
+        "status": 200,
+        "latency_ms": 0.8921739645302296,
+        "route": "chat"
+      },
+      {
+        "prompt": "hello",
+        "status": 200,
+        "latency_ms": 0.8679931052029133,
+        "route": "chat"
+      },
+      {
+        "prompt": "yooo wasup",
+        "status": 200,
+        "latency_ms": 1.04545708745718,
+        "route": "chat"
+      },
+      {
+        "prompt": "what effect is on nix rn",
+        "status": 200,
+        "latency_ms": 1.1628982611000538,
+        "route": "chat"
+      },
+      {
+        "prompt": "what effect is it currently on tho",
+        "status": 200,
+        "latency_ms": 1.046912744641304,
+        "route": "chat"
+      },
+      {
+        "prompt": "bro what effect is nix currently using",
+        "status": 200,
+        "latency_ms": 0.9807832539081573,
+        "route": "chat"
+      },
+      {
+        "prompt": "hey",
+        "status": 200,
+        "latency_ms": 0.790563877671957,
+        "route": "chat"
+      },
+      {
+        "prompt": "what's you favourite song you said",
+        "status": 200,
+        "latency_ms": 0.9444840252399445,
+        "route": "chat"
+      },
+      {
+        "prompt": "what song did I ask you to play just now on nix",
+        "status": 200,
+        "latency_ms": 1.1178958229720592,
+        "route": "knowledge"
+      },
+      {
+        "prompt": "pause the song",
+        "status": 200,
+        "latency_ms": 0.8971039205789566,
+        "route": "chat"
+      },
+      {
+        "prompt": "reune the song bro",
+        "status": 200,
+        "latency_ms": 0.8694026619195938,
+        "route": "chat"
+      },
+      {
+        "prompt": "resume the song bro",
+        "status": 200,
+        "latency_ms": 1.0299398563802242,
+        "route": "chat"
+      },
+      {
+        "prompt": "resume the song",
+        "status": 200,
+        "latency_ms": 0.9173080325126648,
+        "route": "chat"
+      },
+      {
+        "prompt": "dude pause the song",
+        "status": 200,
+        "latency_ms": 0.9103347547352314,
+        "route": "chat"
+      },
+      {
+        "prompt": "resume song",
+        "status": 200,
+        "latency_ms": 0.861563254147768,
+        "route": "chat"
+      },
+      {
+        "prompt": "perform the opposite of playing the song",
+        "status": 200,
+        "latency_ms": 0.8967122994363308,
+        "route": "chat"
+      },
+      {
+        "prompt": "what is the opposite of play",
+        "status": 200,
+        "latency_ms": 0.9274319745600224,
+        "route": "chat"
+      },
+      {
+        "prompt": "what song is playing rn",
+        "status": 200,
+        "latency_ms": 0.8597350679337978,
+        "route": "chat"
+      },
+      {
+        "prompt": "which of those both songs do you like",
+        "status": 200,
+        "latency_ms": 1.0380148887634277,
+        "route": "chat"
+      },
+      {
+        "prompt": "niceee",
+        "status": 200,
+        "latency_ms": 0.867591705173254,
+        "route": "chat"
+      },
+      {
+        "prompt": "what is it currently playign",
+        "status": 200,
+        "latency_ms": 1.0434319265186787,
+        "route": "chat"
+      },
+      {
+        "prompt": "is it on repeat?",
+        "status": 200,
+        "latency_ms": 0.982258003205061,
+        "route": "chat"
+      },
+      {
+        "prompt": "what is currently playing",
+        "status": 200,
+        "latency_ms": 0.9770211763679981,
+        "route": "chat"
+      },
+      {
+        "prompt": "play he knows by cammila cabello",
+        "status": 200,
+        "latency_ms": 0.9730299934744835,
+        "route": "chat"
+      },
+      {
+        "prompt": "play havana",
+        "status": 200,
+        "latency_ms": 0.901681836694479,
+        "route": "chat"
+      },
+      {
+        "prompt": "play senorita",
+        "status": 200,
+        "latency_ms": 0.9555998258292675,
+        "route": "chat"
+      },
+      {
+        "prompt": "any other senoritas?",
+        "status": 200,
+        "latency_ms": 0.9750290773808956,
+        "route": "chat"
+      },
+      {
+        "prompt": "senorita by cammila cabello?",
+        "status": 200,
+        "latency_ms": 0.9725759737193584,
+        "route": "chat"
+      },
+      {
+        "prompt": "play that",
+        "status": 200,
+        "latency_ms": 0.9683012031018734,
+        "route": "chat"
+      },
+      {
+        "prompt": "play run it",
+        "status": 200,
+        "latency_ms": 0.9225360117852688,
+        "route": "chat"
+      },
+      {
+        "prompt": "play blinding lights",
+        "status": 200,
+        "latency_ms": 0.9365142323076725,
+        "route": "chat"
+      },
+      {
+        "prompt": "its goign good thanks",
+        "status": 200,
+        "latency_ms": 0.950442161411047,
+        "route": "chat"
+      },
+      {
+        "prompt": "whatchu doign rn",
+        "status": 200,
+        "latency_ms": 0.9353859350085258,
+        "route": "chat"
+      },
+      {
+        "prompt": "I am just programming you",
+        "status": 200,
+        "latency_ms": 0.9465096518397331,
+        "route": "chat"
+      },
+      {
+        "prompt": "Your welcome Luna",
+        "status": 200,
+        "latency_ms": 1.0868627578020096,
+        "route": "chat"
+      },
+      {
+        "prompt": "why are you acting so ai like lol",
+        "status": 200,
+        "latency_ms": 1.0178610682487488,
+        "route": "chat"
+      },
+      {
+        "prompt": "ya",
+        "status": 200,
+        "latency_ms": 0.8502122946083546,
+        "route": "chat"
+      },
+      {
+        "prompt": "yoooo",
+        "status": 200,
+        "latency_ms": 0.8586072362959385,
+        "route": "chat"
+      },
+      {
+        "prompt": "why you copying me buddy",
+        "status": 200,
+        "latency_ms": 0.9241150692105293,
+        "route": "chat"
+      },
+      {
+        "prompt": "You dont need to copy me to keep up",
+        "status": 200,
+        "latency_ms": 1.034711953252554,
+        "route": "chat"
+      },
+      {
+        "prompt": "yup",
+        "status": 200,
+        "latency_ms": 0.8926242589950562,
+        "route": "chat"
+      },
+      {
+        "prompt": "wasup",
+        "status": 200,
+        "latency_ms": 0.9820777922868729,
+        "route": "chat"
+      },
+      {
+        "prompt": "again",
+        "status": 200,
+        "latency_ms": 0.8890158496797085,
+        "route": "chat"
+      },
+      {
+        "prompt": "good girl",
+        "status": 200,
+        "latency_ms": 0.9149676188826561,
+        "route": "chat"
+      },
+      {
+        "prompt": "yooo",
+        "status": 200,
+        "latency_ms": 0.8682259358465672,
+        "route": "chat"
+      },
+      {
+        "prompt": "what",
+        "status": 200,
+        "latency_ms": 0.9105326607823372,
+        "route": "chat"
+      },
+      {
+        "prompt": "Hey Luna, Wasup",
+        "status": 200,
+        "latency_ms": 0.945000909268856,
+        "route": "chat"
+      },
+      {
+        "prompt": "Hey Luna Play believer",
+        "status": 200,
+        "latency_ms": 0.9649740532040596,
+        "route": "chat"
+      },
+      {
+        "prompt": "play believer",
+        "status": 200,
+        "latency_ms": 0.8947462774813175,
+        "route": "chat"
+      },
+      {
+        "prompt": "play mad love",
+        "status": 200,
+        "latency_ms": 0.978090800344944,
+        "route": "chat"
+      },
+      {
+        "prompt": "play mad love by Mable",
+        "status": 200,
+        "latency_ms": 0.9438320994377136,
+        "route": "chat"
+      },
+      {
+        "prompt": "Play Starboy",
+        "status": 200,
+        "latency_ms": 0.9741270914673805,
+        "route": "chat"
+      },
+      {
+        "prompt": "play starboy",
+        "status": 200,
+        "latency_ms": 0.9973719716072083,
+        "route": "chat"
+      },
+      {
+        "prompt": "play starboy by the weekend",
+        "status": 200,
+        "latency_ms": 0.9828791953623295,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the son starboy",
+        "status": 200,
+        "latency_ms": 1.013228204101324,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song starboy",
+        "status": 200,
+        "latency_ms": 0.9696888737380505,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song circles",
+        "status": 200,
+        "latency_ms": 0.9568138048052788,
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps",
+        "status": 200,
+        "latency_ms": 0.898613128811121,
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 0.9741922840476036,
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps by maroon five",
+        "status": 200,
+        "latency_ms": 0.977278221398592,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song maps by maroon 5",
+        "status": 200,
+        "latency_ms": 0.9341239929199219,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song maps by maroon five",
+        "status": 200,
+        "latency_ms": 0.931750051677227,
+        "route": "chat"
+      },
+      {
+        "prompt": "what effects do we have for nix",
+        "status": 200,
+        "latency_ms": 0.9730048477649689,
+        "route": "chat"
+      },
+      {
+        "prompt": "Lets apply Chase effect",
+        "status": 200,
+        "latency_ms": 0.9784391149878502,
+        "route": "chat"
+      },
+      {
+        "prompt": "apply chase effect tonix",
+        "status": 200,
+        "latency_ms": 0.9473669342696667,
+        "route": "chat"
+      },
+      {
+        "prompt": "apply chase effect to nix",
+        "status": 200,
+        "latency_ms": 0.9570708498358727,
+        "route": "chat"
+      },
+      {
+        "prompt": "apply rainbow effect to nix bruh",
+        "status": 200,
+        "latency_ms": 1.0819872841238976,
+        "route": "chat"
+      },
+      {
+        "prompt": "what song is your most favourite",
+        "status": 200,
+        "latency_ms": 0.9543867781758308,
+        "route": "chat"
+      },
+      {
+        "prompt": "actuallly????",
+        "status": 200,
+        "latency_ms": 0.9031826630234718,
+        "route": "chat"
+      },
+      {
+        "prompt": "Play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 0.9567216038703918,
+        "route": "chat"
+      },
+      {
+        "prompt": "play MHA theme song",
+        "status": 200,
+        "latency_ms": 0.974711962044239,
+        "route": "chat"
+      },
+      {
+        "prompt": "add night changes to the queue",
+        "status": 200,
+        "latency_ms": 0.9532039985060692,
+        "route": "chat"
+      },
+      {
+        "prompt": "set volume to 55",
+        "status": 200,
+        "latency_ms": 0.943377148360014,
+        "route": "chat"
+      },
+      {
+        "prompt": "set nix volume to 55",
+        "status": 200,
+        "latency_ms": 0.8967150934040546,
+        "route": "chat"
+      },
+      {
+        "prompt": "change nix volume to 55",
+        "status": 200,
+        "latency_ms": 0.8966331370174885,
+        "route": "chat"
+      },
+      {
+        "prompt": "set volume to 30",
+        "status": 200,
+        "latency_ms": 0.9187874384224415,
+        "route": "chat"
+      },
+      {
+        "prompt": "increase volume by 10",
+        "status": 200,
+        "latency_ms": 0.9605539962649345,
+        "route": "chat"
+      },
+      {
+        "prompt": "increase volume by 10 more",
+        "status": 200,
+        "latency_ms": 0.9168200194835663,
+        "route": "chat"
+      },
+      {
+        "prompt": "what is it scurrent volume",
+        "status": 200,
+        "latency_ms": 0.8695274591445923,
+        "route": "chat"
+      },
+      {
+        "prompt": "not the brightness, current volume",
+        "status": 200,
+        "latency_ms": 0.9447126649320126,
+        "route": "chat"
+      },
+      {
+        "prompt": "play sunroof",
+        "status": 200,
+        "latency_ms": 0.8042650297284126,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song sunroof",
+        "status": 200,
+        "latency_ms": 0.9147962555289268,
+        "route": "chat"
+      },
+      {
+        "prompt": "play he knows by Camillia Cabello",
+        "status": 200,
+        "latency_ms": 0.942504033446312,
+        "route": "chat"
+      },
+      {
+        "prompt": "play stitches",
+        "status": 200,
+        "latency_ms": 0.9027090854942799,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches by shawn menedes",
+        "status": 200,
+        "latency_ms": 0.9855031967163086,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches",
+        "status": 200,
+        "latency_ms": 0.982081051915884,
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches by shawn mendes",
+        "status": 200,
+        "latency_ms": 0.9557357989251614,
+        "route": "chat"
+      }
+    ]
+  },
+  "puca_system_model": {
+    "name": "puca-system-model",
+    "requests": 124,
+    "ok": 124,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 1686.2,
+      "p50": 1176.0,
+      "p95": 6469.4,
+      "min": 33.4,
+      "max": 9591.8
+    },
+    "non_empty_replies": 124,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 1729.497142136097,
+        "reply": "I don't have any information about your mother's current state.",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 52.77407122775912,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 571.6036022640765,
+        "reply": "Believer",
+        "route": "chat"
+      },
+      {
+        "prompt": "add Bohemian Rhapsody to the queue",
+        "status": 200,
+        "latency_ms": 53.03033022210002,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what's in my queue?",
+        "status": 200,
+        "latency_ms": 50.79148896038532,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "shuffle the queue",
+        "status": 200,
+        "latency_ms": 80.21766180172563,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "repeat the queue",
+        "status": 200,
+        "latency_ms": 52.785489708185196,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "turn shuffle off",
+        "status": 200,
+        "latency_ms": 57.98691278323531,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "clear the queue",
+        "status": 200,
+        "latency_ms": 50.712083000689745,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "like this song",
+        "status": 200,
+        "latency_ms": 527.3365993052721,
+        "reply": "which one",
+        "route": "chat"
+      },
+      {
+        "prompt": "unlike this song",
+        "status": 200,
+        "latency_ms": 521.5161950327456,
+        "reply": "why?",
+        "route": "chat"
+      },
+      {
+        "prompt": "create a playlist called Nix Voice Check",
+        "status": 200,
+        "latency_ms": 912.7496536821127,
+        "reply": "Playlist created: Nix Voice",
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Nix Voice Check playlist",
+        "status": 200,
+        "latency_ms": 994.6658201515675,
+        "reply": "added to Nix Voice check playlist",
+        "route": "chat"
+      },
+      {
+        "prompt": "play Bohemian Rhapsody",
+        "status": 200,
+        "latency_ms": 6206.142973154783,
+        "reply": "I'd be happy to play some music for you! However, I don't have any information about your favorite song, so I'll just pick one at random. Let me see... Ah, here we go! I'm going to play \"Bohemian RhapsODY\" by Queen. Enjoy!",
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Hindi Songs playlist",
+        "status": 200,
+        "latency_ms": 1078.5651500336826,
+        "reply": "added to your Hindi Songs playlist.",
+        "route": "chat"
+      },
+      {
+        "prompt": "add this song to my Focus playlist",
+        "status": 200,
+        "latency_ms": 716.3790729828179,
+        "reply": "added to Focus playlist",
+        "route": "chat"
+      },
+      {
+        "prompt": "play fate of ophelia by taylor swift",
+        "status": 200,
+        "latency_ms": 2299.2174681276083,
+        "reply": "I'd be happy to play \"Fate of Ophelia\" by Taylor Swift for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the next queued track",
+        "status": 200,
+        "latency_ms": 6721.511228941381,
+        "reply": "I'm happy to help you with that! However, I need to clarify that I don't have the ability to play music or access external devices. I'm here to provide information and assist with text-based conversations only. If you'd like to discuss music or find recommendations, I'd be happy to chat with you about that!",
+        "route": "chat"
+      },
+      {
+        "prompt": "pause",
+        "status": 200,
+        "latency_ms": 1574.9254920519888,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "stop music on nix",
+        "status": 200,
+        "latency_ms": 1586.9351257570088,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "pause music",
+        "status": 200,
+        "latency_ms": 1592.7690309472382,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "resume",
+        "status": 200,
+        "latency_ms": 1583.8523083366454,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "stop music",
+        "status": 200,
+        "latency_ms": 1582.2282959707081,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "stop the music",
+        "status": 200,
+        "latency_ms": 1590.8694048412144,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "unpause",
+        "status": 200,
+        "latency_ms": 1608.1320559605956,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "mute",
+        "status": 200,
+        "latency_ms": 99.57524901255965,
+        "reply": "The speaker is muted.",
+        "route": "chat"
+      },
+      {
+        "prompt": "unmute",
+        "status": 200,
+        "latency_ms": 76.59657439216971,
+        "reply": "The speaker is unmuted.",
+        "route": "chat"
+      },
+      {
+        "prompt": "can you play that song on nix",
+        "status": 200,
+        "latency_ms": 67.33269803225994,
+        "reply": "I don't have a song to play from that \u2014 name the track and I'll play it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what song did I ask you to play",
+        "status": 200,
+        "latency_ms": 33.40468090027571,
+        "reply": "You haven't asked me to play anything yet.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what sign did U ask you to play just now",
+        "status": 200,
+        "latency_ms": 37.13724622502923,
+        "reply": "You haven't asked me to play anything yet.",
+        "route": "chat"
+      },
+      {
+        "prompt": "I moved again \u2014 where do I live now?",
+        "status": 200,
+        "latency_ms": 2151.840175036341,
+        "reply": "I couldn't complete that request, so nothing was saved or changed. Could you phrase it another way?",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "Where was I living before?",
+        "status": 200,
+        "latency_ms": 1092.8559112362564,
+        "reply": "You were living in New York City.",
+        "route": "chat"
+      },
+      {
+        "prompt": "What is my name?",
+        "status": 200,
+        "latency_ms": 52.10438510403037,
+        "reply": "You're Sai Neela.",
+        "route": "chat"
+      },
+      {
+        "prompt": "Where do I live?",
+        "status": 200,
+        "latency_ms": 2106.1595752835274,
+        "reply": "I couldn't complete that request, so nothing was saved or changed. Could you phrase it another way?",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "What is my sister's name?",
+        "status": 200,
+        "latency_ms": 2066.64190068841,
+        "reply": "I don't have any information about your sister's name in my database.",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "What is my locker code?",
+        "status": 200,
+        "latency_ms": 1687.8292690962553,
+        "reply": "I don't have your locker code in my knowledge database yet.",
+        "route": "knowledge"
+      },
+      {
+        "prompt": "Hi Luna, say hello in one short sentence.",
+        "status": 200,
+        "latency_ms": 9591.83346061036,
+        "reply": "Playing announcement in the amy voice on the Nix Dev: hello in one short sentence",
+        "route": "chat"
+      },
+      {
+        "prompt": "hi",
+        "status": 200,
+        "latency_ms": 1300.3266998566687,
+        "reply": "Hi there! How can I help you today?",
+        "route": "chat"
+      },
+      {
+        "prompt": "hello",
+        "status": 200,
+        "latency_ms": 1282.1665122173727,
+        "reply": "Hello! I'm Luna, nice to meet you",
+        "route": "chat"
+      },
+      {
+        "prompt": "yooo wasup",
+        "status": 200,
+        "latency_ms": 528.7135508842766,
+        "reply": "not much",
+        "route": "chat"
+      },
+      {
+        "prompt": "what effect is on nix rn",
+        "status": 200,
+        "latency_ms": 1105.8195382356644,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN",
+        "route": "chat"
+      },
+      {
+        "prompt": "what effect is it currently on tho",
+        "status": 200,
+        "latency_ms": 1230.62749998644,
+        "reply": "It's currently on the \"low\" setting",
+        "route": "chat"
+      },
+      {
+        "prompt": "bro what effect is nix currently using",
+        "status": 200,
+        "latency_ms": 829.7844212502241,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN",
+        "route": "chat"
+      },
+      {
+        "prompt": "hey",
+        "status": 200,
+        "latency_ms": 1005.731618963182,
+        "reply": "hey, how's it going?",
+        "route": "chat"
+      },
+      {
+        "prompt": "what's you favourite song you said",
+        "status": 200,
+        "latency_ms": 9537.3394517228,
+        "reply": "I love listening to music, but I don't have a single favourite song. I enjoy listening to different genres of music, like pop, rock, and electronic dance music. I also appreciate classical music and jazz. Music has a way of evoking emotions and creating a sense of connection with others. It's a universal language that transcends cultural boundaries and can bring people together. Whether it's a hap",
+        "route": "chat"
+      },
+      {
+        "prompt": "what song did I ask you to play just now on nix",
+        "status": 200,
+        "latency_ms": 39.02206104248762,
+        "reply": "You haven't asked me to play anything yet.",
+        "route": "chat"
+      },
+      {
+        "prompt": "pause the song",
+        "status": 200,
+        "latency_ms": 1572.0229428261518,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "reune the song bro",
+        "status": 200,
+        "latency_ms": 1583.4593209438026,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "resume the song bro",
+        "status": 200,
+        "latency_ms": 1585.4565422050655,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "resume the song",
+        "status": 200,
+        "latency_ms": 1585.663091391325,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "dude pause the song",
+        "status": 200,
+        "latency_ms": 1597.7265061810613,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "resume song",
+        "status": 200,
+        "latency_ms": 1584.376497194171,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "perform the opposite of playing the song",
+        "status": 200,
+        "latency_ms": 1591.1876917816699,
+        "reply": "Nothing is playing right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what is the opposite of play",
+        "status": 200,
+        "latency_ms": 36.57385008409619,
+        "reply": "Pause is the opposite of play, and resume (or unpause) is the opposite of pause. Say \u201cpause the music\u201d and I'll do it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what song is playing rn",
+        "status": 200,
+        "latency_ms": 3856.881238054484,
+        "reply": "I don't have that information stored here. I'm just a conversational AI, I don't have personal experiences or memories. I don't know what song is currently playing.",
+        "route": "chat"
+      },
+      {
+        "prompt": "which of those both songs do you like",
+        "status": 200,
+        "latency_ms": 3668.168231844902,
+        "reply": "I'd pick \"I'm Yours\" by Jason Mraz. It's my favorite song. I love how upbeat and happy it is. It always makes me feel good.",
+        "route": "chat"
+      },
+      {
+        "prompt": "niceee",
+        "status": 200,
+        "latency_ms": 513.6355040594935,
+        "reply": "nicee",
+        "route": "chat"
+      },
+      {
+        "prompt": "what is it currently playign",
+        "status": 200,
+        "latency_ms": 1185.2057198993862,
+        "reply": "Currently playing: \"The Sound of Music\"",
+        "route": "chat"
+      },
+      {
+        "prompt": "is it on repeat?",
+        "status": 200,
+        "latency_ms": 909.6595197916031,
+        "reply": "yes, it is on repeat",
+        "route": "chat"
+      },
+      {
+        "prompt": "what is currently playing",
+        "status": 200,
+        "latency_ms": 1837.1000466868281,
+        "reply": "Currently playing: \"The Sound of Silence\" by Simon & Garfunkel",
+        "route": "chat"
+      },
+      {
+        "prompt": "play he knows by cammila cabello",
+        "status": 200,
+        "latency_ms": 1346.5252420865,
+        "reply": "I'd love to play that song for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play havana",
+        "status": 200,
+        "latency_ms": 664.8386460728943,
+        "reply": "playing havana",
+        "route": "chat"
+      },
+      {
+        "prompt": "play senorita",
+        "status": 200,
+        "latency_ms": 1836.9890749454498,
+        "reply": "I'd love to play Senorita by Shawn Mendes for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "any other senoritas?",
+        "status": 200,
+        "latency_ms": 889.6940010599792,
+        "reply": "yes, there are three more",
+        "route": "chat"
+      },
+      {
+        "prompt": "senorita by cammila cabello?",
+        "status": 200,
+        "latency_ms": 796.8253111466765,
+        "reply": "yes, that's right",
+        "route": "chat"
+      },
+      {
+        "prompt": "play that",
+        "status": 200,
+        "latency_ms": 51.265244372189045,
+        "reply": "I don't have a song to play from that \u2014 name the track and I'll play it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play run it",
+        "status": 200,
+        "latency_ms": 1057.539639994502,
+        "reply": "OK, I will play run it",
+        "route": "chat"
+      },
+      {
+        "prompt": "play blinding lights",
+        "status": 200,
+        "latency_ms": 669.3091280758381,
+        "reply": "blinding lights",
+        "route": "chat"
+      },
+      {
+        "prompt": "its goign good thanks",
+        "status": 200,
+        "latency_ms": 1043.2687662541866,
+        "reply": "nice to hear that",
+        "route": "chat"
+      },
+      {
+        "prompt": "whatchu doign rn",
+        "status": 200,
+        "latency_ms": 724.4921438395977,
+        "reply": "just chillin'",
+        "route": "chat"
+      },
+      {
+        "prompt": "I am just programming you",
+        "status": 200,
+        "latency_ms": 888.0070117302239,
+        "reply": "I'm here to help you",
+        "route": "chat"
+      },
+      {
+        "prompt": "Your welcome Luna",
+        "status": 200,
+        "latency_ms": 1087.6463782042265,
+        "reply": "Thanks a lot! I really appreciate it",
+        "route": "chat"
+      },
+      {
+        "prompt": "why are you acting so ai like lol",
+        "status": 200,
+        "latency_ms": 1176.977187860757,
+        "reply": "I'm just trying to be helpful and friendly",
+        "route": "chat"
+      },
+      {
+        "prompt": "ya",
+        "status": 200,
+        "latency_ms": 436.082208994776,
+        "reply": "ok",
+        "route": "chat"
+      },
+      {
+        "prompt": "yoooo",
+        "status": 200,
+        "latency_ms": 413.8737143948674,
+        "reply": "hey",
+        "route": "chat"
+      },
+      {
+        "prompt": "why you copying me buddy",
+        "status": 200,
+        "latency_ms": 2489.6108228713274,
+        "reply": "I'm sorry, I didn't mean to copy you. I just thought we were working together on this project",
+        "route": "chat"
+      },
+      {
+        "prompt": "You dont need to copy me to keep up",
+        "status": 200,
+        "latency_ms": 1306.1608476564288,
+        "reply": "Got it. I'll keep up without copying you",
+        "route": "chat"
+      },
+      {
+        "prompt": "yup",
+        "status": 200,
+        "latency_ms": 532.6046920381486,
+        "reply": "got it",
+        "route": "chat"
+      },
+      {
+        "prompt": "wasup",
+        "status": 200,
+        "latency_ms": 533.7822120636702,
+        "reply": "not much",
+        "route": "chat"
+      },
+      {
+        "prompt": "again",
+        "status": 200,
+        "latency_ms": 608.3580311387777,
+        "reply": "Yes, again",
+        "route": "chat"
+      },
+      {
+        "prompt": "good girl",
+        "status": 200,
+        "latency_ms": 605.6520189158618,
+        "reply": "thank you",
+        "route": "chat"
+      },
+      {
+        "prompt": "yooo",
+        "status": 200,
+        "latency_ms": 404.9531100317836,
+        "reply": "hey",
+        "route": "chat"
+      },
+      {
+        "prompt": "what",
+        "status": 200,
+        "latency_ms": 608.9783408679068,
+        "reply": "is going on",
+        "route": "chat"
+      },
+      {
+        "prompt": "Hey Luna, Wasup",
+        "status": 200,
+        "latency_ms": 1007.7234832569957,
+        "reply": "Not much, just hanging out",
+        "route": "chat"
+      },
+      {
+        "prompt": "Hey Luna Play believer",
+        "status": 200,
+        "latency_ms": 703.2254030928016,
+        "reply": "What's up?",
+        "route": "chat"
+      },
+      {
+        "prompt": "play believer",
+        "status": 200,
+        "latency_ms": 1316.5710009634495,
+        "reply": "I'd like to play Believer by Imagine Dragons",
+        "route": "chat"
+      },
+      {
+        "prompt": "play mad love",
+        "status": 200,
+        "latency_ms": 664.8208722472191,
+        "reply": "play hard love",
+        "route": "chat"
+      },
+      {
+        "prompt": "play mad love by Mable",
+        "status": 200,
+        "latency_ms": 2295.8373366855085,
+        "reply": "I'd like to play some music for you. What kind of music would you like?",
+        "route": "chat"
+      },
+      {
+        "prompt": "Play Starboy",
+        "status": 200,
+        "latency_ms": 787.0745961554348,
+        "reply": "Playing Starboy...",
+        "route": "chat"
+      },
+      {
+        "prompt": "play starboy",
+        "status": 200,
+        "latency_ms": 654.117226600647,
+        "reply": "playing starboy",
+        "route": "chat"
+      },
+      {
+        "prompt": "play starboy by the weekend",
+        "status": 200,
+        "latency_ms": 1226.2401850894094,
+        "reply": "playing starboy by The Weeknd",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the son starboy",
+        "status": 200,
+        "latency_ms": 4684.830504003912,
+        "reply": "I'd be happy to play some music for you! However, I don't have the song \"Starboy\" by The Weeknd in my library. Would you like me to suggest some other songs that might be similar?",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song starboy",
+        "status": 200,
+        "latency_ms": 6469.419131986797,
+        "reply": "I'd be happy to play \"Starboy\" for you! However, I need to clarify that I'm a large language model, I don't have the capability to play music directly. But I can provide you with lyrics or information about the song if you'd like. Would you like me to do that?",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song circles",
+        "status": 200,
+        "latency_ms": 1798.6565018072724,
+        "reply": "I'd be happy to play the song \"Circles\" for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps",
+        "status": 200,
+        "latency_ms": 3692.999810911715,
+        "reply": "I'd be happy to play maps with you! What kind of map would you like to play? Would you like to choose a specific location or let me surprise you?",
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 2692.2980598174036,
+        "reply": "I'd be happy to play some Maroon 5 for you! Here's \"Maps\" by Maroon 4",
+        "route": "chat"
+      },
+      {
+        "prompt": "play maps by maroon five",
+        "status": 200,
+        "latency_ms": 2831.8590000271797,
+        "reply": "I'd be happy to play some Maroon 5 for you! I'll put on \"Maps\" right now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song maps by maroon 5",
+        "status": 200,
+        "latency_ms": 2026.9924122840166,
+        "reply": "I'd be happy to play \"Maps\" by Maroon 5 for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song maps by maroon five",
+        "status": 200,
+        "latency_ms": 2200.694791972637,
+        "reply": "I'd be happy to play the song \"Maps\" by Maroon 5 for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "what effects do we have for nix",
+        "status": 200,
+        "latency_ms": 961.4870119839907,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN",
+        "route": "chat"
+      },
+      {
+        "prompt": "Lets apply Chase effect",
+        "status": 200,
+        "latency_ms": 694.8066931217909,
+        "reply": "Chase effect applied",
+        "route": "chat"
+      },
+      {
+        "prompt": "apply chase effect tonix",
+        "status": 200,
+        "latency_ms": 996.4630170725286,
+        "reply": "Chase effect applied to Tonix",
+        "route": "chat"
+      },
+      {
+        "prompt": "apply chase effect to nix",
+        "status": 200,
+        "latency_ms": 2382.9353470355272,
+        "reply": "The Chase effect is running.",
+        "route": "chat"
+      },
+      {
+        "prompt": "apply rainbow effect to nix bruh",
+        "status": 200,
+        "latency_ms": 1160.2442851290107,
+        "reply": "The Rainbow effect is running.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what song is your most favourite",
+        "status": 200,
+        "latency_ms": 1835.0428296253085,
+        "reply": "I love listening to \"What Song Is Your Favourite\" by Sai Neel",
+        "route": "chat"
+      },
+      {
+        "prompt": "actuallly????",
+        "status": 200,
+        "latency_ms": 2900.304624810815,
+        "reply": "Yes, I'm afraid so. The company has decided to downsize, and we're letting go of several employees, including you.",
+        "route": "chat"
+      },
+      {
+        "prompt": "Play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 1138.6126400902867,
+        "reply": "Playing Maps by Maroon 5.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play MHA theme song",
+        "status": 200,
+        "latency_ms": 1607.7326512895525,
+        "reply": "I'd be happy to play the MHA theme for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "add night changes to the queue",
+        "status": 200,
+        "latency_ms": 51.53105407953262,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it.",
+        "route": "chat"
+      },
+      {
+        "prompt": "set volume to 55",
+        "status": 200,
+        "latency_ms": 8120.832650922239,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent.",
+        "route": "chat"
+      },
+      {
+        "prompt": "set nix volume to 55",
+        "status": 200,
+        "latency_ms": 7026.350849773735,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent.",
+        "route": "chat"
+      },
+      {
+        "prompt": "change nix volume to 55",
+        "status": 200,
+        "latency_ms": 7009.89844603464,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent.",
+        "route": "chat"
+      },
+      {
+        "prompt": "set volume to 30",
+        "status": 200,
+        "latency_ms": 1705.863940063864,
+        "reply": "The Echo Dot confirmed speaker volume at 30 percent.",
+        "route": "chat"
+      },
+      {
+        "prompt": "increase volume by 10",
+        "status": 200,
+        "latency_ms": 211.96493599563837,
+        "reply": "The speaker volume is now at 40%.",
+        "route": "chat"
+      },
+      {
+        "prompt": "increase volume by 10 more",
+        "status": 200,
+        "latency_ms": 240.3941652737558,
+        "reply": "The speaker volume is now at 60%.",
+        "route": "chat"
+      },
+      {
+        "prompt": "what is it scurrent volume",
+        "status": 200,
+        "latency_ms": 158.87621883302927,
+        "reply": "The speaker volume is at 70%.",
+        "route": "chat"
+      },
+      {
+        "prompt": "not the brightness, current volume",
+        "status": 200,
+        "latency_ms": 211.01614506915212,
+        "reply": "The speaker volume is at 70%.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play sunroof",
+        "status": 200,
+        "latency_ms": 1176.0274288244545,
+        "reply": "OK, I'm playing the sunroof",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song sunroof",
+        "status": 200,
+        "latency_ms": 1790.5772500671446,
+        "reply": "I'd be happy to play the song \"Sunroof\" for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play he knows by Camillia Cabello",
+        "status": 200,
+        "latency_ms": 3378.4132609143853,
+        "reply": "I'd love to play that song for you! It's a beautiful piece by Camillla Cabello. I'll start playing it now.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play stitches",
+        "status": 200,
+        "latency_ms": 6289.009414147586,
+        "reply": "I'd be happy to play Stitches with you! Let's get started. I'll start by singing the song, and then we can take turns adding lyrics and harmonies. Ready? Here's the first verse: \"Stitches, stitches, they're my favorite part of the game\" Your turn!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches by shawn menedes",
+        "status": 200,
+        "latency_ms": 2153.9264102466404,
+        "reply": "I'd be happy to play \"Stitches\" by Shawn Mendes for you!",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches",
+        "status": 200,
+        "latency_ms": 5811.700488440692,
+        "reply": "I'd be happy to play the song \"Stitches\" for you! However, I need to clarify that I'm a large language model, I don't have the capability to play music directly. But I can provide you with lyrics or information about the song if you'd like.",
+        "route": "chat"
+      },
+      {
+        "prompt": "play the song stitches by shawn mendes",
+        "status": 200,
+        "latency_ms": 2026.0369959287345,
+        "reply": "I'd be happy to play \"Stitches\" by Shawn Mendes for you!",
+        "route": "chat"
+      }
+    ]
+  },
+  "luna_model_path": {
+    "name": "luna-model-path",
+    "requests": 124,
+    "ok": 124,
+    "error_rate": 0.0,
+    "latency_ms": {
+      "mean": 1622.7,
+      "p50": 1187.2,
+      "p95": 6423.2,
+      "min": 33.6,
+      "max": 9357.6
+    },
+    "non_empty_replies": 124,
+    "rows": [
+      {
+        "prompt": "How is my mother doing these days?",
+        "status": 200,
+        "latency_ms": 1740.4492660425603,
+        "reply": "I don't have any information about your mother's current state."
+      },
+      {
+        "prompt": "add the song believer to the queue",
+        "status": 200,
+        "latency_ms": 59.773026034235954,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "play the song believer next",
+        "status": 200,
+        "latency_ms": 582.2086669504642,
+        "reply": "Believer"
+      },
+      {
+        "prompt": "add Bohemian Rhapsody to the queue",
+        "status": 200,
+        "latency_ms": 53.14514972269535,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "what's in my queue?",
+        "status": 200,
+        "latency_ms": 52.0780086517334,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "shuffle the queue",
+        "status": 200,
+        "latency_ms": 52.02080402523279,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "repeat the queue",
+        "status": 200,
+        "latency_ms": 50.138774793595076,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "turn shuffle off",
+        "status": 200,
+        "latency_ms": 53.63497184589505,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "clear the queue",
+        "status": 200,
+        "latency_ms": 55.937797762453556,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "like this song",
+        "status": 200,
+        "latency_ms": 505.35752112045884,
+        "reply": "which one"
+      },
+      {
+        "prompt": "unlike this song",
+        "status": 200,
+        "latency_ms": 513.334927149117,
+        "reply": "why?"
+      },
+      {
+        "prompt": "create a playlist called Nix Voice Check",
+        "status": 200,
+        "latency_ms": 897.4127192050219,
+        "reply": "Playlist created: Nix Voice"
+      },
+      {
+        "prompt": "add this song to my Nix Voice Check playlist",
+        "status": 200,
+        "latency_ms": 983.5199387744069,
+        "reply": "added to Nix Voice check playlist"
+      },
+      {
+        "prompt": "play Bohemian Rhapsody",
+        "status": 200,
+        "latency_ms": 6526.008729822934,
+        "reply": "I'd be happy to play some music for you! However, I don't have any information about your favorite song, so I'll just pick one at random. Let me see... Ah, here we go! I'm going to play \"Bohemian RhapsODY\" by Queen. Enjoy!"
+      },
+      {
+        "prompt": "add this song to my Hindi Songs playlist",
+        "status": 200,
+        "latency_ms": 1952.8327994048595,
+        "reply": "added to your Hindi Songs playlist."
+      },
+      {
+        "prompt": "add this song to my Focus playlist",
+        "status": 200,
+        "latency_ms": 688.8760225847363,
+        "reply": "added to Focus playlist"
+      },
+      {
+        "prompt": "play fate of ophelia by taylor swift",
+        "status": 200,
+        "latency_ms": 2247.9498754255474,
+        "reply": "I'd be happy to play \"Fate of Ophelia\" by Taylor Swift for you!"
+      },
+      {
+        "prompt": "play the next queued track",
+        "status": 200,
+        "latency_ms": 6680.341753177345,
+        "reply": "I'm happy to help you with that! However, I need to clarify that I don't have the ability to play music or access external devices. I'm here to provide information and assist with text-based conversations only. If you'd like to discuss music or find recommendations, I'd be happy to chat with you about that!"
+      },
+      {
+        "prompt": "pause",
+        "status": 200,
+        "latency_ms": 1580.6399215944111,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "stop music on nix",
+        "status": 200,
+        "latency_ms": 1589.0813320875168,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "pause music",
+        "status": 200,
+        "latency_ms": 1579.233440104872,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "resume",
+        "status": 200,
+        "latency_ms": 1585.2549551054835,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "stop music",
+        "status": 200,
+        "latency_ms": 1583.178095985204,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "stop the music",
+        "status": 200,
+        "latency_ms": 1591.14747075364,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "unpause",
+        "status": 200,
+        "latency_ms": 1581.4339201897383,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "mute",
+        "status": 200,
+        "latency_ms": 91.97159437462687,
+        "reply": "The speaker is muted."
+      },
+      {
+        "prompt": "unmute",
+        "status": 200,
+        "latency_ms": 69.62186377495527,
+        "reply": "The speaker is unmuted."
+      },
+      {
+        "prompt": "can you play that song on nix",
+        "status": 200,
+        "latency_ms": 48.3349752612412,
+        "reply": "I don't have a song to play from that \u2014 name the track and I'll play it."
+      },
+      {
+        "prompt": "what song did I ask you to play",
+        "status": 200,
+        "latency_ms": 56.9098605774343,
+        "reply": "You haven't asked me to play anything yet."
+      },
+      {
+        "prompt": "what sign did U ask you to play just now",
+        "status": 200,
+        "latency_ms": 33.61979080364108,
+        "reply": "You haven't asked me to play anything yet."
+      },
+      {
+        "prompt": "I moved again \u2014 where do I live now?",
+        "status": 200,
+        "latency_ms": 2068.7212119810283,
+        "reply": "I couldn't complete that request, so nothing was saved or changed. Could you phrase it another way?"
+      },
+      {
+        "prompt": "Where was I living before?",
+        "status": 200,
+        "latency_ms": 1078.1651102006435,
+        "reply": "You were living in New York City."
+      },
+      {
+        "prompt": "What is my name?",
+        "status": 200,
+        "latency_ms": 55.126176215708256,
+        "reply": "You're Sai Neela."
+      },
+      {
+        "prompt": "Where do I live?",
+        "status": 200,
+        "latency_ms": 2197.5950594060123,
+        "reply": "I couldn't complete that request, so nothing was saved or changed. Could you phrase it another way?"
+      },
+      {
+        "prompt": "What is my sister's name?",
+        "status": 200,
+        "latency_ms": 1896.1021821014583,
+        "reply": "I don't have any information about your sister's name in my database."
+      },
+      {
+        "prompt": "What is my locker code?",
+        "status": 200,
+        "latency_ms": 2282.2539187036455,
+        "reply": "I don't have your locker code in my knowledge database yet. I'll check again later."
+      },
+      {
+        "prompt": "Hi Luna, say hello in one short sentence.",
+        "status": 200,
+        "latency_ms": 3782.875165808946,
+        "reply": "Playing announcement in the amy voice on the Nix Dev: Hi Luna"
+      },
+      {
+        "prompt": "hi",
+        "status": 200,
+        "latency_ms": 1313.578079920262,
+        "reply": "Hi there! How can I help you today?"
+      },
+      {
+        "prompt": "hello",
+        "status": 200,
+        "latency_ms": 1299.7532370500267,
+        "reply": "Hello! I'm Luna, nice to meet you"
+      },
+      {
+        "prompt": "yooo wasup",
+        "status": 200,
+        "latency_ms": 530.7193328626454,
+        "reply": "not much"
+      },
+      {
+        "prompt": "what effect is on nix rn",
+        "status": 200,
+        "latency_ms": 1267.875641118735,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN"
+      },
+      {
+        "prompt": "what effect is it currently on tho",
+        "status": 200,
+        "latency_ms": 1241.4027769118547,
+        "reply": "It's currently on the \"low\" setting"
+      },
+      {
+        "prompt": "bro what effect is nix currently using",
+        "status": 200,
+        "latency_ms": 1078.3720179460943,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN"
+      },
+      {
+        "prompt": "hey",
+        "status": 200,
+        "latency_ms": 981.4251563511789,
+        "reply": "hey, how's it going?"
+      },
+      {
+        "prompt": "what's you favourite song you said",
+        "status": 200,
+        "latency_ms": 9357.571752276272,
+        "reply": "I love listening to music, but I don't have a single favourite song. I enjoy listening to different genres of music, like pop, rock, and electronic dance music. I also appreciate classical music and jazz. Music has a way of evoking emotions and creating a sense of connection with others. It's a universal language that transcends cultural boundaries and can bring people together. Whether it's a hap"
+      },
+      {
+        "prompt": "what song did I ask you to play just now on nix",
+        "status": 200,
+        "latency_ms": 36.054403986781836,
+        "reply": "You haven't asked me to play anything yet."
+      },
+      {
+        "prompt": "pause the song",
+        "status": 200,
+        "latency_ms": 1592.6735163666308,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "reune the song bro",
+        "status": 200,
+        "latency_ms": 1582.825624383986,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "resume the song bro",
+        "status": 200,
+        "latency_ms": 1587.296349927783,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "resume the song",
+        "status": 200,
+        "latency_ms": 1586.1015701666474,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "dude pause the song",
+        "status": 200,
+        "latency_ms": 1590.6584654003382,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "resume song",
+        "status": 200,
+        "latency_ms": 1580.3124448284507,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "perform the opposite of playing the song",
+        "status": 200,
+        "latency_ms": 1586.0759383067489,
+        "reply": "Nothing is playing right now."
+      },
+      {
+        "prompt": "what is the opposite of play",
+        "status": 200,
+        "latency_ms": 35.7066229917109,
+        "reply": "Pause is the opposite of play, and resume (or unpause) is the opposite of pause. Say \u201cpause the music\u201d and I'll do it."
+      },
+      {
+        "prompt": "what song is playing rn",
+        "status": 200,
+        "latency_ms": 3770.387661177665,
+        "reply": "I don't have that information stored here. I'm just a conversational AI, I don't have personal experiences or memories. I don't know what song is currently playing."
+      },
+      {
+        "prompt": "which of those both songs do you like",
+        "status": 200,
+        "latency_ms": 3650.2613541670144,
+        "reply": "I'd pick \"I'm Yours\" by Jason Mraz. It's my favorite song. I love how upbeat and happy it is. It always makes me feel good."
+      },
+      {
+        "prompt": "niceee",
+        "status": 200,
+        "latency_ms": 540.2491083368659,
+        "reply": "nicee"
+      },
+      {
+        "prompt": "what is it currently playign",
+        "status": 200,
+        "latency_ms": 1187.8992510028183,
+        "reply": "Currently playing: \"The Sound of Music\""
+      },
+      {
+        "prompt": "is it on repeat?",
+        "status": 200,
+        "latency_ms": 925.3578018397093,
+        "reply": "yes, it is on repeat"
+      },
+      {
+        "prompt": "what is currently playing",
+        "status": 200,
+        "latency_ms": 1841.9953640550375,
+        "reply": "Currently playing: \"The Sound of Silence\" by Simon & Garfunkel"
+      },
+      {
+        "prompt": "play he knows by cammila cabello",
+        "status": 200,
+        "latency_ms": 1330.0482342019677,
+        "reply": "I'd love to play that song for you!"
+      },
+      {
+        "prompt": "play havana",
+        "status": 200,
+        "latency_ms": 715.7954359427094,
+        "reply": "playing havana"
+      },
+      {
+        "prompt": "play senorita",
+        "status": 200,
+        "latency_ms": 1805.5009869858623,
+        "reply": "I'd love to play Senorita by Shawn Mendes for you!"
+      },
+      {
+        "prompt": "any other senoritas?",
+        "status": 200,
+        "latency_ms": 887.6068191602826,
+        "reply": "yes, there are three more"
+      },
+      {
+        "prompt": "senorita by cammila cabello?",
+        "status": 200,
+        "latency_ms": 820.0931088067591,
+        "reply": "yes, that's right"
+      },
+      {
+        "prompt": "play that",
+        "status": 200,
+        "latency_ms": 49.55205926671624,
+        "reply": "I don't have a song to play from that \u2014 name the track and I'll play it."
+      },
+      {
+        "prompt": "play run it",
+        "status": 200,
+        "latency_ms": 1040.4059691354632,
+        "reply": "OK, I will play run it"
+      },
+      {
+        "prompt": "play blinding lights",
+        "status": 200,
+        "latency_ms": 655.6080393493176,
+        "reply": "blinding lights"
+      },
+      {
+        "prompt": "its goign good thanks",
+        "status": 200,
+        "latency_ms": 727.3527290672064,
+        "reply": "nice to hear that"
+      },
+      {
+        "prompt": "whatchu doign rn",
+        "status": 200,
+        "latency_ms": 710.7878485694528,
+        "reply": "just chillin'"
+      },
+      {
+        "prompt": "I am just programming you",
+        "status": 200,
+        "latency_ms": 883.105824701488,
+        "reply": "I'm here to help you"
+      },
+      {
+        "prompt": "Your welcome Luna",
+        "status": 200,
+        "latency_ms": 1075.7135548628867,
+        "reply": "Thanks a lot! I really appreciate it"
+      },
+      {
+        "prompt": "why are you acting so ai like lol",
+        "status": 200,
+        "latency_ms": 1187.1851980686188,
+        "reply": "I'm just trying to be helpful and friendly"
+      },
+      {
+        "prompt": "ya",
+        "status": 200,
+        "latency_ms": 419.0707108937204,
+        "reply": "ok"
+      },
+      {
+        "prompt": "yoooo",
+        "status": 200,
+        "latency_ms": 414.9606409482658,
+        "reply": "hey"
+      },
+      {
+        "prompt": "why you copying me buddy",
+        "status": 200,
+        "latency_ms": 2484.5058070495725,
+        "reply": "I'm sorry, I didn't mean to copy you. I just thought we were working together on this project"
+      },
+      {
+        "prompt": "You dont need to copy me to keep up",
+        "status": 200,
+        "latency_ms": 1304.818312637508,
+        "reply": "Got it. I'll keep up without copying you"
+      },
+      {
+        "prompt": "yup",
+        "status": 200,
+        "latency_ms": 520.3684130683541,
+        "reply": "got it"
+      },
+      {
+        "prompt": "wasup",
+        "status": 200,
+        "latency_ms": 510.1482099853456,
+        "reply": "not much"
+      },
+      {
+        "prompt": "again",
+        "status": 200,
+        "latency_ms": 609.4514350406826,
+        "reply": "Yes, again"
+      },
+      {
+        "prompt": "good girl",
+        "status": 200,
+        "latency_ms": 518.6813999898732,
+        "reply": "thank you"
+      },
+      {
+        "prompt": "yooo",
+        "status": 200,
+        "latency_ms": 413.10508782044053,
+        "reply": "hey"
+      },
+      {
+        "prompt": "what",
+        "status": 200,
+        "latency_ms": 611.9215986691415,
+        "reply": "is going on"
+      },
+      {
+        "prompt": "Hey Luna, Wasup",
+        "status": 200,
+        "latency_ms": 917.0872610993683,
+        "reply": "Not much, just hanging out"
+      },
+      {
+        "prompt": "Hey Luna Play believer",
+        "status": 200,
+        "latency_ms": 692.5674676895142,
+        "reply": "What's up?"
+      },
+      {
+        "prompt": "play believer",
+        "status": 200,
+        "latency_ms": 1335.146453231573,
+        "reply": "I'd like to play Believer by Imagine Dragons"
+      },
+      {
+        "prompt": "play mad love",
+        "status": 200,
+        "latency_ms": 685.3545629419386,
+        "reply": "play hard love"
+      },
+      {
+        "prompt": "play mad love by Mable",
+        "status": 200,
+        "latency_ms": 2082.4982170015574,
+        "reply": "I'd like to play some music for you. What kind of music would you like?"
+      },
+      {
+        "prompt": "Play Starboy",
+        "status": 200,
+        "latency_ms": 745.0579311698675,
+        "reply": "Playing Starboy..."
+      },
+      {
+        "prompt": "play starboy",
+        "status": 200,
+        "latency_ms": 663.8492769561708,
+        "reply": "playing starboy"
+      },
+      {
+        "prompt": "play starboy by the weekend",
+        "status": 200,
+        "latency_ms": 1052.2194779478014,
+        "reply": "playing starboy by The Weeknd"
+      },
+      {
+        "prompt": "play the son starboy",
+        "status": 200,
+        "latency_ms": 4679.9917672760785,
+        "reply": "I'd be happy to play some music for you! However, I don't have the song \"Starboy\" by The Weeknd in my library. Would you like me to suggest some other songs that might be similar?"
+      },
+      {
+        "prompt": "play the song starboy",
+        "status": 200,
+        "latency_ms": 6423.241090960801,
+        "reply": "I'd be happy to play \"Starboy\" for you! However, I need to clarify that I'm a large language model, I don't have the capability to play music directly. But I can provide you with lyrics or information about the song if you'd like. Would you like me to do that?"
+      },
+      {
+        "prompt": "play the song circles",
+        "status": 200,
+        "latency_ms": 1810.5194149538875,
+        "reply": "I'd be happy to play the song \"Circles\" for you!"
+      },
+      {
+        "prompt": "play maps",
+        "status": 200,
+        "latency_ms": 3621.3916414417326,
+        "reply": "I'd be happy to play maps with you! What kind of map would you like to play? Would you like to choose a specific location or let me surprise you?"
+      },
+      {
+        "prompt": "play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 2636.663351673633,
+        "reply": "I'd be happy to play some Maroon 5 for you! Here's \"Maps\" by Maroon 4"
+      },
+      {
+        "prompt": "play maps by maroon five",
+        "status": 200,
+        "latency_ms": 2698.010863736272,
+        "reply": "I'd be happy to play some Maroon 5 for you! I'll put on \"Maps\" right now."
+      },
+      {
+        "prompt": "play the song maps by maroon 5",
+        "status": 200,
+        "latency_ms": 1986.658797133714,
+        "reply": "I'd be happy to play \"Maps\" by Maroon 5 for you!"
+      },
+      {
+        "prompt": "play the song maps by maroon five",
+        "status": 200,
+        "latency_ms": 2170.0287060812116,
+        "reply": "I'd be happy to play the song \"Maps\" by Maroon 5 for you!"
+      },
+      {
+        "prompt": "what effects do we have for nix",
+        "status": 200,
+        "latency_ms": 584.9196990020573,
+        "reply": "Your light supports 37 effects: Pulse, Heartbeat, Ripple, Standing Wave, Twinkle, Crimson Heartbeat, Aurora Pulse, Candle, Fireplace, Embers, Aurora, Sunset Drift, Ocean Ripple, Rainbow Twinkle, Forest Twinkle, Comet, Chase, Scanner, Pinwheel, Spiral, Wipe, Helix, Orbits, Bounce, Spring, Rainbow, Fire Comet, Ice Comet, Rainbow Chase, Ice Scanner, Rainbow Pinwheel, Sunset Spiral, Rainbow Orbits, DN"
+      },
+      {
+        "prompt": "Lets apply Chase effect",
+        "status": 200,
+        "latency_ms": 723.7018290907145,
+        "reply": "Chase effect applied"
+      },
+      {
+        "prompt": "apply chase effect tonix",
+        "status": 200,
+        "latency_ms": 1015.5126880854368,
+        "reply": "Chase effect applied to Tonix"
+      },
+      {
+        "prompt": "apply chase effect to nix",
+        "status": 200,
+        "latency_ms": 998.7792619504035,
+        "reply": "The Chase effect is running."
+      },
+      {
+        "prompt": "apply rainbow effect to nix bruh",
+        "status": 200,
+        "latency_ms": 1322.1144587732852,
+        "reply": "The Rainbow effect is running."
+      },
+      {
+        "prompt": "what song is your most favourite",
+        "status": 200,
+        "latency_ms": 1849.3438358418643,
+        "reply": "I love listening to \"What Song Is Your Favourite\" by Sai Neel"
+      },
+      {
+        "prompt": "actuallly????",
+        "status": 200,
+        "latency_ms": 2879.1539701633155,
+        "reply": "Yes, I'm afraid so. The company has decided to downsize, and we're letting go of several employees, including you."
+      },
+      {
+        "prompt": "Play maps by maroon 5",
+        "status": 200,
+        "latency_ms": 1141.7808569967747,
+        "reply": "Playing Maps by Maroon 5."
+      },
+      {
+        "prompt": "play MHA theme song",
+        "status": 200,
+        "latency_ms": 1611.0793901607394,
+        "reply": "I'd be happy to play the MHA theme for you!"
+      },
+      {
+        "prompt": "add night changes to the queue",
+        "status": 200,
+        "latency_ms": 53.662987891584635,
+        "reply": "OpenDeck is installed but untrusted. Review its source and permissions in Skills before explicitly trusting it."
+      },
+      {
+        "prompt": "set volume to 55",
+        "status": 200,
+        "latency_ms": 7290.45783309266,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent."
+      },
+      {
+        "prompt": "set nix volume to 55",
+        "status": 200,
+        "latency_ms": 7328.204425983131,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent."
+      },
+      {
+        "prompt": "change nix volume to 55",
+        "status": 200,
+        "latency_ms": 6983.279829844832,
+        "reply": "The Echo Dot confirmed speaker volume at 55 percent."
+      },
+      {
+        "prompt": "set volume to 30",
+        "status": 200,
+        "latency_ms": 1892.4240861088037,
+        "reply": "The Echo Dot confirmed speaker volume at 30 percent."
+      },
+      {
+        "prompt": "increase volume by 10",
+        "status": 200,
+        "latency_ms": 226.1376460082829,
+        "reply": "The speaker volume is now at 50%."
+      },
+      {
+        "prompt": "increase volume by 10 more",
+        "status": 200,
+        "latency_ms": 190.05102198570967,
+        "reply": "The speaker volume is now at 70%."
+      },
+      {
+        "prompt": "what is it scurrent volume",
+        "status": 200,
+        "latency_ms": 151.81705728173256,
+        "reply": "The speaker volume is at 70%."
+      },
+      {
+        "prompt": "not the brightness, current volume",
+        "status": 200,
+        "latency_ms": 196.65296096354723,
+        "reply": "The speaker volume is at 70%."
+      },
+      {
+        "prompt": "play sunroof",
+        "status": 200,
+        "latency_ms": 1144.5162892341614,
+        "reply": "OK, I'm playing the sunroof"
+      },
+      {
+        "prompt": "play the song sunroof",
+        "status": 200,
+        "latency_ms": 1822.9710273444653,
+        "reply": "I'd be happy to play the song \"Sunroof\" for you!"
+      },
+      {
+        "prompt": "play he knows by Camillia Cabello",
+        "status": 200,
+        "latency_ms": 3261.4715583622456,
+        "reply": "I'd love to play that song for you! It's a beautiful piece by Camillla Cabello. I'll start playing it now."
+      },
+      {
+        "prompt": "play stitches",
+        "status": 200,
+        "latency_ms": 6260.791117325425,
+        "reply": "I'd be happy to play Stitches with you! Let's get started. I'll start by singing the song, and then we can take turns adding lyrics and harmonies. Ready? Here's the first verse: \"Stitches, stitches, they're my favorite part of the game\" Your turn!"
+      },
+      {
+        "prompt": "play the song stitches by shawn menedes",
+        "status": 200,
+        "latency_ms": 1973.9871062338352,
+        "reply": "I'd be happy to play \"Stitches\" by Shawn Mendes for you!"
+      },
+      {
+        "prompt": "play the song stitches",
+        "status": 200,
+        "latency_ms": 5832.031904254109,
+        "reply": "I'd be happy to play the song \"Stitches\" for you! However, I need to clarify that I'm a large language model, I don't have the capability to play music directly. But I can provide you with lyrics or information about the song if you'd like."
+      },
+      {
+        "prompt": "play the song stitches by shawn mendes",
+        "status": 200,
+        "latency_ms": 1970.1001681387424,
+        "reply": "I'd be happy to play \"Stitches\" by Shawn Mendes for you!"
+      }
+    ]
+  }
+}

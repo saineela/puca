@@ -625,10 +625,13 @@ def _maybe_advance_queue() -> None:
     speaker has gone idle. A one-off play never auto-advances, and a paused
     track is not finished, so this cannot hijack a deliberate pause.
     """
-    if _queue_service_on() and _queue_service_alive():
-        _advance_through_queue_service()
-        return
     state = _read_music_state()
+    if _queue_service_on() and _queue_service_alive():
+        # The queue service owns the decision now. Every device that watches the
+        # speaker reports here; the service compares the reports and advances
+        # once, then either starts the next track itself or hands it back here.
+        _report_playback_to_queue(state)
+        return
     if not state.get("queue_active"):
         return
     # A paused speaker also reports itself idle, and the console's clock only
@@ -802,6 +805,26 @@ def music_search(handler, _match=None) -> bool:
     return _respond(handler, payload, cache=(cache_status, age))
 
 
+def _direct_stream_url(play_url: str) -> str:
+    """The direct stream behind a proxied one, or "" when there is none.
+
+    OpenDeck hands out ``/api/media/stream?url=<direct>``. Measured live, the Dot
+    refused that URL with "could not fetch" while the same audio was reachable
+    at the direct address it wraps, so a refusal is worth one second attempt
+    before it is reported.
+    """
+    if not isinstance(play_url, str) or "?" not in play_url:
+        return ""
+    try:
+        query = urllib.parse.urlsplit(play_url).query
+        wrapped = (urllib.parse.parse_qs(query).get("url") or [""])[0].strip()
+    except ValueError:
+        return ""
+    if wrapped.lower().startswith(("http://", "https://")) and wrapped != play_url:
+        return wrapped
+    return ""
+
+
 def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -> dict:
     """Record the handed-over track and command the speaker to play it.
 
@@ -852,31 +875,56 @@ def _start_playback(result: dict, skill_id: str, *, queue: dict | None = None) -
             # the earlier moment made the page's progress bar and the lyrics
             # run ahead of the audio (about a line, on a converted track).
             state["started_at"] = time.time()
-            try:
-                handoff_result = _call_tool(handoff_skill, handoff_control["tool"], handoff_arguments)
-                # The control matched and the call came back, but a speaker that
-                # refused the stream reports ok:false. Treating that as success is
-                # exactly how a reply claimed "Playing …" while nothing reached the
-                # device (measured live), so a refusal is recorded as the error it
-                # is and the reply says so.
-                refused = (
-                    isinstance(handoff_result, dict)
-                    and handoff_result.get("ok") is False
-                )
-                if refused:
-                    state["handoff"] = {
-                        "supported": True,
-                        "skill_id": handoff_skill,
-                        "result": handoff_result,
-                        "error": str(
-                            handoff_result.get("error")
-                            or "the speaker refused the stream"
-                        )[:200],
+            # The control matched and the call came back, but a speaker that
+            # refused the stream reports ok:false. Treating that as success is
+            # exactly how a reply claimed "Playing …" while nothing reached the
+            # device (measured live), so a refusal is never recorded as
+            # playback. Before it is reported, the same audio is tried once by a
+            # different route: the direct stream behind a proxied URL.
+            candidates = [play_url]
+            direct_url = _direct_stream_url(play_url)
+            if direct_url:
+                candidates.append(direct_url)
+            errors: list[str] = []
+            handoff_result: dict | None = None
+            used_url = play_url
+            for candidate in candidates:
+                arguments = dict(handoff_arguments)
+                arguments["url"] = candidate
+                try:
+                    outcome = _call_tool(handoff_skill, handoff_control["tool"], arguments)
+                except MusicApiError as exc:
+                    errors.append(str(exc))
+                    continue
+                if isinstance(outcome, dict) and outcome.get("ok") is False:
+                    errors.append(
+                        str(outcome.get("error") or "the speaker refused the stream")
+                    )
+                    continue
+                handoff_result, used_url = outcome, candidate
+                break
+            if handoff_result is not None:
+                handoff_state: dict = {
+                    "supported": True,
+                    "skill_id": handoff_skill,
+                    "result": handoff_result,
+                }
+                if used_url != play_url:
+                    # Which route worked, and why the first one did not — so the
+                    # request log explains a fallback instead of hiding it.
+                    handoff_state["fallback"] = {
+                        "url": used_url,
+                        "first_error": (errors[0] if errors else "")[:200],
                     }
-                else:
-                    state["handoff"] = {"supported": True, "skill_id": handoff_skill, "result": handoff_result}
-            except MusicApiError as exc:
-                state["handoff"] = {"supported": True, "skill_id": handoff_skill, "error": str(exc)}
+                state["handoff"] = handoff_state
+            else:
+                state["handoff"] = {
+                    "supported": True,
+                    "skill_id": handoff_skill,
+                    "error": (errors[-1] if errors else "the speaker refused the stream")[:200],
+                }
+                if len(errors) > 1:
+                    state["handoff"]["first_error"] = errors[0][:200]
     _write_music_state(state)
     # What is playing just changed, and the wall display is the surface that
     # shows it: tell it now instead of waiting for its next poll.
@@ -1178,6 +1226,22 @@ def _queue_service_payload(reply: dict) -> dict:
 LIBRARY_LIMIT_MAX = 500
 
 
+def current_queue_payload(limit: int | None = None) -> dict:
+    """The queue as every reader should see it, whichever end owns it.
+
+    The page and the wall display must not disagree about the line-up, so a
+    reader that is not the queue route itself (the panel's one-paint snapshot)
+    comes through here: the service's window when it is running, the provider
+    skill's own queue when it is not. This is a read and nothing else — no
+    cursor moves, nothing is handed to the speaker.
+    """
+    if _queue_service_on() and _queue_service_alive():
+        window = limit or int(_push_queue_limits().get("window", 50))
+        return _queue_service_payload(_queue_service_state(0, max(1, window), None))
+    skill_id, result = _provider_call("queue", {"op": "list"})
+    return _queue_payload(skill_id, result)
+
+
 def _queue_payload(skill_id: str, result: dict) -> dict:
     """Normalize the provider's queue result into the page/app contract."""
     queue = result.get("queue") if isinstance(result.get("queue"), list) else []
@@ -1396,20 +1460,60 @@ def _queue_service_play_from(result: dict, skill_id: str) -> dict | None:
     return play_result
 
 
-def _advance_through_queue_service() -> None:
-    """The queue service's version of "the track ended, play the next one"."""
+def _playback_report(state: dict, player: dict) -> dict:
+    """The speaker's own state, in the shape the queue service reads.
+
+    The console is the only thing that can see the speaker, but seeing is all it
+    does: the report says what happened, and the service decides what follows.
+    A pause made through the console is reported as a pause, not as an ended
+    track, because a paused speaker also reports itself idle.
+    """
+    track = state.get("track") if isinstance(state.get("track"), dict) else {}
+    paused = isinstance(state.get("paused_at"), (int, float))
+    return {
+        "state": "paused" if paused else (_player_state_name(player) or "unknown"),
+        "position": _position(state, player).get("elapsed_sec") or 0,
+        "duration": state.get("duration_sec") or 0,
+        "video_id": track.get("video_id") or "",
+        "index": state.get("queue_index"),
+        "queue_active": bool(state.get("queue_active")),
+        "queue": True,
+    }
+
+
+def _report_playback_to_queue(state: dict) -> None:
+    """Tell the queue service what the speaker did, then do only what it says.
+
+    The service advances at most once per finished track, whatever number of
+    devices are polling, and its reply says whether it has already started the
+    next track on the speaker. If it has, nothing is handed over a second time
+    here; if it has not (a service running without its own player), this end
+    performs the hand-off exactly as it always did.
+    """
     try:
-        result = _queue_service_op({"op": "next", "auto": True})
+        player = _player_status()
+    except MusicApiError:
+        player = {}
+    try:
+        reply = _queue_service_request("POST", "/playback",
+                                       _playback_report(state, player), timeout=5)
     except MusicApiError:
         return
-    if not result.get("ok"):
+    if not reply.get("advanced"):
         return
+    if reply.get("executed"):
+        panel_stream.notify("queue", action="next")
+        return
+    # A hand-off that fails must not turn the poll into an error: the speaker is
+    # simply further along than this end could follow, and the next report says
+    # so. (The queue has already moved, so nothing is played twice for trying.)
     skill_id = ""
     try:
         skill_id, _manifest, _provider = _provider_skill()
+        _queue_service_play_from(reply, skill_id)
     except MusicApiError:
         return
-    _queue_service_play_from(result, skill_id)
+    panel_stream.notify("queue", action="next")
 
 
 @_guarded
@@ -1536,15 +1640,22 @@ def _music_queue_service(handler, _match=None) -> bool:
             payload["code"] = "queue_empty"
             payload["error"] = reply.get("message") or "The queue has no track to play."
             return _respond(handler, payload, 409)
-        try:
-            skill_id, _manifest, _provider = _provider_skill()
-            played = _queue_service_play_from(reply, skill_id)
-        except MusicApiError as exc:
-            return _fail(handler, exc)
-        if played is None:
-            return _fail(handler, MusicApiError("The queue has no track to play.", 409, "queue_empty"))
+        # ``executed`` means the service already started the track on the
+        # speaker through its player callback. Handing it over again here would
+        # start it twice: the same song, restarted, and a queue that jumps
+        # because two places are counting the same track.
+        played = None
+        if not reply.get("executed"):
+            try:
+                skill_id, _manifest, _provider = _provider_skill()
+                played = _queue_service_play_from(reply, skill_id)
+            except MusicApiError as exc:
+                return _fail(handler, exc)
+            if played is None:
+                return _fail(handler, MusicApiError("The queue has no track to play.", 409, "queue_empty"))
+        chosen = played or (reply.get("track") if isinstance(reply.get("track"), dict) else {})
         payload["track"] = _now_playing_payload()["track"]
-        payload["message"] = payload["message"] or f"Playing “{played.get('title') or ''}”."
+        payload["message"] = payload["message"] or f"Playing “{chosen.get('title') or ''}”."
     elif not payload["message"]:
         total = payload["total"]
         payload["message"] = f"{total} track(s) queued." if total else "The queue is empty."
@@ -1575,6 +1686,42 @@ def music_queue_resolve(handler, _match=None) -> bool:
         return _respond(handler, {"ok": False, "video_id": video_id,
                                   "error": "That track is not known to the provider."}, 404)
     return _respond(handler, {"ok": True, "video_id": video_id, "track": track})
+
+
+@_guarded
+def music_queue_play(handler, _match=None) -> bool:
+    """Start one track the queue service has already chosen.
+
+    This is the service's player callback, not a second play endpoint: it never
+    chooses a track and never reads the queue. It exists because the speaker is
+    reached through an installed skill, and the installed skills live here — so
+    the service decides *what* plays, and this end is the hand that presses the
+    button.
+    """
+    body = _body(handler)
+    video_id = _text(body.get("video_id"), "video_id", 64)
+    if not video_id:
+        return _fail(handler, MusicApiError("Provide video_id=<id>.", 400, "validation_error"))
+    index = _int(body.get("index"), "index", 0, QUEUE_INDEX_MAX)
+    try:
+        skill_id, result = _provider_call("play", {"video_id": video_id})
+    except MusicApiError as exc:
+        return _fail(handler, exc)
+    if not result.get("play_url"):
+        return _fail(handler, MusicApiError("The speaker could not start that track.",
+                                            502, "play_failed"))
+    # The track stays a queue track: the console's position clock and its own
+    # end-of-track reporting are anchored to the queue's index, so the next
+    # report names the same track the service is counting.
+    _start_playback(result, skill_id, queue={"index": index} if index is not None else None)
+    panel_stream.notify("queue", action="play")
+    return _respond(handler, {
+        "ok": True,
+        "video_id": video_id,
+        "index": index,
+        "track": _now_playing_payload()["track"],
+        "message": f"Playing “{result.get('title') or ''}”.",
+    })
 
 
 @_guarded

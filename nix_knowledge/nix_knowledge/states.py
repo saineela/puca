@@ -235,6 +235,11 @@ _NAME_STOPWORDS = {
     "hey", "nix", "just", "oh", "um", "well", "update",
     # be-verbs (incl. negated): the optional name group must never eat them
     "is", "was", "seems", "looks",
+    # question words: "how is my mother doing" must never register "how"
+    # as the mother's name (measured: a person record named "how" rendered
+    # as "how: better" on every later state read)
+    "how", "what", "who", "when", "where", "why", "which",
+    "did", "does", "doing", "feeling", "recently", "lately",
     "isnt", "isn't", "wasnt", "wasn't", "arent", "aren't", "aint",
     # interjections/addressing: "bro my sister is sick" - "bro" is the
     # user addressing the assistant, NOT the sister's name. Left as a
@@ -888,13 +893,26 @@ def find_states(engine, query: str | None = None) -> dict[str, Any]:
             except Exception:  # noqa: BLE001
                 continue
             if q:
-                haystack = json.dumps(data, default=str).lower()
-                if not any(
-                    token in haystack
-                    for token in re.findall(r"[a-z]+", q)
-                    if len(token) > 2
-                ):
-                    continue
+                # A question about a PERSON is matched on the person, not
+                # on any word that happens to appear in the record. "how is
+                # my father doing" used to reach the mother's record because
+                # "doing" appears in it; the answer was about someone else.
+                wanted_roles = {
+                    _ROLE_ALIASES.get(role.casefold(), role.casefold())
+                    for role in re.findall(r"\bmy\s+(%s)\b" % _ROLES_RE, q)
+                }
+                if wanted_roles:
+                    record_role = str(data.get("role") or "").casefold()
+                    if record_role not in wanted_roles:
+                        continue
+                else:
+                    haystack = json.dumps(data, default=str).lower()
+                    if not any(
+                        token in haystack
+                        for token in re.findall(r"[a-z]+", q)
+                        if len(token) > 2
+                    ):
+                        continue
             person_label = state_person_label(data)
             if person_label is None:
                 continue

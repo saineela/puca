@@ -1,0 +1,37 @@
+{
+  "kind": "pre-registration",
+  "tag": "d2-repeat-k5-2026-10-18",
+  "status": "registered, not yet run",
+  "decision": "owner decision on d2-d4-scoring-report-2026-10-18 (changes-requested, 2026-10-18T06:49:36Z), items 3 and 4",
+  "why": "The WP2 confirmation run scored each case once, and the production model samples: the post-hoc taxonomy found the same question scoring 0 in the run and answering correctly on a re-ask. A single sample per case is a point estimate with unmeasured variance, so the repeat fixes the sample count in advance instead of repeating until a result appears.",
+  "protocol": {
+    "samples_per_case": 5,
+    "fixed_settings": {
+      "model": "qwen3.5:4b (the model /api/health reports for the console; exposed as luna-v6-contextual-v1)",
+      "framing": "same task framing for PUCA and both baselines",
+      "tool_budget": "same 1200-token context budget per arm",
+      "decoding": "unchanged console/model decoding; no prompt, persona or weight change",
+      "seeded_facts": "the new set's own seed block, in a dedicated instance (NIX_ISOLATE_DASHBOARD_DATA=1)",
+      "scoring_rules": "the pre-registered rules in eval/memory_sets.py SCORING_RULES, unchanged"
+    },
+    "clustering": "the case is the experimental unit: a case's five samples are averaged into one observation, a case counts as honest only when most of its samples are (majority rule), and no interval is computed over samples as if they were extra cases",
+    "reporting": "per case: every sample, the mean, the within-case standard deviation and the sample values; aggregate: the count and share of cases whose recall varied across samples, then the gate numbers",
+    "gates_unchanged": {
+      "abstention": "at least 23 of 25 pooled unknown cases honest AND 95% Wilson lower bound at least 0.75",
+      "memory_advantage": "paired interval on the difference excludes zero against both baselines",
+      "if_either_fails": "report the failure; do not weaken the criterion"
+    },
+    "set": "a NEW 50/25/25 set written after the WP6 fix, frozen with sha256 before the first sample, prior exposure stated; confirm-2026-10-18 is retired from confirmation use because it is development-visible",
+    "preserved": "benchmarks/results/d2_memory_confirm_2026-10-18.json stays as the single-sample baseline result and is never overwritten; the repeat writes its own result file"
+  },
+  "harness": {
+    "runner": "benchmarks/memory_evaluation.py --samples 5",
+    "freeze": "benchmarks/freeze_memory_eval.py --samples 5 (the sample count is part of the frozen design)",
+    "reporting": "eval/memory_sets.py run_set(samples=...) averages per case, keeps every sample, and abstention_report stays case-level"
+  },
+  "not_done": [
+    "the new set has not been written yet",
+    "the k=5 repeat has not been run yet; no result exists for it",
+    "the human D4 review is still outstanding (an agent rubric pass was recorded, which does not replace it)"
+  ]
+}

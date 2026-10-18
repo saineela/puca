@@ -63,3 +63,62 @@ def test_rule_can_decline_to_speak() -> None:
         DecisionTrigger("future_event"), UserStateSnapshot(presence=Presence.HOME)
     )
     assert outcome.reason == "rule_no_action"
+
+
+class _OffPolicy:
+    """D8: a policy object whose observable behaviour is nothing at all."""
+
+    def __init__(self, reason: str = "disabled") -> None:
+        self.reason = reason
+        self.evaluations = 0
+        self.side_effects: list[str] = []
+
+    def evaluate(self, *, tier: str, at, owner_speaking: bool = False) -> dict:
+        self.evaluations += 1
+        return {"notify": False, "reason": self.reason, "side_effects": self.side_effects}
+
+
+def test_proactivity_policy_gate_runs_before_any_rule_and_delivers_nothing_when_off() -> None:
+    """With the policy off, a registered rule must not reach Core at all."""
+    calls: list[CorePromptRequest] = []
+    policy = _OffPolicy("disabled")
+    engine = DecisionEngine(calls.append, proactivity_policy=policy)
+    engine.register(
+        "future_event",
+        lambda trigger, state: CorePromptRequest(trigger, state, "Say something."),
+    )
+    outcome = engine.evaluate(
+        DecisionTrigger("future_event", tier="critical"),
+        UserStateSnapshot(presence=Presence.HOME),
+    )
+    assert outcome.status == "ignored"
+    assert outcome.reason == "disabled"
+    assert calls == [], "nothing is dispatched while the policy is off"
+    assert policy.side_effects == []
+
+
+def test_proactivity_policy_gate_lets_a_permitted_trigger_through() -> None:
+    calls: list[CorePromptRequest] = []
+
+    class _OnPolicy(_OffPolicy):
+        def evaluate(self, *, tier: str, at, owner_speaking: bool = False) -> dict:
+            self.evaluations += 1
+            return {"notify": tier == "critical", "reason": "tier_allowed", "side_effects": []}
+
+    policy = _OnPolicy()
+    engine = DecisionEngine(calls.append, proactivity_policy=policy)
+    engine.register(
+        "future_event",
+        lambda trigger, state: CorePromptRequest(trigger, state, "Say something."),
+    )
+    blocked = engine.evaluate(
+        DecisionTrigger("future_event", tier="routine"),
+        UserStateSnapshot(presence=Presence.HOME),
+    )
+    assert blocked.status == "ignored"
+    allowed = engine.evaluate(
+        DecisionTrigger("future_event", tier="critical"),
+        UserStateSnapshot(presence=Presence.HOME),
+    )
+    assert allowed.status == "dispatched"
+    assert len(calls) == 1

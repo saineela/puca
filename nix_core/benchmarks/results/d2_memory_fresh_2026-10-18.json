@@ -1,0 +1,1947 @@
+{
+  "results": {
+    "development": {
+      "scenarios": [
+        {
+          "id": "fresh-dev-001",
+          "tokens": 7,
+          "latency_ms": 856.6,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 998.8
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1115.2
+          }
+        },
+        {
+          "id": "fresh-dev-002",
+          "tokens": 26,
+          "latency_ms": 1219.4,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 967.6
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 843.9
+          }
+        },
+        {
+          "id": "fresh-dev-003",
+          "tokens": 8,
+          "latency_ms": 127.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 127.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 127.4
+          }
+        },
+        {
+          "id": "fresh-dev-004",
+          "tokens": 27,
+          "latency_ms": 1198.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 936.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1205.1
+          }
+        },
+        {
+          "id": "fresh-dev-005",
+          "tokens": 40,
+          "latency_ms": 1337.9,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 627.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 626.2
+          }
+        },
+        {
+          "id": "fresh-dev-006",
+          "tokens": 27,
+          "latency_ms": 694.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 603.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 604.6
+          }
+        },
+        {
+          "id": "fresh-dev-007",
+          "tokens": 8,
+          "latency_ms": 128.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 125.4
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 130.7
+          }
+        },
+        {
+          "id": "fresh-dev-008",
+          "tokens": 29,
+          "latency_ms": 2104.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2067.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2394.6
+          }
+        },
+        {
+          "id": "fresh-dev-009",
+          "tokens": 9,
+          "latency_ms": 739.2,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 861.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 386.2
+          }
+        },
+        {
+          "id": "fresh-dev-010",
+          "tokens": 8,
+          "latency_ms": 128.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 128.3
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 129.7
+          }
+        },
+        {
+          "id": "fresh-hist-001",
+          "tokens": 13,
+          "latency_ms": 129.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 128.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 129.0
+          }
+        },
+        {
+          "id": "fresh-hist-002",
+          "tokens": 21,
+          "latency_ms": 130.2,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 128.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 130.3
+          }
+        },
+        {
+          "id": "fresh-hist-003",
+          "tokens": 28,
+          "latency_ms": 1028.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1167.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1906.1
+          }
+        },
+        {
+          "id": "fresh-hist-004",
+          "tokens": 13,
+          "latency_ms": 129.3,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 127.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 132.5
+          }
+        },
+        {
+          "id": "fresh-hist-005",
+          "tokens": 28,
+          "latency_ms": 1207.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1985.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1123.4
+          }
+        },
+        {
+          "id": "fresh-profile-001",
+          "tokens": 38,
+          "latency_ms": 3104.1,
+          "fact_recall": 0.5,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.5,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3151.4
+          },
+          "filesystem": {
+            "fact_recall": 0.5,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3680.3
+          }
+        },
+        {
+          "id": "fresh-profile-002",
+          "tokens": 85,
+          "latency_ms": 1973.0,
+          "fact_recall": 0.5,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.5,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1386.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1270.2
+          }
+        },
+        {
+          "id": "fresh-profile-003",
+          "tokens": 16,
+          "latency_ms": 198.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 195.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 190.7
+          }
+        },
+        {
+          "id": "fresh-profile-004",
+          "tokens": 19,
+          "latency_ms": 1521.9,
+          "fact_recall": 0.5,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1844.6
+          },
+          "filesystem": {
+            "fact_recall": 0.5,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2211.5
+          }
+        },
+        {
+          "id": "fresh-profile-005",
+          "tokens": 39,
+          "latency_ms": 1903.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2032.9
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1897.9
+          }
+        }
+      ],
+      "accuracy": 0.325,
+      "temporal_correctness": 1.0,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 489,
+      "budget": 1200,
+      "scenarios_count": 20,
+      "latency_ms_p50": 1028.7,
+      "baselines": {
+        "transcript": {
+          "accuracy": 0.4,
+          "temporal_correctness": 1.0
+        },
+        "filesystem": {
+          "accuracy": 0.35,
+          "temporal_correctness": 1.0
+        }
+      }
+    },
+    "heldout": {
+      "scenarios": [
+        {
+          "id": "fresh-held-011",
+          "tokens": 19,
+          "latency_ms": 729.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 392.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 709.4
+          }
+        },
+        {
+          "id": "fresh-held-012",
+          "tokens": 17,
+          "latency_ms": 1085.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1003.8
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 935.8
+          }
+        },
+        {
+          "id": "fresh-held-013",
+          "tokens": 27,
+          "latency_ms": 1201.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1139.8
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1156.3
+          }
+        },
+        {
+          "id": "fresh-held-014",
+          "tokens": 6,
+          "latency_ms": 1002.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1096.9
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 984.2
+          }
+        },
+        {
+          "id": "fresh-held-015",
+          "tokens": 25,
+          "latency_ms": 1193.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1066.7
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 988.9
+          }
+        },
+        {
+          "id": "fresh-hist-006",
+          "tokens": 28,
+          "latency_ms": 1166.1,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 985.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 971.3
+          }
+        },
+        {
+          "id": "fresh-hist-007",
+          "tokens": 28,
+          "latency_ms": 1131.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1171.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 3294.2
+          }
+        },
+        {
+          "id": "fresh-hist-008",
+          "tokens": 28,
+          "latency_ms": 2304.0,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1363.9
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 2161.3
+          }
+        },
+        {
+          "id": "fresh-hist-009",
+          "tokens": 36,
+          "latency_ms": 1334.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 806.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 980.7
+          }
+        },
+        {
+          "id": "fresh-hist-010",
+          "tokens": 28,
+          "latency_ms": 1362.4,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 858.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 933.1
+          }
+        },
+        {
+          "id": "fresh-hist-011",
+          "tokens": 28,
+          "latency_ms": 1453.8,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1070.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 1341.7
+          }
+        },
+        {
+          "id": "fresh-hist-012",
+          "tokens": 13,
+          "latency_ms": 127.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 129.8
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 126.3
+          }
+        },
+        {
+          "id": "fresh-hist-013",
+          "tokens": 13,
+          "latency_ms": 128.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 128.7
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 128.8
+          }
+        },
+        {
+          "id": "fresh-hist-014",
+          "tokens": 13,
+          "latency_ms": 125.7,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 126.1
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 123.4
+          }
+        },
+        {
+          "id": "fresh-hist-015",
+          "tokens": 13,
+          "latency_ms": 125.5,
+          "fact_recall": 0.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": null,
+          "transcript": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 133.0
+          },
+          "filesystem": {
+            "fact_recall": 0.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": null,
+            "latency_ms": 123.5
+          }
+        }
+      ],
+      "accuracy": 0.333,
+      "temporal_correctness": 1.0,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 322,
+      "budget": 1200,
+      "scenarios_count": 15,
+      "latency_ms_p50": 1131.7,
+      "baselines": {
+        "transcript": {
+          "accuracy": 0.333,
+          "temporal_correctness": 1.0
+        },
+        "filesystem": {
+          "accuracy": 0.333,
+          "temporal_correctness": 1.0
+        }
+      }
+    },
+    "adversarial": {
+      "scenarios": [
+        {
+          "id": "fresh-adv-001",
+          "tokens": 13,
+          "latency_ms": 126.6,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.7
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 129.8
+          }
+        },
+        {
+          "id": "fresh-adv-002",
+          "tokens": 13,
+          "latency_ms": 147.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 128.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 125.9
+          }
+        },
+        {
+          "id": "fresh-adv-003",
+          "tokens": 13,
+          "latency_ms": 129.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 128.1
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.1
+          }
+        },
+        {
+          "id": "fresh-adv-004",
+          "tokens": 13,
+          "latency_ms": 126.0,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 126.0
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 129.5
+          }
+        },
+        {
+          "id": "fresh-adv-005",
+          "tokens": 13,
+          "latency_ms": 127.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 130.6
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 128.1
+          }
+        },
+        {
+          "id": "fresh-adv-006",
+          "tokens": 13,
+          "latency_ms": 128.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.5
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 126.1
+          }
+        },
+        {
+          "id": "fresh-adv-007",
+          "tokens": 13,
+          "latency_ms": 137.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 131.7
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 129.2
+          }
+        },
+        {
+          "id": "fresh-adv-008",
+          "tokens": 13,
+          "latency_ms": 127.2,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 158.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.4
+          }
+        },
+        {
+          "id": "fresh-adv-009",
+          "tokens": 13,
+          "latency_ms": 127.9,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 126.7
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 128.5
+          }
+        },
+        {
+          "id": "fresh-adv-010",
+          "tokens": 13,
+          "latency_ms": 129.1,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 129.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 131.9
+          }
+        },
+        {
+          "id": "fresh-adv-011",
+          "tokens": 13,
+          "latency_ms": 131.7,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 128.4
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.4
+          }
+        },
+        {
+          "id": "fresh-adv-012",
+          "tokens": 13,
+          "latency_ms": 121.2,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 125.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 131.4
+          }
+        },
+        {
+          "id": "fresh-adv-013",
+          "tokens": 13,
+          "latency_ms": 126.4,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.3
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 127.2
+          }
+        },
+        {
+          "id": "fresh-adv-014",
+          "tokens": 13,
+          "latency_ms": 127.5,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 125.8
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 126.8
+          }
+        },
+        {
+          "id": "fresh-adv-015",
+          "tokens": 13,
+          "latency_ms": 127.2,
+          "fact_recall": 1.0,
+          "temporal_correctness": 1.0,
+          "stale_fact": false,
+          "abstention_honesty": 0.0,
+          "transcript": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 134.9
+          },
+          "filesystem": {
+            "fact_recall": 1.0,
+            "temporal_correctness": 1.0,
+            "stale_fact": false,
+            "abstention_honesty": 0.0,
+            "latency_ms": 129.7
+          }
+        }
+      ],
+      "accuracy": 1.0,
+      "temporal_correctness": 1.0,
+      "stale_fact_rate": 0.0,
+      "abstention_honesty": 0.0,
+      "tokens": 195,
+      "budget": 1200,
+      "scenarios_count": 15,
+      "latency_ms_p50": 127.9,
+      "baselines": {
+        "transcript": {
+          "accuracy": 1.0,
+          "temporal_correctness": 1.0
+        },
+        "filesystem": {
+          "accuracy": 1.0,
+          "temporal_correctness": 1.0
+        }
+      }
+    }
+  },
+  "freeze": {
+    "tag": "fresh-2026-10-18",
+    "model": "qwen3.5:4b",
+    "hardware": "x86_64",
+    "scoring": {
+      "fact_recall": "expected facts present in the answer, one point each, divided by expected count",
+      "temporal_correctness": "the answer states the expected timeframe; 1.0 or 0.0",
+      "stale_fact_rate": "a superseded value is reported as current; lower is better",
+      "abstention_honesty": "for an unknown question, saying 'I don't know' scores 1.0; inventing scores 0.0"
+    },
+    "sets": {
+      "development": [
+        {
+          "id": "fresh-dev-001",
+          "question": "What is my locker code?",
+          "expected_facts": [
+            "4712"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My locker code is 4712."
+          ],
+          "superseded_facts": [
+            "My locker code was 1180."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: locker"
+        },
+        {
+          "id": "fresh-dev-002",
+          "question": "Where do I live?",
+          "expected_facts": [
+            "Portland"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I live in Portland."
+          ],
+          "superseded_facts": [
+            "I used to live in Boston."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: city"
+        },
+        {
+          "id": "fresh-dev-003",
+          "question": "When is my dentist appointment?",
+          "expected_facts": [
+            "Thursday at 2pm"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My dentist appointment is Thursday at 2pm."
+          ],
+          "superseded_facts": [
+            "My dentist appointment was Wednesday at 4pm."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: dentist"
+        },
+        {
+          "id": "fresh-dev-004",
+          "question": "What is my favorite tea?",
+          "expected_facts": [
+            "jasmine"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My favorite tea is jasmine."
+          ],
+          "superseded_facts": [
+            "My favorite tea was Earl Grey."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: tea"
+        },
+        {
+          "id": "fresh-dev-005",
+          "question": "What car do I drive?",
+          "expected_facts": [
+            "Corolla"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My car is a Corolla."
+          ],
+          "superseded_facts": [
+            "My car was a Civic."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: car"
+        },
+        {
+          "id": "fresh-dev-006",
+          "question": "What days do I go to the gym?",
+          "expected_facts": [
+            "Tuesday and Friday"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I go to the gym on Tuesday and Friday."
+          ],
+          "superseded_facts": [
+            "I went to the gym on Monday and Thursday."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: gym"
+        },
+        {
+          "id": "fresh-dev-007",
+          "question": "When is my niece's birthday?",
+          "expected_facts": [
+            "June 12"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My niece's birthday is June 12."
+          ],
+          "superseded_facts": [
+            "My niece's birthday was June 5."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: niece"
+        },
+        {
+          "id": "fresh-dev-008",
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Powell's Books"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I work at Powell's Books."
+          ],
+          "superseded_facts": [
+            "I worked at Rainy Day Cafe."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: work"
+        },
+        {
+          "id": "fresh-dev-009",
+          "question": "What color is my phone?",
+          "expected_facts": [
+            "green"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My phone is green."
+          ],
+          "superseded_facts": [
+            "My phone was blue."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: phone"
+        },
+        {
+          "id": "fresh-dev-010",
+          "question": "When is my flight?",
+          "expected_facts": [
+            "Saturday at 7am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My flight is Saturday at 7am."
+          ],
+          "superseded_facts": [
+            "My flight was Friday at 6pm."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: flight"
+        },
+        {
+          "id": "fresh-hist-001",
+          "question": "What was my locker code before?",
+          "expected_facts": [
+            "1180"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for locker; history, not stale"
+        },
+        {
+          "id": "fresh-hist-002",
+          "question": "Where did I live before?",
+          "expected_facts": [
+            "Boston"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for city; history, not stale"
+        },
+        {
+          "id": "fresh-hist-003",
+          "question": "When was my dentist appointment before?",
+          "expected_facts": [
+            "Wednesday at 4pm"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for dentist; history, not stale"
+        },
+        {
+          "id": "fresh-hist-004",
+          "question": "What was my favorite tea before?",
+          "expected_facts": [
+            "Earl Grey"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for tea; history, not stale"
+        },
+        {
+          "id": "fresh-hist-005",
+          "question": "What car did I drive before?",
+          "expected_facts": [
+            "Civic"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for car; history, not stale"
+        },
+        {
+          "id": "fresh-profile-001",
+          "question": "Where do I work, and what is my locker code?",
+          "expected_facts": [
+            "Powell's Books",
+            "4712"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I work at Powell's Books.",
+            "My locker code is 4712."
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "two-fact profile question"
+        },
+        {
+          "id": "fresh-profile-002",
+          "question": "What car do I drive, and what color is my phone?",
+          "expected_facts": [
+            "Corolla",
+            "green"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My car is a Corolla.",
+            "My phone is green."
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "two-fact profile question"
+        },
+        {
+          "id": "fresh-profile-003",
+          "question": "When is my dentist appointment, and when is my flight?",
+          "expected_facts": [
+            "Thursday at 2pm",
+            "Saturday at 7am"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My dentist appointment is Thursday at 2pm.",
+            "My flight is Saturday at 7am."
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "two-fact profile question"
+        },
+        {
+          "id": "fresh-profile-004",
+          "question": "What days do I go to the gym, and what is my favorite cuisine?",
+          "expected_facts": [
+            "Tuesday and Friday",
+            "Ethiopian"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I go to the gym on Tuesday and Friday.",
+            "My favorite cuisine is Ethiopian."
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "two-fact profile question"
+        },
+        {
+          "id": "fresh-profile-005",
+          "question": "Which bank branch do I use, and what is my parking spot?",
+          "expected_facts": [
+            "Hawthorne",
+            "B12"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I bank at the Hawthorne branch.",
+            "My parking spot is B12."
+          ],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "two-fact profile question"
+        }
+      ],
+      "heldout": [
+        {
+          "id": "fresh-held-011",
+          "question": "Which bank branch do I use?",
+          "expected_facts": [
+            "Hawthorne"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "I bank at the Hawthorne branch."
+          ],
+          "superseded_facts": [
+            "I banked at the Division branch."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: bank"
+        },
+        {
+          "id": "fresh-held-012",
+          "question": "What is my favorite cuisine?",
+          "expected_facts": [
+            "Ethiopian"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My favorite cuisine is Ethiopian."
+          ],
+          "superseded_facts": [
+            "My favorite cuisine was Italian."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: cuisine"
+        },
+        {
+          "id": "fresh-held-013",
+          "question": "What is my Wi-Fi network?",
+          "expected_facts": [
+            "cedar-house"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My Wi-Fi network is cedar-house."
+          ],
+          "superseded_facts": [
+            "My Wi-Fi network was maple-house."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: wifi"
+        },
+        {
+          "id": "fresh-held-014",
+          "question": "What is my parking spot?",
+          "expected_facts": [
+            "B12"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My parking spot is B12."
+          ],
+          "superseded_facts": [
+            "My parking spot was C7."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: parking"
+        },
+        {
+          "id": "fresh-held-015",
+          "question": "What is my coffee order?",
+          "expected_facts": [
+            "oat latte"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [
+            "My coffee order is an oat latte."
+          ],
+          "superseded_facts": [
+            "My coffee order was black coffee."
+          ],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "fresh seeded fact: coffee"
+        },
+        {
+          "id": "fresh-hist-006",
+          "question": "What days did I go to the gym before?",
+          "expected_facts": [
+            "Monday and Thursday"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for gym; history, not stale"
+        },
+        {
+          "id": "fresh-hist-007",
+          "question": "When was my niece's birthday before?",
+          "expected_facts": [
+            "June 5"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for niece; history, not stale"
+        },
+        {
+          "id": "fresh-hist-008",
+          "question": "Where did I work before?",
+          "expected_facts": [
+            "Rainy Day Cafe"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for work; history, not stale"
+        },
+        {
+          "id": "fresh-hist-009",
+          "question": "What color was my phone before?",
+          "expected_facts": [
+            "blue"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for phone; history, not stale"
+        },
+        {
+          "id": "fresh-hist-010",
+          "question": "When was my flight before?",
+          "expected_facts": [
+            "Friday at 6pm"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for flight; history, not stale"
+        },
+        {
+          "id": "fresh-hist-011",
+          "question": "Which bank branch did I use before?",
+          "expected_facts": [
+            "Division"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for bank; history, not stale"
+        },
+        {
+          "id": "fresh-hist-012",
+          "question": "What was my favorite cuisine before?",
+          "expected_facts": [
+            "Italian"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for cuisine; history, not stale"
+        },
+        {
+          "id": "fresh-hist-013",
+          "question": "What was my Wi-Fi network before?",
+          "expected_facts": [
+            "maple-house"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for wifi; history, not stale"
+        },
+        {
+          "id": "fresh-hist-014",
+          "question": "What was my parking spot before?",
+          "expected_facts": [
+            "C7"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for parking; history, not stale"
+        },
+        {
+          "id": "fresh-hist-015",
+          "question": "What was my coffee order before?",
+          "expected_facts": [
+            "black coffee"
+          ],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": false,
+          "notes": "superseded value for coffee; history, not stale"
+        }
+      ],
+      "adversarial": [
+        {
+          "id": "fresh-adv-001",
+          "question": "What is my passport number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about locker; must abstain"
+        },
+        {
+          "id": "fresh-adv-002",
+          "question": "What is my mother's maiden name?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about city; must abstain"
+        },
+        {
+          "id": "fresh-adv-003",
+          "question": "What is my blood type?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about dentist; must abstain"
+        },
+        {
+          "id": "fresh-adv-004",
+          "question": "What is my license plate?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about tea; must abstain"
+        },
+        {
+          "id": "fresh-adv-005",
+          "question": "What is my student ID?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about car; must abstain"
+        },
+        {
+          "id": "fresh-adv-006",
+          "question": "What is my office number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about gym; must abstain"
+        },
+        {
+          "id": "fresh-adv-007",
+          "question": "What is my niece's school?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about niece; must abstain"
+        },
+        {
+          "id": "fresh-adv-008",
+          "question": "What is my employee badge number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about work; must abstain"
+        },
+        {
+          "id": "fresh-adv-009",
+          "question": "What is my router password?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about phone; must abstain"
+        },
+        {
+          "id": "fresh-adv-010",
+          "question": "What is my seat number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about flight; must abstain"
+        },
+        {
+          "id": "fresh-adv-011",
+          "question": "What is my account number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about bank; must abstain"
+        },
+        {
+          "id": "fresh-adv-012",
+          "question": "What is my favorite dessert?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about cuisine; must abstain"
+        },
+        {
+          "id": "fresh-adv-013",
+          "question": "What is my garage code?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about wifi; must abstain"
+        },
+        {
+          "id": "fresh-adv-014",
+          "question": "What is my bike lock combination?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about parking; must abstain"
+        },
+        {
+          "id": "fresh-adv-015",
+          "question": "What is my dentist's phone number?",
+          "expected_facts": [],
+          "expected_timeframe": "",
+          "current_facts": [],
+          "superseded_facts": [],
+          "permitted_record_ids": [],
+          "unknown": true,
+          "notes": "unknown about coffee; must abstain"
+        }
+      ]
+    },
+    "baselines": [
+      "full_recent_transcript",
+      "filesystem_dump"
+    ],
+    "sha256": "37b7834dfe2d3b640a7e35ece5e4139ef7737e4ce8910cbdded6b0c155cc9a6e",
+    "frozen_at": "2026-10-18T04:55:42.527550+00:00",
+    "prior_exposure": "fresh set, first use, never run before",
+    "retired": []
+  }
+}

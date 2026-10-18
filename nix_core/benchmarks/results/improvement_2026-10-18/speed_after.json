@@ -1,0 +1,715 @@
+{
+  "benchmark": "router",
+  "scenario": "default",
+  "samples": 100,
+  "warmup_samples": 10,
+  "successful_samples": 100,
+  "p50_ms": 0.148,
+  "p95_ms": 0.198,
+  "min_ms": 0.033,
+  "max_ms": 0.21,
+  "mean_ms": 0.137,
+  "requests_per_second": 7320.644,
+  "samples_detail": [
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.055,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.137,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.198,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.159,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.172,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.047,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.142,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.188,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.159,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.145,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.166,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.047,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.209,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.146,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.164,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.046,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.132,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.206,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.166,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.047,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.194,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.168,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.157,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.05,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.136,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.187,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.149,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.16,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.166,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.045,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.132,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.188,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.152,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.18,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.049,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.136,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.188,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.151,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.171,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.048,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.193,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.167,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.048,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.143,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.199,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.145,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.143,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.163,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.045,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.129,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.21,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.148,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.173,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.047,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.201,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.155,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.171,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.048,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.131,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.189,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.159,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.136,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.167,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.046,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.14,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.189,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.15,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.161,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.172,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.045,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.133,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.193,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.147,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.147,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.152,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.034,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.097,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.137,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.106,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "My sister is doing alright now",
+      "elapsed_ms": 0.106,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"personal_statement\"}",
+      "error": null
+    },
+    {
+      "prompt": "Tell me a short joke",
+      "elapsed_ms": 0.12,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"tell_me\"}",
+      "error": null
+    },
+    {
+      "prompt": "hi",
+      "elapsed_ms": 0.033,
+      "ok": true,
+      "result": "{\"route\": \"chat\", \"rule\": \"address_only\"}",
+      "error": null
+    },
+    {
+      "prompt": "what is on my schedule tomorrow?",
+      "elapsed_ms": 0.095,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"scheduling_verb\"}",
+      "error": null
+    },
+    {
+      "prompt": "I have robotics practice tomorrow at 5pm and remember that I joined TSA",
+      "elapsed_ms": 0.145,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    },
+    {
+      "prompt": "What do you remember about robotics?",
+      "elapsed_ms": 0.109,
+      "ok": true,
+      "result": "{\"route\": \"knowledge\", \"rule\": \"store_fact\"}",
+      "error": null
+    }
+  ]
+}

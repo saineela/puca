@@ -21,6 +21,7 @@ from transformers.generation import LogitsProcessorList
 
 from .context import TemporalContext
 from .engine import KnowledgeEngine
+from .query import asks_for_past, content_words, has_past_frame, matches_words
 from .functions.calendar import (
     cancel_calendar_event,
     create_calendar_event,
@@ -34,6 +35,59 @@ try:
     from nix_actions.engine import ActionsEngine
 except ImportError:  # nix_actions is an optional sibling package
     ActionsEngine = None
+
+
+# ---------------------------------------------------------------------------
+# Word matching
+# ---------------------------------------------------------------------------
+
+def _stem(word: str) -> str:
+    """The comparison form of one word: lowercase, no possessive, no plural.
+
+    Recall has to connect the way people ask to the way a key was
+    stored: "where do I live" must find "user lives in Austin", and
+    "what's my dog called" must find "my dog's name is Mochi". Both
+    differences are inflection, not different subjects, so they are
+    removed here instead of being enumerated as synonyms.
+    """
+    word = word.lower().replace("’", "'")
+    if word.endswith("'s"):
+        word = word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        word = word[:-1]
+    return word
+
+
+def _stem_words(text: str) -> set[str]:
+    return {_stem(word) for word in re.findall(r"[\w']+", text)}
+
+
+# A reminder or alarm with no time anywhere in it: the one slot the user
+# has to supply before anything can be scheduled.
+_MISSING_TIME_REQUEST = re.compile(
+    r"^(?:please\s+|hey\s+nix\s+)?"
+    r"(?:remind\s+me|set\s+(?:an?\s+)?(?:alarm|reminder)|wake\s+me(?:\s+up)?)\b"
+    r"(?P<rest>.*)$",
+    re.IGNORECASE,
+)
+
+
+def _missing_time_question(text: str) -> str | None:
+    """The question a scheduling request without a time has to answer.
+
+    Only called when the deterministic router found no time to resolve, so
+    a request that does carry one ("remind me tomorrow at 8 to call mom")
+    never reaches it.
+    """
+    match = _MISSING_TIME_REQUEST.match((text or "").strip())
+    if not match:
+        return None
+    rest = match.group("rest").strip().strip(".,!?")
+    task = re.sub(r"^(?:to|about|that)\s+", "", rest, flags=re.IGNORECASE).strip()
+    task = re.sub(r"\s+(?:please|ok|okay)$", "", task, flags=re.IGNORECASE).strip()
+    if not task:
+        return "What should I remind you about, and when?"
+    return f"When should I remind you to {task}?"
 
 
 # ---------------------------------------------------------------------------
@@ -513,8 +567,56 @@ class KnowledgeNeedle:
                                     "Omit for broad memory retrieval."
                                 ),
                             },
+                            "history": {
+                                "type": "boolean",
+                                "description": (
+                                    "Ask for the PAST reading, not the "
+                                    "current one: what was true before a "
+                                    "correction ('where did I live before "
+                                    "that'). Returns superseded records "
+                                    "with the date they stopped being "
+                                    "true; the current value is still in "
+                                    "facts."
+                                ),
+                            },
                         },
                         "required": [],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_fact",
+                    "description": (
+                        "Delete stored facts that a description matches "
+                        "('delete the note about my old address', 'forget "
+                        "that my spare key is under the mat'). DESTRUCTIVE: "
+                        "the first call only names the matching records and "
+                        "asks for confirmation; call it again with "
+                        "confirm=true only after the user says yes."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": (
+                                    "The description the user used for the "
+                                    "fact, with meta words such as 'the "
+                                    "note about' removed."
+                                ),
+                            },
+                            "confirm": {
+                                "type": "boolean",
+                                "description": (
+                                    "True only when the user has explicitly "
+                                    "confirmed the deletion in this turn. "
+                                    "Never set it on the first request."
+                                ),
+                            },
+                        },
+                        "required": ["query"],
                     },
                 },
             },
@@ -614,6 +716,7 @@ class KnowledgeNeedle:
             "cancel_calendar_event": self._cancel_calendar_event,
             "create_fact": self._create_fact,
             "find_facts": self._find_facts,
+            "delete_fact": self._delete_fact,
             "store_profile_keys": self._store_profile_keys,
             "create_state": self._create_state,
             "find_states": self._find_states,
@@ -734,6 +837,13 @@ class KnowledgeNeedle:
             },
         }
 
+        # An event that was already stored is not scheduled twice either:
+        # a second reminder for the same practice is the same noise as a
+        # second row on the calendar.
+        if result.get("duplicate"):
+            response["duplicate"] = True
+            return response
+
         # Hand the scheduled intent to the Actions engine when one is
         # attached. Knowledge stores the fact; Actions triggers it.
         if self.actions_engine is not None:
@@ -768,6 +878,7 @@ class KnowledgeNeedle:
     def _find_facts(
         self,
         query: str | None = None,
+        history: bool = False,
     ) -> dict[str, Any]:
 
         records = self.engine.search("fact")
@@ -824,19 +935,30 @@ class KnowledgeNeedle:
         # (b) every query word appears in the fact, or (c) a resolved
         # entity name appears in the fact (referent hit).
         query_words = (
-            set(re.findall(r"[\w']+", query_normalized))
+            _stem_words(query_normalized)
             if query_normalized else set()
         )
 
+        # A past-framed sentence ("I previously lived in Boise.") is history
+        # stored as an ordinary active row. A current-fact question must not
+        # read it, and a question that asks for the past must still reach it.
+        wants_history = bool(history) or (
+            bool(query_normalized) and asks_for_past(query_normalized)
+        )
+
         results = []
+        historical_rows: list[dict[str, Any]] = []
 
         for record in records:
             value = str(
                 record.data.get("value", "")
             )
 
+            if has_past_frame(value) and not wants_history:
+                continue
+
             value_words = (
-                set(re.findall(r"[\w']+", value.lower()))
+                _stem_words(value)
                 if query_normalized else set()
             )
 
@@ -848,10 +970,17 @@ class KnowledgeNeedle:
                     core_query_words = (
                         query_words - polarity_words
                     )
-                    if not core_query_words.issubset(value_words):
+                    # Literal word-overlap first, then the content-word
+                    # comparison: "which code opens my garage" has to reach
+                    # "My garage code is 8042." even though "opens" is in the
+                    # question and not in the sentence (see query.py).
+                    if not (
+                        core_query_words.issubset(value_words)
+                        or matches_words(content_words(query_normalized), value)
+                    ):
                         continue
 
-            results.append({
+            row = {
                 "record_id": record.id,
                 "value": value,
                 "confidence": record.confidence,
@@ -862,7 +991,12 @@ class KnowledgeNeedle:
                 "updated_at": record.updated_at,
                 "kind": "fact",
                 "about": sorted(resolved_names & value_words),
-            })
+            }
+            if has_past_frame(value):
+                # Only a past-frame question got here: the row is the answer
+                # to that question, and it is also the history row.
+                historical_rows.append({**row, "previous": True})
+            results.append(row)
 
         # -------------------------------------------------------
         # Keys ride along: micro-facts about people in the user's
@@ -887,46 +1021,163 @@ class KnowledgeNeedle:
             name for _, name in resolved
         }
 
-        for record in self.engine.search("key"):
-            value = str(record.data.get("value", ""))
+        def key_row(record) -> dict[str, Any] | None:
+            """A key as recall data: its sentence plus where it sits.
+
+            The sentence matters: a caller that asks "where do i live"
+            has to hear "user lives in Austin", not the bare value, and
+            "live" has to reach "lives" (see _stem_words).
+            """
+            data = record.data
+            value = str(data.get("value", ""))
             if not value:
-                continue
+                return None
+            # A key's stored value is already its sentence ("user lives in
+            # Austin") for keys written by the key finder; a key written by
+            # an older path holds the bare value. Render only the bare one,
+            # so a recall cannot say "user lives in user lives in Austin".
+            subject = str(data.get("subject") or "").strip().lower()
+            already_sentence = bool(subject) and value.lower().startswith(subject + " ")
+            if already_sentence:
+                text_value = value
+            else:
+                try:
+                    from .keys import key_text
 
-            value_lower = value.lower()
-            value_words = set(re.findall(r"[\w']+", value_lower))
-
-            if query_normalized:
-                if query_normalized not in value_lower:
-                    if not (
-                        key_query_words.issubset(value_words)
-                        or resolved_names & value_words
-                    ):
-                        continue
-
-            results.append({
+                    text_value = key_text(data)
+                except Exception:
+                    text_value = value
+            value_words = _stem_words(text_value) | _stem_words(value)
+            # Prefer the pronoun the user used ("my dog") over the
+            # record's subject word ("user") when matching words.
+            value_words |= _stem_words(str(data.get("predicate", "")))
+            if query_normalized and query_normalized not in text_value.lower():
+                if not (
+                    key_query_words.issubset(value_words)
+                    or resolved_names & value_words
+                    or matches_words(content_words(query_normalized), text_value)
+                    or matches_words(content_words(query_normalized), value)
+                ):
+                    return None
+            return {
                 "record_id": record.id,
                 "value": value,
+                "text": text_value,
                 "confidence": record.confidence,
                 "certainty": record.certainty,
                 "source": record.source,
                 "status": record.status,
                 "created_at": record.created_at,
                 "updated_at": record.updated_at,
+                "valid_until": (
+                    record.valid_until.isoformat()
+                    if record.valid_until else None
+                ),
                 "kind": "key",
                 "about": sorted(resolved_names & value_words),
-            })
+            }
+
+        for record in self.engine.search("key"):
+            row = key_row(record)
+            if row is not None:
+                results.append(row)
+
+        # -------------------------------------------------------
+        # Superseded records: "where did I live before that" is a
+        # question about history, and the store keeps it (a closed
+        # record has valid_until instead of being deleted). Only a
+        # question that asks for the past reads them; an ordinary
+        # "where do I live" must never answer with an old city.
+        # -------------------------------------------------------
+        previous: list[dict[str, Any]] = list(historical_rows)
+        if history:
+            # A superseded copy of the value that is current today is not
+            # a different place the user lived: "moved to Seattle" closes
+            # the old city, and an earlier Seattle row left over from a
+            # previous correction is the same answer as today's. History
+            # means the OTHER values, newest first.
+            active_values = {
+                _stem(str(row.get("value") or ""))
+                for row in results
+                if row.get("kind") == "key"
+            }
+            for record in self.engine.search("key", status="superseded"):
+                row = key_row(record)
+                if row is None:
+                    continue
+                if _stem(str(row.get("value") or "")) in active_values:
+                    continue
+                row["previous"] = True
+                previous.append(row)
+            previous.sort(
+                key=lambda item: str(item.get("valid_until") or ""),
+                reverse=True,
+            )
+            # One row per distinct value: a value corrected twice over the
+            # weeks is still one place the user lived, not three.
+            distinct: list[dict[str, Any]] = []
+            seen_values: set[str] = set()
+            for item in previous:
+                norm = _stem(str(item.get("value") or ""))
+                if norm in seen_values:
+                    continue
+                seen_values.add(norm)
+                distinct.append(item)
+            previous = distinct
+            for record in self.engine.search("fact", status="superseded"):
+                value = str(record.data.get("value", ""))
+                if not value:
+                    continue
+                value_words = _stem_words(value)
+                if query_normalized and query_normalized not in value.lower():
+                    if not (query_words - polarity_words).issubset(value_words):
+                        continue
+                previous.append({
+                    "record_id": record.id,
+                    "value": value,
+                    "status": record.status,
+                    "valid_until": (
+                        record.valid_until.isoformat()
+                        if record.valid_until else None
+                    ),
+                    "kind": "fact",
+                    "previous": True,
+                })
 
         return {
             "ok": True,
             "count": len(results),
             "query": query,
+            "history": bool(history),
             "resolved_entities": [
                 {"role": role, "name": name}
                 for role, name in resolved
             ],
             "state_change_detected": state_change,
             "facts": results,
+            "previous": previous,
         }
+
+    def _delete_fact(
+        self,
+        query: str,
+        confirm: bool = False,
+    ) -> dict[str, Any]:
+        """Delete stored facts by description, behind a confirmation.
+
+        The knowledge half of the D4 c38 defect: a deletion was routed to the
+        calendar and the stored fact survived. The tool is destructive, so it
+        only names its matches until it is called with ``confirm=True``.
+        """
+        from .functions.facts import delete_facts
+
+        return delete_facts(
+            self.engine,
+            query=query,
+            confirm=bool(confirm),
+            source="knowledge_qwen",
+            reason="Deleted from natural-language user request.",
+        )
 
     def _create_fact(
         self,
@@ -1722,6 +1973,22 @@ The pattern for every response is:
                 ]
             )
 
+        # D5: where an engine is installed, the envelope is generated under a
+        # grammar, so a malformed one cannot be produced at the token level.
+        # With no engine the call is unchanged - the five independent checks in
+        # eval/plan_validation.py remain the only guarantee, as they do anyway.
+        try:
+            from .grammar import grammar_logits_processor
+
+            grammar = grammar_logits_processor(
+                self.tokenizer, inputs["input_ids"].shape[1]
+            )
+        except Exception:
+            grammar = None
+        generate_kwargs: dict[str, Any] = {}
+        if grammar is not None:
+            generate_kwargs["logits_processor"] = LogitsProcessorList([grammar])
+
         stopper = _StopAfterToolCall(self.tokenizer)
         stopper.prompt_length = inputs["input_ids"].shape[1]
 
@@ -1731,6 +1998,7 @@ The pattern for every response is:
                 max_new_tokens=96,
                 do_sample=False,
                 stopping_criteria=StoppingCriteriaList([stopper]),
+                **generate_kwargs,
             )
 
         generated = outputs[
@@ -2229,6 +2497,25 @@ The pattern for every response is:
         elif routed is not None:
             name, arguments = routed
         else:
+            # A reminder with no time is a missing-slot request, not a
+            # request to guess: measured live, "Remind me to call mom."
+            # was answered "I'll remind you to call your mom later." with
+            # nothing scheduled. Ask for the time instead.
+            question = _missing_time_question(user_request)
+            if question:
+                return KnowledgeResponse(
+                    user_request=user_request,
+                    function=None,
+                    result={
+                        "ok": True,
+                        "operation": "NEEDS_CLARIFICATION",
+                        "status": "needs_clarification",
+                        "question": question,
+                        "temporal_context": self._temporal_envelope(),
+                    },
+                    analysis_required=True,
+                ).to_dict()
+
             tool_call = self._generate_tool_call(
                 user_request
             )
@@ -2388,6 +2675,11 @@ The pattern for every response is:
             user_request,
             function_result,
         )
+        function_result = self._maybe_fallback_to_calendar(
+            name,
+            user_request,
+            function_result,
+        )
 
         if isinstance(function_result, dict):
             function_result.setdefault(
@@ -2427,17 +2719,42 @@ The pattern for every response is:
         picked the wrong function, and the fact finder gets a second
         chance - it carries entity referent resolution.
         """
-        if name != "find_calendar_events":
+        if name not in ("find_calendar_events", "find_states"):
             return function_result
         if not isinstance(function_result, dict):
             return function_result
 
         request_lower = user_request.lower()
-        if _CALENDAR_DOMAIN_RE.search(request_lower):
+        if name == "find_states":
+            # The same current-state question may live in the fact store: a
+            # person's "my mother is doing okay" is a fact for one user and a
+            # state for another. Only an empty state list retries, and only
+            # through the fact finder.
+            if function_result.get("states") or function_result.get("count"):
+                return function_result
+            try:
+                fallback = self._find_facts(
+                    query=" ".join(content_words(request_lower)) or user_request
+                )
+            except Exception:  # noqa: BLE001 - fallback must never crash
+                return function_result
+            if fallback.get("count"):
+                fallback["fallback_from"] = name
+                return fallback
             return function_result
-
         events = function_result.get("events") or []
         if not events:
+            # An empty calendar tells the user nothing, and the same question
+            # may live in the fact store ("when is my dentist appointment" is
+            # an event for one person and a stored fact for another). With a
+            # real subject in the request there is something to look for; a
+            # bare browse with no subject ("what is my schedule") that found
+            # nothing still reports nothing.
+            if not content_words(request_lower):
+                return function_result
+        elif _CALENDAR_DOMAIN_RE.search(request_lower):
+            # A successful, on-domain calendar result stays: the request named
+            # the calendar, and the events answer it.
             return function_result
 
         # Relevance check: at least one event title must share a
@@ -2461,7 +2778,9 @@ The pattern for every response is:
             return function_result
 
         try:
-            fallback = self._find_facts(query=user_request)
+            fallback = self._find_facts(
+                query=" ".join(content_words(request_lower)) or user_request
+            )
         except Exception:  # noqa: BLE001 - fallback must never crash
             return function_result
 
@@ -2469,4 +2788,44 @@ The pattern for every response is:
             fallback["fallback_from"] = name
             return fallback
 
+        return function_result
+
+    def _maybe_fallback_to_calendar(
+        self,
+        name: str,
+        user_request: str,
+        function_result: Any,
+    ) -> Any:
+        """Give an empty fact lookup the calendar's second chance.
+
+        The same question lives in a different store for different people:
+        "when is my dentist appointment" is a calendar event for one user and a
+        stored fact for another, and the selector cannot know which. This is
+        the mirror of `_maybe_fallback_to_facts`: read-only, only when the fact
+        finder found nothing, and only when the request carries calendar
+        vocabulary - so an ordinary missing fact still reports as missing
+        instead of answering from an unrelated event list. A write never
+        retries anywhere.
+        """
+        if name != "find_facts":
+            return function_result
+        if not isinstance(function_result, dict):
+            return function_result
+        if function_result.get("count"):
+            return function_result
+        if not _CALENDAR_DOMAIN_RE.search(user_request.lower()):
+            return function_result
+
+        title = " ".join(content_words(user_request)) or None
+        try:
+            fallback = (
+                self._find_calendar_events(title=title)
+                if title else self._find_calendar_events()
+            )
+        except Exception:  # noqa: BLE001 - fallback must never crash
+            return function_result
+
+        if fallback.get("events"):
+            fallback["fallback_from"] = name
+            return fallback
         return function_result

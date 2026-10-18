@@ -85,6 +85,8 @@ over the data directory.
 | `POST` | `/limits` | The queue limits the OpenDeck instance declares (see below); the console pushes them whenever it reads the installed manifest. |
 | `POST` | `/resolutions` | A bulk fill of resolved metadata, for a caller that resolved tracks itself. |
 | `POST` | `/warm` | Resolve the next few tracks now, within the same rate limit. |
+| `GET` | `/playback` | What the speaker last said — `state`, `position`, `duration`, `video_id`, `at` — and `advanced`, how many hand-offs the service has performed. |
+| `POST` | `/playback` | A device's report of the speaker: `{"state","position","duration","video_id","index","queue_active"}`. The reply says `advanced` (whether this report ended a queued track) and `executed` (whether the service has already started the next one). Every device may report; the service advances at most once per track. |
 
 ## The limits come from the OpenDeck instance
 
@@ -132,9 +134,29 @@ service that stopped, and the queue goes back to the provider skill.
   resolve one track's metadata, used as the background's callback).
 - `POST /api/music/queue/resolve` is what the service calls back for, one track
   at a time.
-- Playing a queued track is unchanged from the outside: the service decides
-  *which* track, and the provider skill still resolves the stream URL and
-  receives the hand-off, so a queued song plays exactly like a searched one.
+- **The service is the only thing that executes the queue.** Devices — the
+  page, the wall panel, the phone — may add to the queue and may report what the
+  speaker is doing, but they no longer decide what comes next. The service hands
+  the selected track to a *player* callback, and in production that callback is
+  `POST /internal/music/queue/play` on the console: the console is where the
+  installed speaker skill lives, so it resolves the stream and presses the
+  button, while the choice stays in the queue. A service started with no player
+  still decides and returns `executed: false`, and the console performs that one
+  hand-off — it is the caller, never the decider.
+- **One finished track advances the line-up once.** The speaker emits no
+  end-of-track event, so each device's `now-playing` poll reports the speaker's
+  state to `POST /playback`. The service advances when the report says the
+  speaker is idle at (or past) the end of the track the queue is pointing at,
+  and it remembers the mark: that track, at that position. Reports below the
+  mark are progress towards an end that has not happened yet — which is the
+  normal case on a speaker that never reports "playing", where the console's own
+  clock is the only progress signal. A second reader of the same ending is
+  refused by the mark, a paused or stopped-early track is not finished at all,
+  and a track the queue did not choose (a one-off play, or a song another device
+  started) moves nothing. The mark is cleared when the position falls back to
+  the start of the track, because that is a new pass — how repeat-one gets one
+  ending per pass rather than one ending ever. That is what stops three devices
+  polling one speaker from being three advances.
 - The assistant's own queue tool forwards to the service too (the worker reads
   `NIX_MUSIC_QUEUE_URL`), so the page and the assistant are reading one line-up
   rather than two.

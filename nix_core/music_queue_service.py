@@ -47,6 +47,10 @@ TICK_SECONDS = float(os.environ.get("NIX_MUSIC_QUEUE_TICK", "1.0"))
 # answer at all (as opposed to answering that it does not know a track).
 PROVIDER_COOLDOWN_SECONDS = float(os.environ.get("NIX_MUSIC_QUEUE_PROVIDER_COOLDOWN", "30"))
 MAX_BODY = 2 * 1024 * 1024
+# How far the speaker's reported position has to fall back before the same
+# track is treated as started over (a repeat-one pass) rather than as the same
+# finish being reported again.
+RESTART_MARGIN = 5.0
 
 
 class ProviderUnavailable(RuntimeError):
@@ -69,17 +73,39 @@ class QueueService:
         resolver: Callable[[str], dict | None] | None = None,
         console_url: str = "",
         cooldown: float = PROVIDER_COOLDOWN_SECONDS,
+        player: Callable[[dict], dict | None] | None = None,
     ) -> None:
         self.queue = queue
         self.resolver = resolver
         self.console_url = console_url.rstrip("/")
         self.cooldown = max(0.0, float(cooldown))
+        # The queue is the only thing that decides what plays. It does not hold
+        # the speaker's credentials; a player callback (the console, in
+        # production) turns one of its tracks into playback. Without one the
+        # service still decides, and the caller performs the hand-off itself.
+        self.player = player
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._inflight = threading.BoundedSemaphore(queue.limits.resolve_concurrency)
         self.resolved_calls = 0
         self.provider_errors = 0
         self._paused_until = 0.0
+        # What the speaker last said, so end-of-track is decided on a transition
+        # rather than on every poll (three devices polling must not equal three
+        # advances).
+        self._playback: dict[str, Any] = {
+            "state": "unknown", "position": 0.0, "duration": 0.0,
+            "video_id": "", "index": -1, "at": 0.0,
+        }
+        # The last track this service advanced past, and how far into it the
+        # speaker was: what stops a second reader of the same finished track —
+        # or the same reader a moment later — from advancing it again.
+        self._advanced_mark: dict[str, Any] | None = None
+        # Three devices may report at the same moment; reading the previous
+        # report and writing the next one has to be one step, or two of them can
+        # both see "playing" and both advance.
+        self._playback_lock = threading.Lock()
+        self.advanced = 0
 
     # ── limits ────────────────────────────────────────────────────────────
     def set_limits(self, limits: dict | None) -> QueueLimits:
@@ -144,10 +170,139 @@ class QueueService:
         if op in ("set_index", "play"):
             if index is None:
                 raise ValueError(f"{op} needs index=<queue position>")
-            return {**queue.set_index(index), "message": "Queue position selected."}
+            selected = queue.set_index(index)
+            rows = queue.snapshot()
+            cursor = selected.get("index", -1)
+            selected = {**selected, "track": rows[cursor] if 0 <= cursor < len(rows) else {}}
+            return {**selected, "message": "Queue position selected.",
+                    **self._executed(selected, reason="select")}
         if op == "next":
-            return queue.start_next(auto=bool(body.get("auto")))
+            moved = queue.start_next(auto=bool(body.get("auto")))
+            return {**moved, **self._executed(moved, reason="auto" if body.get("auto") else "skip")}
+        if op == "start":
+            # "Play what the queue is pointing at": a caller that has just
+            # added something may ask for it, but the decision and the hand-off
+            # stay here.
+            cursor = queue.state()
+            selected = {"ok": True, "index": cursor.index, "total": queue.total(),
+                        "revision": queue.revision(),
+                        "track": queue.snapshot()[cursor.index]
+                        if 0 <= cursor.index < queue.total() else {}}
+            return {**selected, "message": "Queue started.",
+                    **self._executed(selected, reason="start")}
         raise ValueError(f"unknown queue op: {op or '(none)'}")
+
+    # ── playback: the queue decides, one hand-off per track ───────────────
+    def current_track(self) -> dict[str, Any]:
+        rows = self.queue.snapshot()
+        index = self.queue.state().index
+        return rows[index] if 0 <= index < len(rows) else {}
+
+    def _executed(self, result: dict, *, reason: str) -> dict:
+        """Hand the selected track to the player, at most once per track.
+
+        ``executed`` tells the console whether this service has already started
+        the track: if it has, the console must not start it a second time, and
+        if it has not (no player configured) the console performs the hand-off
+        as it always did.
+        """
+        track = result.get("track") if isinstance(result.get("track"), dict) else None
+        if not result.get("ok") or not track or not track.get("video_id"):
+            return {"executed": False}
+        if self.player is None:
+            return {"executed": False}
+        try:
+            reply = self.player({
+                "video_id": track.get("video_id"),
+                "index": result.get("index"),
+                "title": track.get("title") or "",
+                "reason": reason,
+            })
+        except Exception as exc:  # the speaker is down; the queue is intact
+            self.provider_errors += 1
+            return {"executed": False, "play_error": f"{type(exc).__name__}: {exc}"}
+        self.advanced += 1
+        return {"executed": True, "play_result": reply}
+
+    def report_playback(self, report: dict) -> dict:
+        """Take the speaker's state from the console and decide what follows.
+
+        The console is the only thing that can see the speaker, but it is no
+        longer the thing that decides: it reports, and this decides. A track
+        that has reached its end advances the line-up exactly once — however
+        many devices are polling the same speaker — because the service
+        remembers which track it advanced past and how far into it the speaker
+        was. A report below that mark is progress towards an end that has not
+        happened yet; the end itself is the report that reaches the mark.
+        """
+        with self._playback_lock:
+            return self._report_playback(report)
+
+    def _report_playback(self, report: dict) -> dict:
+        def number(value: Any) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+
+        state = str(report.get("state") or "unknown").strip().lower()
+        self._playback = {
+            "state": state,
+            "position": number(report.get("position")),
+            "duration": number(report.get("duration")),
+            "video_id": str(report.get("video_id") or ""),
+            "index": int(report.get("index")) if str(report.get("index") or "").lstrip("-").isdigit() else -1,
+            "at": time.time(),
+        }
+        decision = {"advanced": False, "reason": "not finished"}
+        finished = state in ("idle", "stopped", "off", "streaming_stopped")
+        if not finished:
+            # A track that is playing (or paused) is never skipped over.
+            return {"ok": True, **decision}
+        if report.get("queue_active") is False:
+            # Search-and-play is a one-off: it is not the queue's track, so its
+            # ending must not move the line-up on.
+            decision["reason"] = "a one-off play, not the queue"
+            return {"ok": True, **decision}
+        track = self.current_track()
+        queued_id = str(track.get("video_id") or "")
+        reported_id = self._playback["video_id"]
+        position = self._playback["position"]
+        duration = self._playback["duration"] or float(track.get("duration_sec") or 0)
+        mark = self._advanced_mark
+        if mark and (mark["video_id"] != reported_id
+                     or (position and position < mark["position"] - RESTART_MARGIN)):
+            # A different track — or this same one starting over, which is what
+            # repeat-one does — so the record of the last advance no longer
+            # applies.
+            mark = None
+        self._advanced_mark = mark
+        if not queued_id or not reported_id:
+            decision["reason"] = "nothing queued" if not queued_id else "the report names no track"
+            return {"ok": True, **decision}
+        if reported_id != queued_id:
+            # The speaker stopped something else (a one-off play, or a track the
+            # queue has already moved past). The queue must not advance under it.
+            decision["reason"] = "the finished track is not the queued one"
+            return {"ok": True, **decision}
+        if duration and position and position < duration - 1.5:
+            decision["reason"] = "stopped before the end"
+            return {"ok": True, **decision}
+        if mark is not None:
+            decision["reason"] = "already advanced for this track"
+            return {"ok": True, **decision}
+        moved = self.queue.start_next(auto=True)
+        result = {**moved, **self._executed(moved, reason="auto")}
+        if moved.get("ok"):
+            # Recorded whether or not the hand-off succeeded: the queue has
+            # already moved on, and a second report of the same finished track
+            # must not move it again.
+            self._advanced_mark = {"video_id": reported_id, "position": position}
+        return {"ok": True, "advanced": bool(moved.get("ok")),
+                "index": moved.get("index"), "track": moved.get("track"),
+                "code": moved.get("code"), "reason": "track finished",
+                "executed": bool(result.get("executed")),
+                "play_error": result.get("play_error")}
 
     # ── the background ────────────────────────────────────────────────────
     def start(self) -> None:
@@ -266,6 +421,28 @@ def console_resolver(console_url: str, token: str = "", timeout: float = 20.0):
     return resolver
 
 
+def console_player(console_url: str, token: str = "", timeout: float = 30.0):
+    """A player that asks the console to start one queued track on the speaker.
+
+    The speaker is reached through an installed skill, and the console is where
+    the installed skills live. The queue still chooses the track and the moment:
+    this call only turns that decision into playback, and always for a track the
+    queue has already selected.
+    """
+    url = console_url.rstrip("/") + "/internal/music/queue/play"
+
+    def player(request: dict) -> dict | None:
+        body = json.dumps(request).encode()
+        call = urllib.request.Request(url, data=body, method="POST", headers={
+            "Content-Type": "application/json",
+            **({"X-Nix-Token": token} if token else {}),
+        })
+        with urllib.request.urlopen(call, timeout=timeout) as response:
+            return json.loads(response.read() or b"{}")
+
+    return player
+
+
 def _handler_for(service: QueueService):
     class Handler(BaseHTTPRequestHandler):
         server_version = "NixMusicQueue/1.0"
@@ -326,11 +503,19 @@ def _handler_for(service: QueueService):
             if path == "/state":
                 query = self._query()
                 revision = query.get("revision")
-                return self._send(service.queue.state(
+                payload = service.queue.state(
                     offset=self._number(query.get("from"), 0, 0, 1_000_000),
                     limit=self._number(query.get("limit"), service.queue.limits.window, 1, 2000),
                     revision=None if revision in (None, "") else self._number(revision, -1, 0, 2**31),
-                ).as_dict())
+                ).as_dict()
+                # The speaker's last reported state travels with the queue, so
+                # every reader mirrors one snapshot instead of asking different
+                # consoles and getting different answers.
+                payload["playback"] = dict(service._playback)
+                return self._send(payload)
+            if path == "/playback":
+                return self._send({"ok": True, **service._playback,
+                                   "advanced": service.advanced})
             if path == "/all":
                 return self._send({"ok": True, "queue": service.queue.snapshot(),
                                    "total": service.queue.total(),
@@ -385,6 +570,8 @@ def _handler_for(service: QueueService):
                         None if limit is None else self._number(limit, 0, 0, 500))})
                 if path == "/ops":
                     return self._send(service.queue_op(body))
+                if path == "/playback":
+                    return self._send(service.report_playback(body))
             except IndexError as exc:
                 return self._send({"ok": False, "error": str(exc)}, 404)
             except ValueError as exc:
@@ -407,7 +594,8 @@ def serve(
     queue = MusicQueue(db or music_queue.default_db(),
                        QueueLimits.from_provider({"limits": limits} if limits else None))
     resolver = console_resolver(console_url, token) if console_url else None
-    service = QueueService(queue, resolver=resolver, console_url=console_url)
+    player = console_player(console_url, token) if console_url else None
+    service = QueueService(queue, resolver=resolver, console_url=console_url, player=player)
     service.start()
     server = ThreadingHTTPServer(("0.0.0.0", port), _handler_for(service))
     server.queue_service = service  # type: ignore[attr-defined]

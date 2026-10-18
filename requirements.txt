@@ -1,0 +1,5 @@
+# Core runtime dependencies. The sibling packages declare their own runtime
+# dependencies in their pyproject.toml files.
+numpy>=1.24
+requests>=2.31
+websockets>=12

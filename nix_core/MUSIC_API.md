@@ -58,6 +58,7 @@ same page against the same state.
 | `GET` | `/api/music/queue[?from=&limit=&revision=]` | The play queue: `{queue:[…], index, count, total, offset, revision, unchanged, message}`. `queue` is a window of the line-up and `total` is how long it is; with `revision` set to the one the caller holds, an unchanged queue answers `unchanged:true` with no tracks at all. |
 | `POST` | `/api/music/queue` | `{"action":"add"\|"add_many"\|"add_range"\|"remove"\|"move"\|"front"\|"next_up"\|"clear"\|"next"\|"play", …}` — changes the queue, or resolves a queued track and hands it to the speaker. `add_many` takes `tracks:[{video_id,title,…},…]`, which is how a whole playlist changes hands in one call. |
 | `POST` | `/api/music/queue/resolve` | `{"video_id"}` — the track's metadata, read-only: nothing is queued and nothing plays. This is what the queue service calls back for. |
+| `POST` | `/internal/music/queue/play` | `{"video_id","index"}` — the queue service's player callback: resolves one track it has already chosen and hands it to the speaker. It never chooses and never reads the queue. |
 | `GET` | `/api/music/library?kind=&limit=&playlist_id=[&refresh=1]` | Provider library read (`playlists`, `playlist`, `likes`, `history`, `frequent`, `stats`), answered from the console's catalog cache. |
 | `POST` | `/api/music/save` | `{"kind":"like"\|"unlike"\|"playlist_add"\|"playlist_create", …}` — writes to the user's own library through the declared `save` provider action. |
 | `GET` | `/api/music/lyrics[?video_id=|title=|artist=|album=|duration_sec=]` | Synchronized lyrics for the current or named track, plus the same position estimate. |
@@ -205,6 +206,21 @@ past its length *and* the speaker has gone idle, and only then does it ask the
 provider for the next entry. A one-off play never auto-advances (the recorded
 state marks queue-sourced playback), and a paused speaker is not "finished", so
 the poll cannot hijack a deliberate pause.
+
+**One speaker, one decider.** When the queue service is running, the poll is a
+report rather than a decision: the console sends the speaker's state to the
+service's `POST /playback`, and the service advances the line-up at most once
+per finished track — however many devices (page, wall panel, phone) are polling
+the same speaker. The service remembers the ending it acted on (the track, and
+how far into it the speaker was), so a report below that mark is progress, and
+the end itself is the one report that advances. Its reply carries `executed`,
+which says whether the service has already started the next track through `POST
+/internal/music/queue/play`; if it has, the console must not hand the same track
+over again. A report of a track the queue did not choose, or of a track stopped
+before its end, moves nothing, and a position back at the start of the track
+clears the mark — one ending per pass, which is what repeat-one needs. The same
+rule holds when the service runs without a player: it still decides, answers
+`executed:false`, and the console performs that one hand-off.
 
 ### Saving to the user's own library
 
@@ -366,8 +382,13 @@ needs no cross-origin setup.
   anything else becomes a search the user picks from.
 - The playlists row ends in the **library page**: every playlist the provider
   lists, each wearing its own cover, and a tap opens that playlist's **whole song
-  list** — `kind=playlist` with the reader's own `limit`, which is why the library
-  read is capped at 200 rather than at a search page's 12.
+  list** — `kind=playlist` with the reader's own `limit`.
+- A shelf the user scrolls to is read at the **whole-library ceiling** (500), not
+  as a short preview: the liked-songs shelf renders every song the provider lists,
+  so a 430-song *Liked Music* playlist arrives whole instead of stopping at 15.
+  `kind=library` keeps the ceiling honest — the provider caps a read it cannot
+  fill and the console's own catalog cache is keyed by the `limit` asked for, so
+  a short read and a whole read never share an entry.
 - A search answers with more than songs: the page matches the playlists it already
   holds by name and the artists the songs on it are by, so “Miles” offers the
   artist as a doorway (a tap searches the catalog for them) and any playlist that

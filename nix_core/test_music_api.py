@@ -548,6 +548,76 @@ def test_a_stream_the_speaker_refused_is_not_recorded_as_a_successful_handoff(mu
     assert saved["handoff"]["error"], saved["handoff"]
 
 
+PROXIED_STREAM = (
+    "http://192.168.0.152:4100/api/media/stream?url="
+    "https%3A%2F%2Frr7.googlevideo.com%2Fvideoplayback%3Fx%3D1"
+)
+DIRECT_STREAM = "https://rr7.googlevideo.com/videoplayback?x=1"
+
+
+def _play_provider_payload(play_url: str) -> dict:
+    return {
+        "ok": True, "action": "play", "message": "serving", "video_id": "abc12345678",
+        "title": "Song", "artist": "Artist", "duration_sec": 200, "artwork_url": "",
+        "mime_type": "audio/mp4", "play_url": play_url, "tracks": [], "playlists": [],
+        "count": 1, "lyrics": [], "lyrics_plain": "", "lyrics_timing": "", "lyrics_source": "",
+    }
+
+
+def test_a_refused_proxied_stream_is_retried_once_on_the_direct_url(music_env, monkeypatch):
+    # Measured live: the Dot could not fetch an OpenDeck /api/media/stream?url=…
+    # URL (WorkerOperationError), while the same audio was reachable directly.
+    # The failed route is not reported until the direct one has been tried.
+    def answer(matched):
+        url = matched["arguments"].get("url", "")
+        if "/api/media/stream?" in url:
+            return {"ok": False, "error": "WorkerOperationError: could not fetch " + url}
+        return {"ok": True, "action": "play_url", "message": "playing"}
+
+    runtime = FakeRuntime(results={
+        "opendeck_music": _play_provider_payload(PROXIED_STREAM),
+        "control_ring": answer,
+    })
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/play", {"query": "Song"})
+    finally:
+        server.shutdown()
+    handoffs = [call for call in runtime.calls if call["arguments"].get("action") == "play_url"]
+    assert status == 200
+    assert len(handoffs) == 2
+    assert handoffs[0]["arguments"]["url"] == PROXIED_STREAM
+    assert handoffs[1]["arguments"]["url"] == DIRECT_STREAM
+    assert payload["handoff"]["supported"] is True
+    assert "error" not in payload["handoff"]
+    assert payload["handoff"]["fallback"]["url"] == DIRECT_STREAM
+    assert payload["handoff"]["fallback"]["first_error"].startswith("WorkerOperationError")
+    saved = json.loads(Path(music_api._state_path()).read_text(encoding="utf-8"))
+    assert saved["handoff"]["fallback"]["url"] == DIRECT_STREAM
+
+
+def test_a_refused_stream_the_direct_url_cannot_fix_is_still_reported(music_env, monkeypatch):
+    def answer(matched):
+        return {"ok": False, "error": "could not fetch " + matched["arguments"].get("url", "")}
+
+    runtime = FakeRuntime(results={
+        "opendeck_music": _play_provider_payload(PROXIED_STREAM),
+        "control_ring": answer,
+    })
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/api/music/play", {"query": "Song"})
+    finally:
+        server.shutdown()
+    handoffs = [call for call in runtime.calls if call["arguments"].get("action") == "play_url"]
+    assert status == 200
+    assert len(handoffs) == 2
+    assert payload["handoff"]["error"]
+    assert payload["handoff"]["first_error"].startswith("could not fetch http://192.168.0.152")
+
+
 def test_control_routes_volume_to_the_skill_that_declares_it(music_env, monkeypatch):
     runtime = FakeRuntime()
     install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
@@ -1700,3 +1770,162 @@ def test_a_published_queue_service_that_stopped_falls_back_to_the_provider(music
     assert [item["title"] for item in payload["queue"]] == ["From The Provider"]
     assert queue_calls(runtime) == [{"action": "queue", "op": "list"}], \
         "the provider's own queue answered, because the service was not there"
+
+
+# ── three devices, one speaker ───────────────────────────────────────────
+#
+# The wall panel, the phone and a laptop browser are open on the same speaker.
+# They may all *see* it and all *report* what it is doing, but only the queue
+# service decides what plays, and it presses the button through the console's
+# own installed skills. These tests run that whole path: service → console
+# route → provider → speaker.
+
+
+def _wired_queue_service(tmp_path, console_base):
+    """A queue service whose player is the console at ``console_base``."""
+    queue = music_queue.MusicQueue(str(tmp_path / "wired.db"),
+                                   music_queue.QueueLimits(prefetch=0, resolves_per_minute=0))
+    service = music_queue_service.QueueService(
+        queue, player=music_queue_service.console_player(console_base))
+    httpd = music_queue_service.ThreadingHTTPServer(
+        ("127.0.0.1", 0), music_queue_service._handler_for(service))
+    httpd.queue_service = service
+    Thread(target=httpd.serve_forever, daemon=True).start()
+    return service, httpd, f"http://127.0.0.1:{httpd.server_address[1]}"
+
+
+def _speaker_runtime():
+    """A provider that resolves whichever id it is asked to play."""
+    def answer(matched):
+        arguments = matched["arguments"]
+        if arguments.get("action") != "play":
+            return {"ok": True, "action": "queue"}
+        position = {"v0000": 0, "v0001": 1, "v0002": 2}.get(arguments["video_id"], 0)
+        return queue_result([queue_track(arguments["video_id"], f"Song {position}")],
+                            index=0, message="",
+                            play_url=f"http://speaker/stream?{arguments['video_id']}")
+
+    return FakeRuntime(results={"opendeck_music": answer}, player=idle_player())
+
+
+def _idle_finished(video_id: str, title: str):
+    return dict(finished_queue_state(
+        track={"video_id": video_id, "title": title, "artist": "Artist", "duration_sec": 200},
+        queue_index=0))
+
+
+def _plays(runtime):
+    return [item["arguments"] for item in runtime.calls if item["arguments"].get("action") == "play"]
+
+
+def test_the_console_starts_only_the_track_the_queue_chose(music_env, monkeypatch):
+    runtime = _speaker_runtime()
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    try:
+        status, payload, _headers = read_json(server, "/internal/music/queue/play", {
+            "video_id": "v0001", "index": 1, "reason": "select"})
+    finally:
+        server.shutdown()
+    assert status == 200 and payload["ok"] is True
+    assert _plays(runtime) == [{"action": "play", "video_id": "v0001"}]
+    saved = music_api._read_music_state()
+    # Still a queue track: the service counts this index when the track ends.
+    assert saved["queue_active"] is True and saved["queue_index"] == 1
+
+
+def test_every_device_polling_one_finished_track_advances_it_once(music_env, monkeypatch, tmp_path):
+    runtime = _speaker_runtime()
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    service, httpd, address = _wired_queue_service(
+        tmp_path, f"http://127.0.0.1:{server.server_address[1]}")
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", address)
+    monkeypatch.setattr(music_api, "_queue_limits", {"at": 0.0, "skill_id": "", "values": None})
+    try:
+        read_json(server, "/api/music/queue", {"action": "add_many",
+                                               "tracks": playlist_tracks(3)})
+        _status, selected, _h = read_json(server, "/api/music/queue",
+                                          {"action": "play", "index": 0})
+        assert selected["track"]["title"] == "Song 0"
+        # The service executed through the console, so the console did not hand
+        # the same track over a second time.
+        assert _plays(runtime) == [{"action": "play", "video_id": "v0000"}]
+        assert music_api._read_music_state()["queue_index"] == 0
+
+        # The first song runs out. Three devices ask now-playing, each one
+        # reporting the same finished track to the same queue.
+        for _ in range(3):
+            write_state(**_idle_finished("v0000", "Song 0"))
+            read_json(server, "/api/music/now-playing")
+
+        assert [call["video_id"] for call in _plays(runtime)] == ["v0000", "v0001"]
+        assert service.queue.state().index == 0
+        assert service.queue.total() == 2, "the finished track left the line-up once"
+        assert music_api._read_music_state()["queue_index"] == 0
+    finally:
+        httpd.shutdown()
+        server.shutdown()
+
+
+def test_a_device_playing_its_own_song_does_not_move_the_queue(music_env, monkeypatch, tmp_path):
+    runtime = _speaker_runtime()
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    service, httpd, address = _wired_queue_service(
+        tmp_path, f"http://127.0.0.1:{server.server_address[1]}")
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", address)
+    monkeypatch.setattr(music_api, "_queue_limits", {"at": 0.0, "skill_id": "", "values": None})
+    try:
+        read_json(server, "/api/music/queue", {"action": "add_many",
+                                               "tracks": playlist_tracks(3)})
+        read_json(server, "/api/music/queue", {"action": "play", "index": 0})
+        # Somebody searches and plays something else: the speaker is now on a
+        # track the queue never chose, and its ending says nothing about the
+        # line-up.
+        write_state(**dict(finished_queue_state(
+            track={"video_id": "searched", "title": "Elsewhere", "duration_sec": 200},
+            queue_active=False, queue_index=None)))
+        read_json(server, "/api/music/now-playing")
+    finally:
+        httpd.shutdown()
+        server.shutdown()
+    assert [call["video_id"] for call in _plays(runtime)] == ["v0000"]
+    assert service.queue.total() == 3
+
+
+def test_a_failed_hand_off_does_not_turn_the_poll_into_an_error(music_env, monkeypatch, tmp_path):
+    """The speaker is further along than this end could follow; say so, don't 500.
+
+    A queue service without its own player asks the console to hand the chosen
+    track over. When that hand-off fails (the provider cannot resolve a stream,
+    the worker is down), the poll still answers with the now-playing payload:
+    an error reply would blank the page's music card for a reason that has
+    nothing to do with the page.
+    """
+    runtime = FakeRuntime(results={"opendeck_music": lambda matched: (
+        (_ for _ in ()).throw(RuntimeError("the speaker is not answering"))
+        if matched["arguments"].get("action") == "play" else {"ok": True, "action": "queue"})},
+        player=idle_player())
+    install(monkeypatch, music_env, [PROVIDER_MANIFEST, player_manifest()], runtime)
+    server = serve()
+    service, httpd, address = _wired_queue_service(
+        tmp_path, f"http://127.0.0.1:{server.server_address[1]}")
+    # No player on the service: this end performs the hand-off it asks for.
+    service.player = None
+    monkeypatch.setattr(music_api, "QUEUE_SERVICE_URL", address)
+    monkeypatch.setattr(music_api, "_queue_limits", {"at": 0.0, "skill_id": "", "values": None})
+    try:
+        read_json(server, "/api/music/queue", {"action": "add_many",
+                                               "tracks": playlist_tracks(3)})
+        service.queue.set_index(0)
+        write_state(**_idle_finished("v0000", "Song 0"))
+        status, payload, _h = read_json(server, "/api/music/now-playing")
+    finally:
+        httpd.shutdown()
+        server.shutdown()
+    assert status == 200, payload
+    assert payload["ok"] is True
+    # The line-up still moved on: the ending happened, and the next report will
+    # try the hand-off again.
+    assert service.queue.total() == 2

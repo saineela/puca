@@ -25,6 +25,21 @@ class KnowledgeRecord:
     created_at: datetime
     updated_at: datetime
 
+    # D1 provenance: id of the record that replaced this one, for a
+    # supersede chain. None for live records and for pre-D1 rows.
+    superseded_by: int | None = None
+
+    @property
+    def provenance(self) -> dict[str, Any]:
+        """Where the record came from. Not a trust signal."""
+        return {
+            "source": self.source,
+            "source_id": self.source_id,
+            "superseded_by": self.superseded_by,
+            "valid_from": self.valid_from.isoformat() if self.valid_from else None,
+            "valid_until": self.valid_until.isoformat() if self.valid_until else None,
+        }
+
 
 @dataclass(frozen=True)
 class KnowledgeChange:
